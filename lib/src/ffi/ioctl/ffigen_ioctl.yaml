@@ -1,0 +1,27 @@
+name: Ioctl
+description: FFI bindings for ioctl system calls
+output: "ioctl.ffi.dart"
+exclude-all-by-default: true
+language: c
+headers:
+  entry-points:
+    - "/usr/include/sys/ioctl.h"
+    - "/usr/include/linux/usb/functionfs.h"
+    - "/usr/include/aarch64-linux-gnu/sys/ioctl.h"
+    - "/usr/include/x86_64-linux-gnu/sys/ioctl.h"
+
+functions:
+  include:
+    - "ioctl"
+
+macros:
+  include:
+    - "FUNCTIONFS_.*"
+
+enums:
+  include:
+    - "FUNCTIONFS_.*"
+
+comments:
+  style: any
+  length: full

@@ -1,0 +1,26 @@
+name: Unistd
+description: FFI bindings for unistd system calls (open, close, read, write)
+output: "unistd.ffi.dart"
+exclude-all-by-default: true
+language: c
+headers:
+  entry-points:
+    - "/usr/include/fcntl.h"
+    - "/usr/include/unistd.h"
+
+functions:
+  include:
+    - "open"
+    - "close"
+    - "read"
+    - "write"
+    - "fcntl"
+
+macros:
+  include:
+    - "O_.*"
+    - "F_.*"
+
+comments:
+  style: any
+  length: full

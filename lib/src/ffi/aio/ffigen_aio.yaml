@@ -1,0 +1,23 @@
+name: Aio
+description: FFI bindings for aio system calls
+output: "aio.ffi.dart"
+exclude-all-by-default: true
+language: c
+headers:
+  entry-points:
+    - '/usr/include/libaio.h'
+    - '/usr/include/linux/aio_abi.h'
+
+functions:
+  include:
+    - 'io_setup'
+    - 'io_destroy'
+    - 'io_submit'
+    - 'io_getevents'
+    - 'io_cancel'
+    - 'io_prep_.*'
+
+structs:
+  include:
+    - 'iocb'
+    - 'io_event'

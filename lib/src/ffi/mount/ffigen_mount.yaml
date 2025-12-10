@@ -1,0 +1,26 @@
+name: Mount
+description: FFI bindings for mount system calls
+output: "mount.ffi.dart"
+exclude-all-by-default: true
+language: c
+headers:
+  entry-points:
+    - "/usr/include/sys/mount.h"
+    - "/usr/include/aarch64-linux-gnu/sys/mount.h"
+    - "/usr/include/x86_64-linux-gnu/sys/mount.h"
+
+functions:
+  include:
+    - "mount"
+    - "umount"
+    - "umount2"
+
+macros:
+  include:
+    - "MS_.*"
+    - "MNT_.*"
+    - "UMOUNT_.*"
+
+comments:
+  style: any
+  length: full

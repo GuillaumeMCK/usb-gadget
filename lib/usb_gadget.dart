@@ -1,0 +1,9 @@
+export 'src/core/ch9.dart';
+export 'src/core/descriptors.dart';
+export 'src/core/endpoint.dart';
+export 'src/core/events.dart';
+export 'src/core/hid.dart';
+export 'src/functions/function_fs.dart';
+export 'src/functions/hid_function_fs.dart';
+export 'src/functions/kernel_function.dart';
+export 'src/gadget.dart';
