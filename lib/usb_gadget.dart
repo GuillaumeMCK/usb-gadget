@@ -1,9 +1,7 @@
-export 'src/core/ch9.dart';
-export 'src/core/descriptors.dart';
-export 'src/core/endpoint.dart';
-export 'src/core/events.dart';
-export 'src/core/hid.dart';
-export 'src/functions/function_fs.dart';
-export 'src/functions/hid_function_fs.dart';
-export 'src/functions/kernel_function.dart';
-export 'src/gadget.dart';
+export 'src/usb/usb.dart';
+export 'src/functionfs/functionfs.dart';
+export 'src/gadget/gadget.dart';
+export 'src/functions/functions.dart';
+export 'src/platform/platform.dart';
+export 'src/utils/utils.dart';
+export 'src/logger/logger.dart';
