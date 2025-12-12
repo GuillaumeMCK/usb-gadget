@@ -3,6 +3,58 @@ import 'dart:io';
 
 import '/usb_gadget.dart';
 
+/// USB Device Controller (UDC) states.
+///
+/// Represents the lifecycle states of a USB device as reported by the
+/// Linux USB Gadget framework through sysfs (`/sys/class/udc/{udc}/state`).
+///
+/// Common lifecycle:
+/// - [notAttached]: No USB cable connected.
+/// - [attached]: USB cable connected, but not enumerated.
+/// - [powered]: Host is providing power.
+/// - [default_]: Device is being enumerated (handshake phase).
+/// - [addressed]: Device has been assigned a USB address.
+/// - [configured]: Device is fully configured and ready for data transfer.
+/// - [suspended]: Device has been suspended by the host to save power.
+enum USBDeviceState {
+  /// No USB cable connected to the device.
+  notAttached('not-attached'),
+
+  /// USB cable is connected but device has not been enumerated by the host.
+  attached('attached'),
+
+  /// Host is providing power to the device.
+  powered('powered'),
+
+  /// Device is being enumerated by the host (initial handshake phase).
+  default_('default'),
+
+  /// Device has been assigned a USB address by the host.
+  addressed('addressed'),
+
+  /// Device is fully configured and ready for data transfer.
+  /// This is the state you typically wait for before sending/receiving data.
+  configured('configured'),
+
+  /// Device has been suspended by the host to save power.
+  suspended('suspended');
+
+  const USBDeviceState(this.value);
+
+  /// The string value as it appears in the UDC state file.
+  final String value;
+
+  /// Parses a string value into a [USBDeviceState].
+  /// If the string does not match any state, returns [defaultValue].
+  static USBDeviceState fromString(
+    String state, {
+    USBDeviceState defaultValue = .notAttached,
+  }) => USBDeviceState.values.firstWhere(
+    (e) => e.value == state,
+    orElse: () => defaultValue,
+  );
+}
+
 /// Creates and manages a USB gadget with the specified configuration.
 ///
 /// A Gadget represents a complete USB device that can be bound to a USB Device
@@ -193,7 +245,7 @@ class Gadget with USBGadgetLogger {
 
     log?.debug('Starting bind process');
     final targetUdc = udc ?? _findUdc();
-    log?.debug('Target UDC: $targetUdc');
+    log?.debug('Using UDC: $targetUdc');
 
     try {
       _createGadget();
@@ -208,6 +260,179 @@ class Gadget with USBGadgetLogger {
     }
   }
 
+  /// Unbinds the gadget from the UDC and cleans up resources.
+  ///
+  /// This method safely tears down the gadget in reverse order:
+  /// 1. Unbind from UDC (deactivate hardware)
+  /// 2. Dispose all functions (close files, unmount filesystems)
+  /// 3. Remove symlinks (configuration links)
+  /// 4. Remove directories (functions, configs, gadget)
+  ///
+  /// If the gadget is not bound, this is a no-op. This method never throws;
+  /// errors are logged as warnings.
+  ///
+  /// Example:
+  /// ```dart
+  /// gadget.unbind();  // Safe to call even if not bound
+  /// ```
+  void unbind() {
+    if (_boundUdc != null) {
+      log?.debug('Unbinding from UDC: $_boundUdc');
+      try {
+        _writeAttr('$_gadgetPath/UDC', '');
+      } catch (err) {
+        log?.warn('Failed to unbind from UDC: $err');
+      }
+      _boundUdc = null;
+    }
+
+    for (final function in config.functions) {
+      try {
+        function.dispose();
+        log?.debug('Disposed function: ${function.name}');
+      } catch (err) {
+        log?.warn('Failed to dispose function ${function.name}: $err');
+      }
+    }
+
+    for (final link in _createdSymlinks.reversed) {
+      try {
+        Link(link).deleteSync();
+      } catch (err) {
+        log?.warn('Failed to remove symlink $link: $err');
+      }
+    }
+    _createdSymlinks.clear();
+
+    for (final dir in _createdDirs.reversed) {
+      try {
+        Directory(dir).deleteSync();
+      } catch (err) {
+        log?.warn('Failed to remove directory $dir: $err');
+      }
+    }
+    _createdDirs.clear();
+  }
+
+  /// Waits for the USB device to reach the specified state.
+  ///
+  /// This method monitors the UDC (USB Device Controller) state file to
+  /// determine when the device has reached the target state. This is useful
+  /// for knowing when the host has fully enumerated and configured the device
+  /// before starting data transfers.
+  ///
+  /// Parameters:
+  /// - [targetState]: The USB state to wait for (typically [USBDeviceState.configured])
+  /// - [pollInterval]: How often to check the state (default: 100ms)
+  /// - [timeout]: Maximum time to wait (default: 5 seconds)
+  ///
+  /// Returns a Future that completes when the target state is reached.
+  ///
+  /// Throws:
+  /// - [StateError] if the gadget is not bound to a UDC or state file doesn't exist
+  /// - [TimeoutException] if the target state is not reached within the timeout
+  ///
+  /// Example:
+  /// ```dart
+  /// await gadget.bind();
+  /// await gadget.waitForState(USBDeviceState.configured);
+  /// // Device is now ready to send/receive data
+  /// ```
+  Future<void> waitForState(
+    USBDeviceState targetState, {
+    Duration pollInterval = const Duration(milliseconds: 100),
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
+    if (_boundUdc == null) {
+      throw StateError('Gadget is not bound to any UDC');
+    }
+
+    final statePath = '/sys/class/udc/$_boundUdc/state';
+    final stateFile = File(statePath);
+
+    if (!stateFile.existsSync()) {
+      throw StateError('UDC state file not found: $statePath');
+    }
+
+    final startTime = DateTime.now();
+
+    while (true) {
+      if (DateTime.now().difference(startTime) > timeout) {
+        final currentState = getCurrentUsbState();
+        throw TimeoutException(
+          'Timeout waiting for USB state "${targetState.value}". '
+          'Current state: ${currentState.value}',
+          timeout,
+        );
+      }
+
+      // Read current state
+      final stateStr = stateFile.readAsStringSync().trim();
+      final state = USBDeviceState.fromString(stateStr);
+
+      if (state == targetState) {
+        return;
+      }
+
+      // Wait before next poll
+      await Future<void>.delayed(pollInterval);
+    }
+  }
+
+  /// Gets the current USB device state.
+  ///
+  /// Returns the current state or null if the gadget is not bound or
+  /// the state cannot be determined.
+  USBDeviceState getCurrentUsbState() {
+    if (_boundUdc == null) return .notAttached;
+
+    final statePath = '/sys/class/udc/$_boundUdc/state';
+    final stateFile = File(statePath);
+
+    if (!stateFile.existsSync()) return .notAttached;
+
+    final stateStr = stateFile.readAsStringSync().trim();
+    return USBDeviceState.fromString(stateStr);
+  }
+
+  /// Stream of USB device state changes.
+  ///
+  /// Monitors the UDC state file and emits new states as they change.
+  /// The stream completes when the gadget is unbound.
+  ///
+  /// Parameters:
+  /// - [pollInterval]: How often to check for state changes (default: 100ms)
+  ///
+  /// Example:
+  /// ```dart
+  /// gadget.stateStream().listen((state) {
+  ///   print('USB state changed to: ${state.value}');
+  ///   if (state.isConfigured) {
+  ///     // Ready to transfer data
+  ///   }
+  /// });
+  /// ```
+  Stream<USBDeviceState> stateStream({
+    Duration pollInterval = const Duration(milliseconds: 100),
+  }) async* {
+    if (_boundUdc == null) {
+      throw StateError('Gadget is not bound to any UDC');
+    }
+
+    USBDeviceState? lastState;
+
+    while (_boundUdc != null) {
+      final currentState = getCurrentUsbState();
+
+      if (currentState != lastState) {
+        lastState = currentState;
+        yield currentState;
+      }
+
+      await Future<void>.delayed(pollInterval);
+    }
+  }
+
   /// Waits for all functions to reach the specified state.
   ///
   /// This ensures synchronized initialization - no function is left behind.
@@ -215,7 +440,6 @@ class Gadget with USBGadgetLogger {
     await [
       for (final function in config.functions) function.waitState(state),
     ].wait;
-    log?.info('All functions are in state: $state');
   }
 
   /// Creates the complete configfs gadget structure.
@@ -303,60 +527,6 @@ class Gadget with USBGadgetLogger {
       // Link function to configuration (after preparation)
       _symlink(functionPath, '$configPath/${function.configfsName}');
     }
-  }
-
-  /// Unbinds the gadget from the UDC and cleans up resources.
-  ///
-  /// This method safely tears down the gadget in reverse order:
-  /// 1. Unbind from UDC (deactivate hardware)
-  /// 2. Dispose all functions (close files, unmount filesystems)
-  /// 3. Remove symlinks (configuration links)
-  /// 4. Remove directories (functions, configs, gadget)
-  ///
-  /// If the gadget is not bound, this is a no-op. This method never throws;
-  /// errors are logged as warnings.
-  ///
-  /// Example:
-  /// ```dart
-  /// gadget.unbind();  // Safe to call even if not bound
-  /// ```
-  void unbind() {
-    if (_boundUdc != null) {
-      log?.debug('Unbinding from UDC: $_boundUdc');
-      try {
-        _writeAttr('$_gadgetPath/UDC', '');
-      } catch (err) {
-        log?.warn('Failed to unbind from UDC: $err');
-      }
-      _boundUdc = null;
-    }
-
-    for (final function in config.functions) {
-      try {
-        function.dispose();
-        log?.debug('Disposed function: ${function.name}');
-      } catch (err) {
-        log?.warn('Failed to dispose function ${function.name}: $err');
-      }
-    }
-
-    for (final link in _createdSymlinks.reversed) {
-      try {
-        Link(link).deleteSync();
-      } catch (err) {
-        log?.warn('Failed to remove symlink $link: $err');
-      }
-    }
-    _createdSymlinks.clear();
-
-    for (final dir in _createdDirs.reversed) {
-      try {
-        Directory(dir).deleteSync();
-      } catch (err) {
-        log?.warn('Failed to remove directory $dir: $err');
-      }
-    }
-    _createdDirs.clear();
   }
 
   /// Binds the gadget to the specified UDC.

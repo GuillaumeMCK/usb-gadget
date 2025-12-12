@@ -105,18 +105,15 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
   /// Mount point for FunctionFs
   String get mountPoint => _mountPoint;
 
-  /// Future that completes when the function is ready for UDC binding.
-  @override
-  Future<void> waitState(FunctionFsState state) {
-    if (state == this.state) return Future.value();
-    if (state == FunctionFsState.disposed) {
-      throw StateError('Cannot wait for disposed state');
-    }
-    return _stateController.stream.where((s) => s == state).first;
-  }
-
+  /// Configfs name for the function
   @override
   String get configfsName => 'ffs.$name';
+
+  /// Waits until the function reaches the specified state.
+  @override
+  Future<void> waitState(FunctionFsState state) => state != _state
+      ? _stateController.stream.where((s) => s == state).first
+      : .value();
 
   @override
   Future<void> prepare(String path) async {
