@@ -420,20 +420,16 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   // Override hooks for subclasses
 
   /// Called when the host requests a report via GET_REPORT.
-  @mustBeOverridden
   Uint8List? onGetReport(HIDReportType type, int reportId) {
     return null;
   }
 
   /// Called when the host sends a report via SET_REPORT.
-  @mustBeOverridden
   void onSetReport(HIDReportType type, int reportId, Uint8List data) {}
 
   /// Called when the host changes the idle rate via SET_IDLE.
-  @mustBeOverridden
   void onSetIdle(int reportId, int duration) {}
 
   /// Called when the host changes the protocol via SET_PROTOCOL.
-  @mustBeOverridden
   void onSetProtocol(HIDProtocol protocol) {}
 }
