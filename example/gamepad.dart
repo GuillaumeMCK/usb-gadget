@@ -199,15 +199,15 @@ class SimpleGamepad extends HIDFunctionFs {
     : super(
         name: 'gamepad',
         reportDescriptor: _descriptor,
-        subclass: HIDSubclass.none,
-        protocol: HIDProtocol.none,
+        subclass: .none,
+        protocol: .none,
         endpointConfig: const .inputOnly(
           maxPacketSize: 14,
           pollingIntervalMs: 8,
         ),
-        speeds: {USBSpeed.fullSpeed, USBSpeed.highSpeed},
+        speeds: {.fullSpeed, .highSpeed},
         strings: {
-          USBLanguageId.enUS: ['Simple Gamepad'],
+          .enUS: ['Simple Gamepad'],
         },
       );
 
@@ -278,7 +278,7 @@ Future<void> main() async {
     idProduct: 0x5678,
     deviceClass: .composite,
     strings: const {
-      .enUS: GadgetStrings(
+      .enUS: .new(
         manufacturer: 'Custom',
         product: 'Simple Gamepad',
         serialnumber: 'GAMEPAD001',
