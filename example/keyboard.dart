@@ -59,7 +59,7 @@ Future<void> main() async {
     deviceSubClass: .none,
     deviceProtocol: .none,
     strings: {
-      .enUS: const GadgetStrings(
+      .enUS: const .new(
         manufacturer: 'ACME Corp',
         product: 'USB Keyboard',
         serialnumber: 'KB001',

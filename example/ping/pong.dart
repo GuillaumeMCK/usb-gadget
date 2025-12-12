@@ -59,7 +59,7 @@ Future<void> main() async {
     idVendor: 0x1d6b,
     idProduct: 0x0104,
     strings: {
-      .enUS: const GadgetStrings(
+      .enUS: const .new(
         manufacturer: 'Dart USB',
         product: 'Pong Device',
         serialnumber: '123456',

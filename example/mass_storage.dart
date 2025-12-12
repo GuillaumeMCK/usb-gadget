@@ -39,7 +39,7 @@ Future<void> main(List<String> args) async {
     deviceProtocol: .none,
     udc: udc,
     strings: {
-      .enUS: const GadgetStrings(
+      .enUS: const .new(
         manufacturer: 'Evil Corp',
         product: 'USB Mass Storage Gadget',
         serialnumber: 'MSD123456',
