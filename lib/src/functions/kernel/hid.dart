@@ -7,14 +7,14 @@ import 'base.dart';
 class HIDFunction extends KernelFunction {
   HIDFunction({
     required super.name,
-    required this.reportDescriptor,
+    required this.descriptor,
     this.protocol = HIDProtocol.none,
     this.subclass = HIDSubclass.none,
     this.reportLength = 64,
   }) : super(kernelType: .hid);
 
   /// HID report descriptor (defines device type and data format)
-  final List<int> reportDescriptor;
+  final List<int> descriptor;
 
   /// HID protocol (0=none, 1=keyboard, 2=mouse)
   final HIDProtocol protocol;
@@ -25,9 +25,22 @@ class HIDFunction extends KernelFunction {
   /// Maximum report length in bytes
   final int reportLength;
 
+  /// HID device file handle (use RandomAccessFile for synchronous writes)
+  RandomAccessFile? _file;
+
+  /// Gets the HID device file handle for writing reports.
+  /// Lazily opens the file on first access.
+  RandomAccessFile get file {
+    final currentFile = _file;
+    if (currentFile != null) {
+      return currentFile;
+    }
+    return _file ??= File(_getHIDDevice()).openSync(mode: .writeOnlyAppend);
+  }
+
   @override
   bool validate() {
-    if (reportDescriptor.isEmpty) {
+    if (descriptor.isEmpty) {
       return false;
     }
     if (reportLength <= 0 || reportLength > 1024) {
@@ -61,23 +74,21 @@ class HIDFunction extends KernelFunction {
   }
 
   /// Gets the HID device path (e.g., /dev/hidg0).
-  String? getHIDDevice() {
-    if (!isPrepared) return null;
-    try {
-      final devAttr = tryReadAttribute('dev');
-      if (devAttr != null) {
-        final parts = devAttr.split(':');
-        final devNum = int.tryParse(parts.isEmpty ? devAttr : parts.last);
-        if (devNum != null) {
-          return '/dev/hidg$devNum';
-        }
-      }
-      if (File('/dev/hidg0').existsSync()) {
-        return '/dev/hidg0';
-      }
-      return null;
-    } catch (_) {
-      return null;
+  String _getHIDDevice() {
+    if (!prepared) {
+      throw StateError('HID function not prepared');
     }
+    final devAttr = readAttribute('dev');
+    if (devAttr != null) {
+      final parts = devAttr.split(':');
+      final devNum = int.tryParse(parts.isEmpty ? devAttr : parts.last);
+      if (devNum != null) {
+        return '/dev/hidg$devNum';
+      }
+    }
+    if (File('/dev/hidg0').existsSync()) {
+      return '/dev/hidg0';
+    }
+    throw StateError('No HID device found');
   }
 }
