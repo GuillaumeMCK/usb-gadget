@@ -29,7 +29,8 @@ class MassStorageFunction extends KernelFunction {
   Map<String, String> getConfigAttributes() => {'stall': stall ? '1' : '0'};
 
   @override
-  void onPrepare() {
+  Future<void> prepare(String path) async {
+    await super.prepare(path);
     for (var i = 0; i < luns.length; i++) {
       final lun = luns[i];
       final lunPath = '$functionPath/lun.$i';
@@ -69,7 +70,7 @@ class MassStorageFunction extends KernelFunction {
 
   /// Updates the backing file for a specific LUN.
   void updateLunFile(int lunIndex, String? filePath) {
-    if (!isPrepared) {
+    if (!prepared) {
       log?.error('Function not prepared');
       throw StateError('Function not prepared yet');
     }
@@ -83,7 +84,7 @@ class MassStorageFunction extends KernelFunction {
 
   /// Forces ejection of a LUN (simulates media removal).
   void ejectLun(int lunIndex) {
-    if (!isPrepared) {
+    if (!prepared) {
       throw StateError('Function not prepared yet');
     }
     if (lunIndex >= luns.length) {
@@ -95,7 +96,7 @@ class MassStorageFunction extends KernelFunction {
 
   /// Gets the current file path for a LUN.
   String? getLunFile(int lunIndex) {
-    if (!isPrepared || lunIndex >= luns.length) {
+    if (!prepared || lunIndex >= luns.length) {
       return null;
     }
     try {

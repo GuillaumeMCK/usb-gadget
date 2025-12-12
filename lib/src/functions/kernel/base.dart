@@ -74,12 +74,13 @@ abstract class KernelFunction extends GadgetFunction with USBGadgetLogger {
   final KernelFunctionType kernelType;
 
   /// The function path in configfs
-  late String _functionPath;
+  String? _functionPath;
 
-  String get functionPath => _functionPath;
+  /// The function path in configfs (non-null after preparation)
+  String get functionPath => _functionPath!;
 
   /// Whether the function has been prepared
-  bool _prepared = false;
+  bool get prepared => _functionPath != null;
 
   @override
   String get configfsName => '${kernelType._configfsName}.$name';
@@ -94,18 +95,19 @@ abstract class KernelFunction extends GadgetFunction with USBGadgetLogger {
 
   @override
   Future<void> prepare(String path) async {
-    if (_prepared) {
+    if (prepared) {
       throw StateError('Function already prepared');
     }
+    _functionPath = path;
     if (!validate()) {
       throw StateError('Function configuration validation failed');
     }
-    _functionPath = path;
     log?.info('Preparing kernel function: $path');
-    final functionDir = Directory(_functionPath);
+    final functionDir = Directory(functionPath);
     if (!functionDir.existsSync()) {
       throw FileSystemException(
-        'Function directory does not exist. Kernel module for ${kernelType._configfsName} may not be loaded.',
+        'Function directory does not exist. Kernel module for '
+        '${kernelType._configfsName} may not be loaded.',
         _functionPath,
       );
     }
@@ -113,29 +115,27 @@ abstract class KernelFunction extends GadgetFunction with USBGadgetLogger {
     if (attributes.isNotEmpty) {
       log?.debug('Writing ${attributes.length} attributes...');
       for (final entry in attributes.entries) {
-        _writeAttribute(entry.key, entry.value);
+        writeAttribute(entry.key, entry.value);
       }
     }
-    onPrepare();
-    _prepared = true;
-    log?.info('Kernel function prepared');
   }
 
+  /// Only for FunctionFs-based functions; not needed for kernel functions.
+  /// Returns immediately.
   @override
-  Future<void> waitState(FunctionFsState state) => Future.value();
+  Future<void> waitState(_) => .value();
 
   @override
   @mustCallSuper
   Future<void> dispose() async {
-    if (!_prepared) return;
+    if (!prepared) return;
     log?.info('Disposing kernel function');
-    onDispose();
-    _prepared = false;
+    _functionPath = null;
   }
 
   /// Writes a single attribute to the function directory.
-  void _writeAttribute(String name, String value) {
-    final attrPath = '$_functionPath/$name';
+  void writeAttribute(String name, String value, {String? path}) {
+    final attrPath = '${path ?? functionPath}/$name';
     log?.debug('Setting attribute: $name=$value');
     try {
       File(attrPath).writeAsStringSync(value);
@@ -149,45 +149,13 @@ abstract class KernelFunction extends GadgetFunction with USBGadgetLogger {
   }
 
   /// Reads an attribute from the function directory.
-  @protected
-  String readAttribute(String name) {
-    final attrPath = '$_functionPath/$name';
+  String? readAttribute(String name, {String? path}) {
+    final attrPath = '${path ?? functionPath}/$name';
     try {
       return File(attrPath).readAsStringSync().trim();
     } on FileSystemException catch (e) {
       log?.error('Failed to read attribute: $name (${e.message})');
-      throw FileSystemException(
-        'Failed to read attribute "$name": ${e.message}',
-        attrPath,
-        e.osError,
-      );
     }
+    return null;
   }
-
-  /// Safely reads an attribute, returning null if it doesn't exist.
-  @protected
-  String? tryReadAttribute(String name) {
-    try {
-      return readAttribute(name);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// Updates an attribute value after initial configuration.
-  @protected
-  void updateAttribute(String name, String value) {
-    _writeAttribute(name, value);
-  }
-
-  /// Whether the function is prepared
-  bool get isPrepared => _prepared;
-
-  /// Called after attributes are written during prepare().
-  @protected
-  void onPrepare() {}
-
-  /// Called during dispose().
-  @protected
-  void onDispose() {}
 }

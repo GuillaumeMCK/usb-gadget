@@ -44,12 +44,20 @@ class HIDFunction extends KernelFunction {
   };
 
   @override
-  void onPrepare() {
-    final reportDescPath = '$functionPath/report_desc';
-    log?.info(
-      'Writing HID report descriptor (${reportDescriptor.length} bytes)',
-    );
-    File(reportDescPath).writeAsBytesSync(reportDescriptor);
+  Future<void> prepare(String path) async {
+    log?.info('Writing HID report descriptor (${descriptor.length} bytes)');
+    File(
+      '$path/report_desc',
+    ).writeAsBytesSync(descriptor, mode: .writeOnlyAppend);
+    await super.prepare(path);
+  }
+
+  @override
+  Future<void> dispose() async {
+    log?.info('Closing HID device');
+    await _file?.close();
+    _file = null;
+    await super.dispose();
   }
 
   /// Gets the HID device path (e.g., /dev/hidg0).

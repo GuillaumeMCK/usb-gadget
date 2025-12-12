@@ -44,26 +44,20 @@ abstract class EthernetFunction extends KernelFunction {
   }
 
   /// Gets the network interface name (e.g., "usb0").
-  String? getInterfaceName() {
-    return tryReadAttribute('ifname');
-  }
+  String? getInterfaceName() => readAttribute('ifname');
 
   /// Gets the current host MAC address.
-  String? getHostAddr() {
-    return tryReadAttribute('host_addr');
-  }
+  String? getHostAddr() => readAttribute('host_addr');
 
   /// Gets the current device MAC address.
-  String? getDevAddr() {
-    return tryReadAttribute('dev_addr');
-  }
+  String? getDevAddr() => readAttribute('dev_addr');
 
   /// Updates the host MAC address.
   void setHostAddr(String addr) {
     if (!isValidMacAddress(addr)) {
       throw ArgumentError('Invalid MAC address: $addr');
     }
-    updateAttribute('host_addr', addr);
+    writeAttribute('host_addr', addr);
   }
 
   /// Updates the device MAC address.
@@ -71,7 +65,7 @@ abstract class EthernetFunction extends KernelFunction {
     if (!isValidMacAddress(addr)) {
       throw ArgumentError('Invalid MAC address: $addr');
     }
-    updateAttribute('dev_addr', addr);
+    writeAttribute('dev_addr', addr);
   }
 }
 

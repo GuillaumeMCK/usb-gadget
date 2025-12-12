@@ -9,7 +9,7 @@ class AcmFunction extends KernelFunction {
 
   /// Gets the TTY device path on the device side (e.g., /dev/ttyGS0).
   String? getTtyDevice() {
-    if (!isPrepared) return null;
+    if (!prepared) return null;
     try {
       final portNum = readAttribute('port_num');
       return '/dev/ttyGS$portNum';
@@ -28,7 +28,7 @@ class GenericSerialFunction extends KernelFunction {
 
   /// Gets the TTY device path on the device side.
   String? getTtyDevice() {
-    if (!isPrepared) return null;
+    if (!prepared) return null;
     try {
       final portNum = readAttribute('port_num');
       return '/dev/ttyGS$portNum';
