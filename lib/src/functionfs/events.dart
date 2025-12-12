@@ -1,9 +1,3 @@
-/// FunctionFs event definitions and handling.
-///
-/// Events are delivered on the ep0 file descriptor after the descriptors
-/// have been written. These events signal state changes in the USB function.
-library;
-
 import 'dart:typed_data';
 import '/usb_gadget.dart';
 

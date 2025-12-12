@@ -1,8 +1,3 @@
-/// ioctl system call wrapper
-///
-/// Provides safe, type-safe wrappers for device control operations.
-library;
-
 import 'dart:ffi' as ffi;
 import 'dart:io' show OSError;
 

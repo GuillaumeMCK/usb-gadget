@@ -1,7 +1,7 @@
-export 'base.dart';
-export 'mass_storage.dart';
-export 'serial.dart';
-export 'network.dart';
-export 'hid.dart';
 export 'audio.dart';
+export 'base.dart';
+export 'hid.dart';
+export 'mass_storage.dart';
 export 'misc.dart';
+export 'network.dart';
+export 'serial.dart';

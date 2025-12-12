@@ -1,9 +1,3 @@
-/// Linux mount system calls wrapper
-///
-/// Provides safe, idiomatic Dart interfaces for filesystem mounting
-/// and unmounting operations.
-library;
-
 import 'dart:ffi' as ffi;
 import 'dart:io';
 

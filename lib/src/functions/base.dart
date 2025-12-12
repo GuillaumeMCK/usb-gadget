@@ -1,3 +1,7 @@
+import 'dart:async' show TimeoutException;
+
+import 'dart:io' show FileSystemException;
+
 import '/usb_gadget.dart';
 
 /// Core abstraction for all USB gadget functions.

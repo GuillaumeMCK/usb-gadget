@@ -1,10 +1,3 @@
-/// Linux AIO (Asynchronous I/O) library for Dart
-///
-/// This library provides efficient async I/O operations using Linux's native
-/// AIO (libaio) through FFI. Operations run in dedicated isolates to prevent
-/// blocking the main thread.
-library;
-
 import 'dart:ffi' as ffi;
 import 'dart:io' show OSError;
 
@@ -12,6 +5,8 @@ import 'package:ffi/ffi.dart';
 
 import '../errno/errno.dart';
 import 'aio.ffi.dart' as aio_ffi;
+import 'aio_reader.dart';
+import 'aio_writer.dart';
 
 export 'aio_messages.dart';
 export 'aio_reader.dart' show AioReader;

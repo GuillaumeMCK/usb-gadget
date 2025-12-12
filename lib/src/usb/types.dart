@@ -1,15 +1,3 @@
-/// Type-safe USB descriptor field classes
-///
-/// Provides compile-time safety and validation for USB descriptor fields
-/// as defined in USB 2.0/3.0 specifications, Chapter 9.
-///
-/// These classes ensure that descriptor values are valid at construction time
-/// and provide type-safe interfaces for building USB descriptors. Each class
-/// validates its values according to USB specification requirements.
-library;
-
-import 'dart:typed_data';
-
 import '/usb_gadget.dart';
 
 /// Endpoint number (0-15).
@@ -1376,7 +1364,7 @@ enum USBRequestType {
   static USBRequestType fromByte(int byte) {
     final masked = byte & mask;
     return USBRequestType.values.firstWhere(
-          (t) => t.value == masked,
+      (t) => t.value == masked,
       orElse: () => reserved,
     );
   }
@@ -1408,7 +1396,7 @@ enum USBRecipient {
   static USBRecipient fromByte(int byte) {
     final masked = byte & mask;
     return USBRecipient.values.firstWhere(
-          (r) => r.value == masked,
+      (r) => r.value == masked,
       orElse: () => other,
     );
   }
@@ -1483,5 +1471,3 @@ enum USBFeature {
   /// Raw feature value.
   final int value;
 }
-
-

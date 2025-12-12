@@ -1,9 +1,3 @@
-/// POSIX unistd system calls wrapper
-///
-/// Provides safe, idiomatic Dart interfaces for common file operations
-/// like open, close, read, and write.
-library;
-
 import 'dart:ffi' as ffi;
 import 'dart:io' show OSError;
 import 'dart:typed_data';

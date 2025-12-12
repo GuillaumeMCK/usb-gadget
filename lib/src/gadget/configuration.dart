@@ -151,5 +151,3 @@ final class GadgetMaxPower {
   @override
   String toString() => 'GadgetMaxPower(value=$value, mA=${toMilliAmps()})';
 }
-
-

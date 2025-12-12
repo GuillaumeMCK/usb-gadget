@@ -1,8 +1,3 @@
-/// errno values and utilities
-///
-/// Provides access to POSIX error codes and conversions to Dart OSError.
-library;
-
 import 'dart:io';
 
 import 'errno.ffi.dart' as errno_ffi;

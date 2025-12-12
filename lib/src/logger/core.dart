@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'logger.dart';
 
 final class Logger {

@@ -1,19 +1,3 @@
-/// USB HID (Human Interface Device) support.
-///
-/// Provides types and descriptors for implementing HID devices like keyboards,
-/// mice, game controllers, and custom HID devices. This library follows the
-/// USB HID 1.11 specification.
-///
-/// HID devices communicate through:
-/// - HID descriptors: Describe the device capabilities
-/// - Report descriptors: Define the format of data exchanged
-/// - HID class requests: Control transfers for configuration
-/// - Interrupt transfers: For sending/receiving reports
-library;
-
-import 'dart:typed_data';
-import '/usb_gadget.dart';
-
 /// HID subclass codes (bInterfaceSubClass).
 ///
 /// Subclass codes identify specific types of HID devices. Most HID devices
