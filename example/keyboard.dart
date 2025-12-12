@@ -1,4 +1,4 @@
-import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:usb_gadget/usb_gadget.dart';
@@ -30,42 +30,27 @@ final _descriptor = Uint8List.fromList([
   0xC0, // End Collection
 ]);
 
-class KeyboardFunction extends HIDFunctionFs {
-  KeyboardFunction()
+class Keyboard extends HIDFunction {
+  Keyboard()
     : super(
         name: 'keyboard',
-        reportDescriptor: _descriptor,
-        subclass: .boot,
+        descriptor: _descriptor,
         protocol: .keyboard,
-        endpointConfig: const .inputOnly(maxPacketSize: 8),
-        speeds: {.fullSpeed, .highSpeed},
-        strings: {
-          .enUS: ['ACME USB Keyboard'],
-        },
+        subclass: .boot,
+        reportLength: 8,
       );
 
-  final Completer<void> _hostReady = Completer();
-
-  Future<void> get hostReady => _hostReady.future;
-
-  @override
-  Future<void> onSetIdle(int reportId, int duration) async {
-    super.onSetIdle(reportId, duration);
-    // Additional delay to fix some host timing issues
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-    _hostReady.complete();
-  }
-
-  void sendKey(int keyCode, {int modifiers = 0}) {
-    sendReport(Uint8List(8)
-      ..[0] = modifiers
-      ..[2] = keyCode);
-    sendReport(Uint8List(8));
-  }
+  void sendKey(int keyCode, {int modifiers = 0}) => file
+    ..writeFromSync(
+      Uint8List(8)
+        ..[0] = modifiers
+        ..[2] = keyCode,
+    )
+    ..writeFromSync(Uint8List(8));
 }
 
 Future<void> main() async {
-  final keyboard = KeyboardFunction();
+  final keyboard = Keyboard();
   final gadget = Gadget(
     name: 'hid_keyboard',
     idVendor: 0x1234,
@@ -82,12 +67,16 @@ Future<void> main() async {
     },
     config: .new(functions: [keyboard]),
   );
+
   try {
     await gadget.bind();
-    await keyboard.hostReady;
+    await gadget.waitForState(.configured);
+    await Future<void>.delayed(const .new(milliseconds: 100));
     [0x0B, 0x08, 0x0F, 0x0F, 0x12, 0x2C, 0x1A, 0x12, 0x15, 0x0F, 0x07, 0x28]
-    // hello world\n
+    // Write "hello world\n" keycodes
     .forEach(keyboard.sendKey);
+    stdout.writeln('Ctrl+C to exit.');
+    await ProcessSignal.sigint.watch().first;
   } finally {
     gadget.unbind();
   }
