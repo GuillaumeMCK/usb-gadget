@@ -2,9 +2,10 @@ import 'dart:io';
 
 import '/src/usb/hid/types.dart';
 import 'base.dart';
+// Import for DevicePathResolver mixin
 
 /// HID function (keyboard, mouse, gamepad, etc.).
-class HIDFunction extends KernelFunction {
+class HIDFunction extends KernelFunction with DevicePathResolver {
   HIDFunction({
     required super.name,
     required this.descriptor,
@@ -31,11 +32,11 @@ class HIDFunction extends KernelFunction {
   /// Gets the HID device file handle for writing reports.
   /// Lazily opens the file on first access.
   RandomAccessFile get file {
-    final currentFile = _file;
-    if (currentFile != null) {
-      return currentFile;
-    }
-    return _file ??= File(_getHIDDevice()).openSync(mode: .writeOnlyAppend);
+    assert(
+      getHIDDevice() != null,
+      'HID device path not found. Ensure the HID function is properly configured.',
+    );
+    return _file ??= File(getHIDDevice()!).openSync(mode: .writeOnlyAppend);
   }
 
   @override
@@ -61,7 +62,7 @@ class HIDFunction extends KernelFunction {
     log?.info('Writing HID report descriptor (${descriptor.length} bytes)');
     File(
       '$path/report_desc',
-    ).writeAsBytesSync(descriptor, mode: .writeOnlyAppend);
+    ).writeAsBytesSync(descriptor, mode: FileMode.writeOnlyAppend);
     await super.prepare(path);
   }
 
@@ -74,21 +75,5 @@ class HIDFunction extends KernelFunction {
   }
 
   /// Gets the HID device path (e.g., /dev/hidg0).
-  String _getHIDDevice() {
-    if (!prepared) {
-      throw StateError('HID function not prepared');
-    }
-    final devAttr = readAttribute('dev');
-    if (devAttr != null) {
-      final parts = devAttr.split(':');
-      final devNum = int.tryParse(parts.isEmpty ? devAttr : parts.last);
-      if (devNum != null) {
-        return '/dev/hidg$devNum';
-      }
-    }
-    if (File('/dev/hidg0').existsSync()) {
-      return '/dev/hidg0';
-    }
-    throw StateError('No HID device found');
-  }
+  String? getHIDDevice() => getDevicePath('hidg');
 }
