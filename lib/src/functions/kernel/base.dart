@@ -63,6 +63,37 @@ enum KernelFunctionType {
   String toString() => _configfsName;
 }
 
+/// Helper mixin for functions that need to resolve device paths.
+mixin DevicePathResolver on KernelFunction {
+  /// Resolves a device path from the 'dev' attribute.
+  ///
+  /// Reads the major:minor device numbers and constructs a path using
+  /// the provided prefix. Falls back to checking if the default path exists.
+  String? getDevicePath(String devicePrefix, {int defaultMinor = 0}) {
+    if (!prepared) return null;
+    final defaultPath = '/dev/$devicePrefix$defaultMinor';
+    try {
+      final devAttr = readAttribute('dev');
+      if (devAttr != null) {
+        // Parse major:minor format (e.g., "240:0" -> minor=0)
+        final parts = devAttr.split(':');
+        final minor = int.tryParse(parts.length > 1 ? parts[1] : parts[0]);
+        if (minor != null) {
+          return '/dev/$devicePrefix$minor';
+        }
+      }
+    } catch (_) {
+      // Ignore read errors, fall through to default
+    }
+
+    if (File(defaultPath).existsSync()) {
+      return defaultPath;
+    }
+
+    return null;
+  }
+}
+
 /// Base class for kernel-implemented USB gadget functions.
 abstract class KernelFunction extends GadgetFunction with USBGadgetLogger {
   KernelFunction({required super.name, required this.kernelType});
