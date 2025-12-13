@@ -216,8 +216,7 @@ class SimpleGamepad extends HIDFunctionFs {
 
   final GamepadReport report = GamepadReport();
 
-  @override
-  void onEnable() {
+  void demo() {
     _reportTimer = Timer.periodic(
       Duration(milliseconds: endpointConfig.pollingIntervalMs),
       (timer) {
@@ -228,15 +227,13 @@ class SimpleGamepad extends HIDFunctionFs {
         sendReport(report.toBytes());
       },
     );
-    super.onEnable();
   }
 
   @override
-  void onDisable() {
+  Future<void> dispose() async {
     _reportTimer?.cancel();
     _reportTimer = null;
-    _frameCounter = 0;
-    super.onDisable();
+    await super.dispose();
   }
 
   void _animateFrame() {
@@ -272,6 +269,7 @@ class SimpleGamepad extends HIDFunctionFs {
 }
 
 Future<void> main() async {
+  final gamepad = SimpleGamepad();
   final gadget = Gadget(
     name: 'simple_gamepad',
     idVendor: 0x1234,
@@ -288,12 +286,15 @@ Future<void> main() async {
       attributes: .busPowered,
       maxPower: .fromMilliAmps(500),
       strings: const {.enUS: 'Gamepad Configuration'},
-      functions: [SimpleGamepad()],
+      functions: [gamepad],
     ),
   );
 
   try {
     await gadget.bind();
+    //fix gamepad example wait usb device is configured before writing to endpoint
+    await gadget.waitForState(.configured);
+    gamepad.demo();
     stdout.writeln('Press Ctrl+C to stop');
     await ProcessSignal.sigint.watch().first;
   } finally {
