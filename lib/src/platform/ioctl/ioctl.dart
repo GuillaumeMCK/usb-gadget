@@ -8,6 +8,7 @@ import 'ioctl.ffi.dart' as ioctl_lib;
 /// Singleton library loader for ioctl
 class IoctlLibrary {
   IoctlLibrary._();
+
   static final instance = IoctlLibrary._();
 
   final ioctl_lib.Ioctl lib = ioctl_lib.Ioctl(ffi.DynamicLibrary.process());
@@ -39,27 +40,10 @@ class _IoctlVariadic {
   }
 }
 
-/// Base class for ioctl request identifiers
-///
-/// Each ioctl request has a unique identifier that encodes:
-/// - Direction (read, write, or both)
-/// - Size of data
-/// - Magic number
-/// - Command number
-abstract class IoctlRequest implements Flag {
-  const IoctlRequest(this.value);
-
-  @override
-  final int value;
-
-  /// Human-readable name for this request
-  String get name;
-}
-
 /// FunctionFs ioctl request identifiers
 ///
 /// These ioctls are used with the FunctionFs (USB Gadget) subsystem.
-enum FunctionFsIoctl implements IoctlRequest {
+enum IoctlRequest implements Flag {
   /// Get FIFO status
   fifoStatus(ioctl_lib.FUNCTIONFS_FIFO_STATUS, 'FIFO_STATUS'),
 
@@ -87,16 +71,15 @@ enum FunctionFsIoctl implements IoctlRequest {
   /// Transfer via DMA buffer
   dmabufTransfer(ioctl_lib.FUNCTIONFS_DMABUF_TRANSFER, 'DMABUF_TRANSFER');
 
-  const FunctionFsIoctl(this.value, this.name);
+  const IoctlRequest(this.value, this.name);
 
   @override
   final int value;
 
-  @override
   final String name;
 
   @override
-  String toString() => 'FunctionFsIoctl.$name';
+  String toString() => 'IoctlRequest.$name';
 }
 
 /// Result of an ioctl operation
@@ -275,27 +258,27 @@ extension IoctlRequestExt on IoctlRequest {
 abstract final class FunctionFsHelper {
   /// Get FIFO status for an endpoint
   static int getFifoStatus(int fd) {
-    return Ioctl.call(fd, FunctionFsIoctl.fifoStatus);
+    return Ioctl.call(fd, .fifoStatus);
   }
 
   /// Flush FIFO for an endpoint
   static void flushFifo(int fd) {
-    Ioctl.call(fd, FunctionFsIoctl.fifoFlush);
+    Ioctl.call(fd, .fifoFlush);
   }
 
   /// Clear halt condition on an endpoint
   static void clearHalt(int fd) {
-    Ioctl.call(fd, FunctionFsIoctl.clearHalt);
+    Ioctl.call(fd, .clearHalt);
   }
 
   /// Get interface reverse mapping
   static int getInterfaceRevmap(int fd) {
-    return Ioctl.call(fd, FunctionFsIoctl.interfaceRevmap);
+    return Ioctl.call(fd, .interfaceRevmap);
   }
 
   /// Get endpoint reverse mapping
   static int getEndpointRevmap(int fd) {
-    return Ioctl.call(fd, FunctionFsIoctl.endpointRevmap);
+    return Ioctl.call(fd, .endpointRevmap);
   }
 
   /// Check if endpoint is halted

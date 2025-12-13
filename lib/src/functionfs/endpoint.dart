@@ -360,7 +360,7 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
   void flushFIFO() {
     assert(_fd != null, 'flushFIFO: Endpoint is not open');
 
-    final result = Ioctl.call(_fd!, FunctionFsIoctl.fifoFlush);
+    final result = Ioctl.call(_fd!, .fifoFlush);
     if (result < 0) {
       final error = Errno.toOSError(result);
       log?.error('Failed to flush FIFO: ${error.message}');
@@ -377,7 +377,7 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
   int getFIFOStatus() {
     assert(_fd != null, 'getFIFOStatus: Endpoint is not open');
 
-    final result = Ioctl.call(_fd!, FunctionFsIoctl.fifoStatus);
+    final result = Ioctl.call(_fd!, .fifoStatus);
     if (result < 0) {
       final error = Errno.toOSError(result);
       log?.error('Failed to get FIFO status: ${error.message}');
@@ -444,7 +444,7 @@ class EndpointInFile extends EndpointFile {
   void clearHalt() {
     assert(_fd != null, 'clearHalt: Endpoint is not open');
 
-    final result = Ioctl.call(_fd!, FunctionFsIoctl.clearHalt);
+    final result = Ioctl.call(_fd!, .clearHalt);
     if (result < 0) throw Errno.currentOSError;
   }
 
@@ -607,7 +607,7 @@ class EndpointOutFile extends EndpointFile {
   void clearHalt() {
     assert(_fd != null, 'clearHalt: Endpoint is not open');
 
-    final result = Ioctl.call(_fd!, FunctionFsIoctl.clearHalt);
+    final result = Ioctl.call(_fd!, .clearHalt);
     if (result < 0) throw Errno.currentOSError;
   }
 
