@@ -216,7 +216,10 @@ class SimpleGamepad extends HIDFunctionFs {
 
   final GamepadReport report = GamepadReport();
 
-  void demo() {
+  @override
+  Future<void> onEnable() async {
+    super.onEnable();
+    await waitUSBDeviceState(.configured);
     _reportTimer = Timer.periodic(
       Duration(milliseconds: endpointConfig.pollingIntervalMs),
       (timer) {
@@ -292,9 +295,6 @@ Future<void> main() async {
 
   try {
     await gadget.bind();
-    //fix gamepad example wait usb device is configured before writing to endpoint
-    await gadget.waitForState(.configured);
-    gamepad.demo();
     stdout.writeln('Press Ctrl+C to stop');
     await ProcessSignal.sigint.watch().first;
   } finally {
