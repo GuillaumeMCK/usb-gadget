@@ -299,7 +299,8 @@ abstract final class Errno {
   };
 
   /// Creates an OSError from an errno code
-  static OSError toOSError(int code) => OSError(describe(code), code);
+  static OSError toOSError(int code, [String? custom]) =>
+      OSError(custom ?? describe(code), code);
 
   /// Gets an OSError for the current errno value
   static OSError get currentOSError => toOSError(current);
