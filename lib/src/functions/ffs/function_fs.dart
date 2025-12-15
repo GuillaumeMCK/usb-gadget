@@ -29,17 +29,6 @@ enum FunctionFsState {
   disposed,
 }
 
-/// Configuration for FunctionFs mounting and operation
-class FunctionFsConfig {
-  const FunctionFsConfig({this.mountPoint, this.autoMount = true});
-
-  /// Custom mount point (default: /dev/ffs/{name})
-  final String? mountPoint;
-
-  /// Automatically mount FunctionFs if not mounted
-  final bool autoMount;
-}
-
 /// User Space FunctionFs Gadget Function.
 ///
 /// Implements USB functions in userspace using the Linux FunctionFs API.
@@ -51,8 +40,8 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
     this.speeds = const {USBSpeed.fullSpeed, USBSpeed.highSpeed},
     this.strings = const {},
     this.flags = const FunctionFsFlags(),
-    this.config = const FunctionFsConfig(),
-  }) : _mountPoint = config.mountPoint ?? '/dev/ffs/$name';
+    String? mountPoint,
+  }) : _mountPoint = mountPoint ?? '/dev/ffs/$name';
 
   @override
   GadgetFunctionType get type => .ffs;
@@ -68,9 +57,6 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
 
   /// FunctionFs configuration flags
   final FunctionFsFlags flags;
-
-  /// FunctionFs configuration
-  final FunctionFsConfig config;
 
   /// Mount point for the FunctionFs filesystem
   final String _mountPoint;

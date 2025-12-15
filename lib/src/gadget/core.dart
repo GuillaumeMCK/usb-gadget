@@ -249,7 +249,7 @@ class Gadget with USBGadgetLogger {
 
     try {
       _createGadget();
-      await _waitFunctionsState(.ready);
+      await _setupFunctions();
       log?.info('All functions are ready, binding to UDC...');
       _bindToUdc(targetUdc);
       log?.success('Gadget bound to UDC: $_boundUdc');
@@ -386,9 +386,7 @@ class Gadget with USBGadgetLogger {
   USBDeviceState getCurrentUsbState() {
     if (_boundUdc == null) return .notAttached;
 
-    final statePath = '/sys/class/udc/$_boundUdc/state';
-    final stateFile = File(statePath);
-
+    final stateFile = File('/sys/class/udc/$_boundUdc/state');
     if (!stateFile.existsSync()) return .notAttached;
 
     final stateStr = stateFile.readAsStringSync().trim();
@@ -413,7 +411,7 @@ class Gadget with USBGadgetLogger {
   /// });
   /// ```
   Stream<USBDeviceState> stateStream({
-    Duration pollInterval = const Duration(milliseconds: 100),
+    Duration pollInterval = const Duration(milliseconds: 50),
   }) async* {
     if (_boundUdc == null) {
       throw StateError('Gadget is not bound to any UDC');
@@ -436,10 +434,14 @@ class Gadget with USBGadgetLogger {
   /// Waits for all functions to reach the specified state.
   ///
   /// This ensures synchronized initialization - no function is left behind.
-  Future<void> _waitFunctionsState(FunctionFsState state) async {
-    await [
-      for (final function in config.functions) function.waitState(state),
-    ].wait;
+  Future<void> _setupFunctions() async {
+    final stream = stateStream();
+    for (final function in config.functions) {
+      function.usbDeviceStateStream = stream;
+      if (function.type == .ffs) {
+        await function.waitState(.ready);
+      }
+    }
   }
 
   /// Creates the complete configfs gadget structure.

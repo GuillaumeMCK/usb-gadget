@@ -1,4 +1,4 @@
-import 'dart:async' show TimeoutException;
+import 'dart:async' show StreamController, TimeoutException;
 
 import 'dart:io' show FileSystemException;
 
@@ -38,6 +38,22 @@ abstract class GadgetFunction {
   /// Kernel functions are implemented entirely in the kernel and only require
   /// configuration attribute setup.
   GadgetFunctionType get type;
+
+  /// Stream of USB device state changes propagated from the gadget.
+  ///
+  /// This stream automatically receives updates when the gadget's USB
+  /// state changes. Use this to react to enumeration lifecycle events.
+  Stream<USBDeviceState>? usbDeviceStateStream;
+
+  /// Future void that completes when the state of the USB device changes and
+  /// matches the desired state.
+  Future<void> Function(USBDeviceState state) get waitUSBDeviceState =>
+      (state) {
+        if (usbDeviceStateStream == null) {
+          throw StateError('USB device state stream is not available');
+        }
+        return usbDeviceStateStream!.firstWhere((s) => s == state);
+      };
 
   /// Returns the configfs instance name for this function.
   ///
