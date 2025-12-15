@@ -71,6 +71,8 @@ Future<void> main() async {
   try {
     await gadget.bind();
     await gadget.waitForState(.configured);
+    // An additional delay here prevents the first few keypresses from
+    // being missed on some hosts.
     await Future<void>.delayed(const .new(milliseconds: 100));
     [0x0B, 0x08, 0x0F, 0x0F, 0x12, 0x2C, 0x1A, 0x12, 0x15, 0x0F, 0x07, 0x28]
     // Write "hello world\n" keycodes
