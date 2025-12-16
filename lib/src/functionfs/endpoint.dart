@@ -379,9 +379,6 @@ class EndpointInFile extends EndpointFile {
   /// AIO writer for high-throughput async writes.
   AioWriter? _writer;
 
-  /// Configuration for AIO writer (immutable after first use).
-  ({int bufferSize, int numBuffers})? _writerConfig;
-
   @override
   Future<void> open() async {
     if (_fd != null) {
@@ -402,7 +399,7 @@ class EndpointInFile extends EndpointFile {
     if (_fd == null) return;
 
     // Dispose AIO writer
-    await _writer?.dispose();
+    _writer?.dispose();
     _writer = null;
 
     // Close file descriptor
@@ -451,9 +448,9 @@ class EndpointInFile extends EndpointFile {
   /// Parameters:
   /// - [data]: Data to write
   /// - [bufferSize]: Size of each AIO buffer (default: 16KB)
-  /// - [numBuffers]: Number of AIO buffers (default: 4)
+  /// - [concurrency]: Number of concurrent operations (default: 4)
   ///
-  /// Note: [bufferSize] and [numBuffers] are locked after the first call.
+  /// Note: [bufferSize] and [concurrency] are locked after the first call.
   /// Subsequent calls with different values will use the original configuration.
   ///
   /// Returns a Future that completes with the number of bytes written.
@@ -463,34 +460,17 @@ class EndpointInFile extends EndpointFile {
   Future<int> writeAsync(
     Uint8List data, {
     int bufferSize = 16384,
-    int numBuffers = 4,
+    int concurrency = 4,
   }) {
     assert(_fd != null, 'writeAsync: Endpoint is not open');
+    assert(bufferSize > 0, 'Buffer size must be positive');
+    assert(concurrency > 0, 'Concurrency must be positive');
 
-    if (bufferSize <= 0) {
-      throw ArgumentError.value(
-        bufferSize,
-        'bufferSize',
-        'Buffer size must be positive',
-      );
-    }
-    if (numBuffers <= 0) {
-      throw ArgumentError.value(
-        numBuffers,
-        'numBuffers',
-        'Number of buffers must be positive',
-      );
-    }
-
-    // Lazy-create writer with locked configuration
-    if (_writer == null) {
-      _writerConfig = (bufferSize: bufferSize, numBuffers: numBuffers);
-      _writer = AioWriter(
-        fd: _fd!,
-        bufferSize: bufferSize,
-        numBuffers: numBuffers,
-      );
-    }
+    // Lazy-create writer with locked configuration using ??=
+    _writer ??= AioWriter(
+      _fd!,
+      .new(bufferSize: bufferSize, windowSize: concurrency),
+    );
 
     return _writer!.write(data);
   }
@@ -499,17 +479,7 @@ class EndpointInFile extends EndpointFile {
   ///
   /// Waits for all queued AIO operations to complete.
   /// Safe to call even if no async writes are pending.
-  Future<void> flush() async {
-    await _writer?.flush();
-  }
-
-  /// Whether there are pending asynchronous writes.
-  bool get hasPendingWrites => _writer?.hasPendingWrites ?? false;
-
-  /// Gets the current AIO writer configuration, if any.
-  ///
-  /// Returns null if writeAsync has never been called.
-  ({int bufferSize, int numBuffers})? get writerConfig => _writerConfig;
+  Future<void> flush() => _writer?.flush() ?? Future.value();
 }
 
 /// Manages a USB OUT endpoint (host-to-device).
@@ -558,7 +528,7 @@ class EndpointOutFile extends EndpointFile {
     _streamController = null;
 
     // Dispose AIO reader
-    await _reader?.dispose();
+    _reader?.dispose();
     _reader = null;
 
     // Close file descriptor
@@ -618,12 +588,12 @@ class EndpointOutFile extends EndpointFile {
   /// - Transfer-type-specific error conditions
   /// - Backpressure management
   /// - Buffer allocation and reuse
-  /// - Isochronous timing errors (returns empty packets)
+  /// - Isochronous timing errors (stops reading)
   /// - Aborted bulk/interrupt transfers (ignores)
   ///
   /// Parameters:
-  /// - [numBuffers]: Number of AIO buffers to use (default: 4)
-  ///   More buffers = better throughput but more memory
+  /// - [concurrency]: Number of concurrent AIO operations (default: 4)
+  ///   More concurrency = better throughput but more memory
   ///
   /// Buffer size is determined automatically based on transfer type:
   /// - Bulk: 16KB
@@ -633,85 +603,50 @@ class EndpointOutFile extends EndpointFile {
   /// - Or uses maxPacketSize from config if specified
   ///
   /// Throws [StateError] if endpoint is not open.
-  /// Throws [ArgumentError] if numBuffers is invalid.
-  Stream<Uint8List> stream({int numBuffers = 4}) {
+  /// Throws [ArgumentError] if concurrency is invalid.
+  Stream<Uint8List> stream({int concurrency = 4}) {
     assert(_fd != null, 'stream: Endpoint is not open');
-
-    if (numBuffers <= 0) {
-      throw ArgumentError.value(
-        numBuffers,
-        'numBuffers',
-        'Number of buffers must be positive',
-      );
-    }
+    assert(concurrency > 0, 'Concurrency must be positive');
 
     // Return cached stream if already created
-    final controller = _streamController;
-    if (controller != null && !controller.isClosed) {
-      return controller.stream;
+    if (_streamController?.isClosed == false) {
+      return _streamController!.stream;
     }
 
-    // Determine buffer size based on transfer type
     final bufferSize = switch (transferType) {
       _ when config.maxPacketSize != null => config.maxPacketSize!,
-      TransferType.bulk => 16384,
-      TransferType.interrupt => 64,
-      TransferType.isochronous => 1024,
-      TransferType.control => 64,
+      .bulk => 16384,
+      .interrupt => 64,
+      .isochronous => 1024,
+      .control => 64,
     };
 
-    // Create reader if not exists (configuration is locked)
-    if (_reader == null) {
-      _readerConfig = (bufferSize: bufferSize, numBuffers: numBuffers);
-      _reader = AioReader(
-        fd: _fd!,
-        bufferSize: bufferSize,
-        numBuffers: numBuffers,
-      );
-    }
+    _reader ??= AioReader(
+      _fd!,
+      .new(bufferSize: bufferSize, windowSize: concurrency),
+    );
 
-    // Capture transfer type to avoid capturing 'this'
-    final type = transferType;
-
-    // Create new broadcast controller
     _streamController = StreamController<Uint8List>.broadcast();
 
-    // Forward AIO reader stream to controller
-    _reader!
-        .stream(
-          handleError: (errorCode) {
-            // Isochronous: return empty on timing errors
-            if (type == TransferType.isochronous &&
-                (errorCode == Errno.eio || errorCode == Errno.etimedout)) {
-              return AioErrorAction.empty;
-            }
-
-            // Bulk/Interrupt: ignore aborted transfers
-            if (errorCode == Errno.epipe &&
-                (type == TransferType.bulk || type == TransferType.interrupt)) {
-              return AioErrorAction.ignore;
-            }
-
-            // All other errors propagate to stream
-            return AioErrorAction.error;
-          },
-        )
-        .listen(
-          _streamController?.add,
-          onError: _streamController?.addError,
-          onDone: _streamController?.close,
-          cancelOnError: false,
-        );
+    // Store subscription so we can cancel it later if needed
+    _reader?.stream.listen(
+      (data) {
+        // Forward data
+        if (_streamController != null && !_streamController!.isClosed) {
+          _streamController!.add(data);
+        }
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        if (_streamController != null && !_streamController!.isClosed) {
+          _streamController!.addError(error, stackTrace);
+        }
+      },
+      onDone: () {
+        _streamController?.close();
+      },
+      cancelOnError: false, // Keep stream alive after errors
+    );
 
     return _streamController!.stream;
   }
-
-  /// Whether there is an active stream.
-  bool get hasActiveStream =>
-      _streamController != null && !_streamController!.isClosed;
-
-  /// Gets the current AIO reader configuration, if any.
-  ///
-  /// Returns null if stream() has never been called.
-  ({int bufferSize, int numBuffers})? get readerConfig => _readerConfig;
 }
