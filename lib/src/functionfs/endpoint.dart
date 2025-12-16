@@ -30,13 +30,13 @@ abstract class EndpointFile {
   /// Sets the internal file descriptor upon success.
   /// Throws [OSError] if the underlying C `open` call fails.
   /// Throws [StateError] if already open.
-  void open();
+  Future<void> open();
 
   /// Closes the underlying file descriptor.
   ///
   /// Clears the internal file descriptor after closing.
   /// Safe to call multiple times (idempotent).
-  void close();
+  Future<void> close();
 
   /// Whether the endpoint is currently halted (STALL state).
   ///
@@ -126,7 +126,7 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
   }
 
   @override
-  void close() {
+  Future<void> close() async {
     final fd = _fd;
     if (fd == null) return;
 
@@ -134,7 +134,7 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
     _pollingActive = false;
 
     // Close stream controller
-    _streamController?.close();
+    await _streamController?.close();
     _streamController = null;
 
     // Close file descriptor
@@ -142,8 +142,9 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
       Unistd.close(fd);
     } on OSError catch (e) {
       log?.error('Failed to close EP0 file descriptor: ${e.message}');
+    } finally {
+      _fd = null;
     }
-    _fd = null;
 
     // Cleanup mount if configured
     _mount.cleanupIfNeeded();
@@ -419,25 +420,21 @@ class EndpointInFile extends EndpointFile {
   }
 
   @override
-  void close() {
+  Future<void> close() async {
     if (_fd == null) return;
 
     // Dispose AIO writer
-    try {
-      _writer?.dispose();
-    } catch (e) {
-      // Log but don't throw during cleanup
-    }
+    await _writer?.dispose();
     _writer = null;
-    _writerConfig = null;
 
     // Close file descriptor
     try {
       Unistd.close(_fd!);
     } on OSError {
-      // Log but don't throw during cleanup
+      // Silently ignore errors during cleanup
+    } finally {
+      _fd = null;
     }
-    _fd = null;
   }
 
   @override
@@ -578,29 +575,25 @@ class EndpointOutFile extends EndpointFile {
   }
 
   @override
-  void close() {
+  Future<void> close() async {
     if (_fd == null) return;
 
     // Close stream controller
-    _streamController?.close();
+    await _streamController?.close();
     _streamController = null;
 
     // Dispose AIO reader
-    try {
-      _reader?.dispose();
-    } catch (e) {
-      // Log but don't throw during cleanup
-    }
+    await _reader?.dispose();
     _reader = null;
-    _readerConfig = null;
 
     // Close file descriptor
     try {
       Unistd.close(_fd!);
     } on OSError {
-      // Log but don't throw during cleanup
+      // Silently ignore errors during cleanup
+    } finally {
+      _fd = null;
     }
-    _fd = null;
   }
 
   @override
