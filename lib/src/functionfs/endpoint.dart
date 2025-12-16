@@ -185,8 +185,7 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
     var offset = 0;
     while (offset < data.length) {
       try {
-        final written = Unistd.write(_fd!, data.sublist(offset));
-        offset += written;
+        offset += Unistd.write(_fd!, data.sublist(offset));
       } on OSError catch (e) {
         if (e.errorCode == Errno.eagain) {
           // Retry on EAGAIN (would block)
@@ -212,30 +211,9 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
   /// Throws [ArgumentError] if length is negative.
   List<int> read(int length) {
     assert(_fd != null, 'read: Endpoint is not open');
-
-    if (length < 0) {
-      throw ArgumentError.value(length, 'length', 'Length cannot be negative');
-    }
-
-    if (length == 0) {
-      // Reading 0 bytes is used for ACK
-      try {
-        Unistd.read(_fd!, 0);
-        return const [];
-      } on OSError catch (e) {
-        if (e.errorCode != Errno.eagain) {
-          log?.error('Failed to ACK on EP0: ${e.message}');
-        }
-        rethrow;
-      }
-    }
-
     try {
       return Unistd.read(_fd!, length);
     } on OSError catch (e) {
-      if (e.errorCode == Errno.eagain) {
-        return const [];
-      }
       log?.error('Failed to read from EP0: ${e.message}');
       rethrow;
     }
@@ -556,9 +534,6 @@ class EndpointOutFile extends EndpointFile {
   /// Cached broadcast stream.
   StreamController<Uint8List>? _streamController;
 
-  /// Reader configuration (immutable after stream creation).
-  ({int bufferSize, int numBuffers})? _readerConfig;
-
   @override
   Future<void> open() async {
     if (_fd != null) {
@@ -626,17 +601,9 @@ class EndpointOutFile extends EndpointFile {
   /// Throws [ArgumentError] if length is negative.
   List<int> read(int length) {
     assert(_fd != null, 'read: Endpoint is not open');
-
-    if (length < 0) {
-      throw ArgumentError.value(length, 'length', 'Length cannot be negative');
-    }
-
     try {
       return Unistd.read(_fd!, length);
-    } on OSError catch (e) {
-      if (e.errorCode == Errno.eagain) {
-        return const [];
-      }
+    } on OSError {
       rethrow;
     }
   }
