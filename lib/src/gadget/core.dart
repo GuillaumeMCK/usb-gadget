@@ -275,7 +275,7 @@ class Gadget with USBGadgetLogger {
   /// ```dart
   /// gadget.unbind();  // Safe to call even if not bound
   /// ```
-  void unbind() {
+  Future<void> unbind() async {
     if (_boundUdc != null) {
       log?.debug('Unbinding from UDC: $_boundUdc');
       try {
@@ -288,7 +288,7 @@ class Gadget with USBGadgetLogger {
 
     for (final function in config.functions) {
       try {
-        function.dispose();
+        await function.dispose();
         log?.debug('Disposed function: ${function.name}');
       } catch (err) {
         log?.warn('Failed to dispose function ${function.name}: $err');
