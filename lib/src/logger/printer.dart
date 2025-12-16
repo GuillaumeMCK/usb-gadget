@@ -22,6 +22,9 @@ final class DefaultPrinter extends IPrinter {
     final color = levelColor(record.level);
     final type = '[${record.level.name}] $_rst';
     stdout.writeln('$color$type[${record.loggerName}] ${record.message}');
+    if (record.error != null) {
+      stderr.writeln('$color${record.error}$_rst');
+    }
     if (record.stackTrace != null) {
       stderr.writeln('$color${record.stackTrace}$_rst');
     }
