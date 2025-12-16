@@ -1,4 +1,4 @@
-import 'dart:async' show StreamController, TimeoutException;
+import 'dart:async' show TimeoutException;
 
 import 'dart:io' show FileSystemException;
 
@@ -124,5 +124,5 @@ abstract class GadgetFunction {
   ///
   /// After this method completes, the function should be in a clean state
   /// and ready for garbage collection.
-  void dispose();
+  Future<void> dispose();
 }
