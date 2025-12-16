@@ -1,188 +1,229 @@
+import 'dart:async';
 import 'dart:ffi' as ffi;
 import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
-import '../errno/errno.dart';
-import 'aio.dart';
+import 'aio.ffi.dart';
+import 'aio_context.dart';
 
-/// Entry point for reader isolate
-///
-/// This isolate performs async reads using Linux AIO, eliminating blocking
-/// and reducing CPU usage through event-driven I/O.
-void readerIsolateEntryPoint(ReaderConfig config) =>
-    _ReaderIsolateController(config).run();
+// Messages
+sealed class ReaderMessage {}
 
-/// Internal controller for reader isolate logic
-class _ReaderIsolateController {
-  _ReaderIsolateController(this.config);
+final class ReaderInit extends ReaderMessage {
+  ReaderInit(this.fd, this.bufferSize, this.windowSize);
 
-  final ReaderConfig config;
-  final ReceivePort receivePort = ReceivePort();
+  final int fd;
+  final int bufferSize;
+  final int windowSize;
+}
 
-  AioContext? _ctx;
-  final Map<int, _ReadRequest> _activeRequests = {};
-  int _nextRequestId = 0;
-  bool _shouldStop = false;
+final class ReaderDemand extends ReaderMessage {
+  ReaderDemand(this.count);
 
-  void run() {
-    // Send our SendPort back to main isolate
-    config.sendPort.send(ReaderReady(receivePort.sendPort));
+  final int count;
+}
 
-    // Setup message handling
-    receivePort.listen(_handleMessage);
+final class ReaderStop extends ReaderMessage {}
 
-    try {
-      // Initialize AIO context
-      _ctx = AioContext.create(config.numBuffers * 2);
+sealed class ReaderResponse {}
 
-      // Submit initial batch of reads
-      for (var i = 0; i < config.numBuffers; i++) {
-        _submitRead();
+final class ReaderReady extends ReaderResponse {
+  ReaderReady(this.sendPort);
+
+  final SendPort sendPort;
+}
+
+final class ReaderData extends ReaderResponse {
+  ReaderData(this.data, this.sequenceId);
+
+  final Uint8List data;
+  final int sequenceId;
+}
+
+final class ReaderEof extends ReaderResponse {}
+
+final class ReaderError extends ReaderResponse {
+  ReaderError(this.error, this.stackTrace);
+
+  final Object error;
+  final StackTrace stackTrace;
+}
+
+void readerIsolateEntry(SendPort mainPort) {
+  final receivePort = ReceivePort();
+  mainPort.send(ReaderReady(receivePort.sendPort));
+
+  _ReaderIsolate(mainPort).run(receivePort);
+}
+
+final class _ReaderIsolate {
+  _ReaderIsolate(this.mainPort);
+
+  final SendPort mainPort;
+
+  AioContext? _context;
+  BufferPool? _bufferPool;
+
+  int _fd = -1;
+  int _bufferSize = 0;
+  int _windowSize = 0;
+  int _fileOffset = 0;
+  int _nextOpId = 0;
+  int _nextSeqId = 0;
+
+  int _pendingDemand = 0;
+  bool _stopped = false;
+  bool _eofReached = false;
+  Timer? _pollTimer;
+
+  void run(ReceivePort receivePort) {
+    receivePort.listen((message) {
+      try {
+        _handleMessage(message);
+      } catch (e, st) {
+        mainPort.send(ReaderError(e, st));
+        _cleanup();
       }
-
-      // Main event loop
-      _eventLoop();
-
-      // Notify completion
-      config.sendPort.send(ReadDone());
-    } catch (e, st) {
-      config.sendPort.send(ReadError(e, st));
-    } finally {
-      _cleanup();
-    }
+    });
   }
 
   void _handleMessage(dynamic message) {
-    if (message is StopReading) {
-      _shouldStop = true;
+    switch (message) {
+      case ReaderInit(:final fd, :final bufferSize, :final windowSize):
+        _initialize(fd, bufferSize, windowSize);
+
+      case ReaderDemand(:final count):
+        _handleDemand(count);
+
+      case ReaderStop():
+        _stopped = true;
+        _cleanup();
     }
   }
 
-  void _eventLoop() {
-    while (!_shouldStop && _activeRequests.isNotEmpty) {
+  void _initialize(int fd, int bufferSize, int windowSize) {
+    _fd = fd;
+    _bufferSize = bufferSize;
+    _windowSize = windowSize;
+
+    _context = AioContext(maxConcurrent: windowSize);
+    _bufferPool = BufferPool(bufferSize, windowSize);
+
+    // Start completion polling
+    _pollCompletions();
+  }
+
+  void _handleDemand(int count) {
+    _pendingDemand += count;
+    _submitReads();
+  }
+
+  void _submitReads() {
+    if (_stopped || _eofReached) return;
+
+    final operations = <TrackedOperation>[];
+
+    // Submit up to min(demand, available_buffers, window_space)
+    while (_pendingDemand > 0 &&
+        _context!.canSubmit &&
+        _bufferPool!.available > 0) {
+      final buffer = _bufferPool!.acquire();
+      if (buffer == null) break;
+
+      final opId = OperationId(_nextOpId);
+      final seqId = _nextSeqId++;
+      _nextOpId++;
+
+      final iocbPtr = calloc<iocb>()
+        ..ref.aio_fildes = _fd
+        ..ref.aio_lio_opcode =
+            0 // IOCB_CMD_PREAD
+        ..ref.aio_reqprio = 0
+        ..ref.aio_rw_flags = 0
+        ..ref.data = ffi.Pointer<ffi.Void>.fromAddress(opId.value)
+        ..ref.u.c.buf = buffer.cast<ffi.Void>()
+        ..ref.u.c.nbytes = _bufferSize
+        ..ref.u.c.offset = _fileOffset;
+
+      operations.add(
+        TrackedOperation(
+          id: opId,
+          type: OperationType.read,
+          buffer: buffer,
+          size: _bufferSize,
+          offset: _fileOffset,
+          iocb: iocbPtr,
+          userData: seqId,
+        ),
+      );
+
+      _fileOffset += _bufferSize;
+      _pendingDemand--;
+    }
+
+    if (operations.isNotEmpty) {
+      _context!.submit(operations);
+    }
+  }
+
+  void _pollCompletions() {
+    _pollTimer = Timer.periodic(const Duration(milliseconds: 10), (_) {
+      if (_stopped) {
+        _pollTimer?.cancel();
+        return;
+      }
+
       try {
-        // Blocking wait for events with timeout to check stop flag periodically
-        _ctx!
-            // Get completed events
-            .getEvents(
-              maxNr: config.numBuffers,
-              timeout: const Duration(milliseconds: 100),
-            )
-            // Process all completed events
-            .forEach(_processEvent);
+        final completions = _context!.getCompletions(
+          timeout: const Duration(milliseconds: 10),
+        );
+
+        for (final completion in completions) {
+          _handleCompletion(completion);
+        }
       } catch (e, st) {
-        config.sendPort.send(ReadError(e, st));
-        _shouldStop = true;
+        mainPort.send(ReaderError(e, st));
+        _stopped = true;
+        _cleanup();
       }
-    }
+    });
   }
 
-  void _processEvent(AioEvent event) {
-    final request = _activeRequests.remove(event.userData);
-    if (request == null) return;
+  void _handleCompletion(CompletedOperation completion) {
+    final op = completion.operation;
 
     try {
-      final data = _handleReadResult(event, request);
-
-      // Send data if non-empty
-      if (data != null && data.isNotEmpty) {
-        config.sendPort.send(ReadData(data));
+      if (!completion.isSuccess) {
+        throw completion.error!;
       }
 
-      // Submit next read if not stopping
-      if (!_shouldStop && data != null && data.isNotEmpty) {
-        _submitRead();
-      } else if (data != null && data.isEmpty) {
-        // EOF reached
-        _shouldStop = true;
+      if (completion.isEof) {
+        _eofReached = true;
+        mainPort.send(ReaderEof());
+        _cleanup();
+        return;
       }
+
+      // Copy data and send
+      final data = Uint8List.fromList(
+        op.buffer.asTypedList(completion.bytesTransferred),
+      );
+      mainPort.send(ReaderData(data, op.userData! as int));
+    } catch (e, st) {
+      mainPort.send(ReaderError(e, st));
+      _stopped = true;
+      _cleanup();
     } finally {
-      request.free();
-    }
-  }
-
-  Uint8List? _handleReadResult(AioEvent event, _ReadRequest request) {
-    if (event.isSuccess) {
-      if (event.bytesTransferred == 0) {
-        return Uint8List(0); // EOF
-      }
-
-      // Copy data from buffer
-      return Uint8List(event.bytesTransferred)..setRange(
-        0,
-        event.bytesTransferred,
-        request.buffer.asTypedList(event.bytesTransferred),
-      );
-    }
-
-    // Handle error
-    final errorCode = event.errorCode;
-    final action =
-        config.handleError?.call(errorCode) ??
-        (errorCode == Errno.eagain
-            ? AioErrorAction.ignore
-            : AioErrorAction.error);
-
-    return switch (action) {
-      AioErrorAction.ignore => null,
-      AioErrorAction.empty => Uint8List(0),
-      AioErrorAction.error => throw Errno.toOSError(errorCode),
-    };
-  }
-
-  void _submitRead() {
-    final id = _nextRequestId++;
-    final buffer = calloc<ffi.Uint8>(config.bufferSize);
-
-    try {
-      final iocb = AioControlBlock.read(
-        fd: config.fd,
-        buffer: buffer.cast<ffi.Void>(),
-        size: config.bufferSize,
-        userData: id,
-      );
-
-      _ctx!.submit([iocb]);
-      _activeRequests[id] = _ReadRequest(iocb, buffer);
-    } catch (err) {
-      calloc.free(buffer);
-      rethrow;
+      _bufferPool!.release(op.buffer);
+      op.free();
     }
   }
 
   void _cleanup() {
-    // Free all active requests
-    for (final request in _activeRequests.values) {
-      try {
-        request.free();
-      } catch (_) {
-        // Ignore cleanup errors
-      }
-    }
-    _activeRequests.clear();
-
-    // Destroy context
-    try {
-      _ctx?.destroy();
-    } catch (_) {
-      // Ignore cleanup errors
-    }
-
-    receivePort.close();
-  }
-}
-
-/// Tracks an active read request
-class _ReadRequest {
-  _ReadRequest(this.iocb, this.buffer);
-
-  final AioControlBlock iocb;
-  final ffi.Pointer<ffi.Uint8> buffer;
-
-  void free() {
-    calloc.free(buffer);
-    iocb.free();
+    _pollTimer?.cancel();
+    _context?.dispose();
+    _bufferPool?.dispose();
   }
 }
