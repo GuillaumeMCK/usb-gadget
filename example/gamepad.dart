@@ -281,6 +281,6 @@ Future<void> main() async {
     stdout.writeln('Press Ctrl+C to stop');
     await ProcessSignal.sigint.watch().first;
   } finally {
-    gadget.unbind();
+    await gadget.unbind();
   }
 }
