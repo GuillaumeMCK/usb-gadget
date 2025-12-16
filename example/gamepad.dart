@@ -5,38 +5,42 @@ import 'dart:typed_data';
 
 import 'package:usb_gadget/usb_gadget.dart';
 
-/// Standard HID Gamepad Report Descriptor
+/// Simple standard HID Gamepad Report Descriptor
 final _descriptor = Uint8List.fromList([
   0x05, 0x01, // Usage Page (Generic Desktop)
   0x09, 0x05, // Usage (Gamepad)
   0xA1, 0x01, // Collection (Application)
-  // Buttons (16 buttons)
+  // Buttons (12 buttons)
   0x05, 0x09, //   Usage Page (Button)
   0x19, 0x01, //   Usage Minimum (Button 1)
-  0x29, 0x10, //   Usage Maximum (Button 16)
+  0x29, 0x0C, //   Usage Maximum (Button 12)
   0x15, 0x00, //   Logical Minimum (0)
   0x25, 0x01, //   Logical Maximum (1)
   0x75, 0x01, //   Report Size (1)
-  0x95, 0x10, //   Report Count (16)
+  0x95, 0x0C, //   Report Count (12)
   0x81, 0x02, //   Input (Data, Variable, Absolute)
-  // Left Stick X & Y
+  // Padding (4 bits to complete the byte)
+  0x75, 0x01, //   Report Size (1)
+  0x95, 0x04, //   Report Count (4)
+  0x81, 0x01, //   Input (Constant)
+  // Left Stick X & Y (8-bit each for simplicity)
   0x05, 0x01, //   Usage Page (Generic Desktop)
   0x09, 0x30, //   Usage (X)
   0x09, 0x31, //   Usage (Y)
   0x15, 0x00, //   Logical Minimum (0)
-  0x26, 0xFF, 0xFF, // Logical Maximum (65535)
-  0x75, 0x10, //   Report Size (16)
+  0x26, 0xFF, 0x00, // Logical Maximum (255)
+  0x75, 0x08, //   Report Size (8)
   0x95, 0x02, //   Report Count (2)
   0x81, 0x02, //   Input (Data, Variable, Absolute)
-  // Right Stick X & Y
+  // Right Stick X & Y (8-bit each)
   0x09, 0x33, //   Usage (Rx)
   0x09, 0x34, //   Usage (Ry)
   0x15, 0x00, //   Logical Minimum (0)
-  0x26, 0xFF, 0xFF, // Logical Maximum (65535)
-  0x75, 0x10, //   Report Size (16)
+  0x26, 0xFF, 0x00, // Logical Maximum (255)
+  0x75, 0x08, //   Report Size (8)
   0x95, 0x02, //   Report Count (2)
   0x81, 0x02, //   Input (Data, Variable, Absolute)
-  // Triggers (Z and Rz)
+  // Triggers (8-bit each)
   0x09, 0x32, //   Usage (Z) - Left Trigger
   0x09, 0x35, //   Usage (Rz) - Right Trigger
   0x15, 0x00, //   Logical Minimum (0)
@@ -54,56 +58,42 @@ final _descriptor = Uint8List.fromList([
   0x75, 0x04, //   Report Size (4)
   0x95, 0x01, //   Report Count (1)
   0x81, 0x42, //   Input (Data, Variable, Absolute, Null State)
-  // Padding
+  // Padding (4 bits)
   0x75, 0x04, //   Report Size (4)
   0x95, 0x01, //   Report Count (1)
-  0x81, 0x03, //   Input (Constant, Variable, Absolute)
+  0x81, 0x01, //   Input (Constant)
 
   0xC0, // End Collection
 ]);
 
-/// Gamepad button enumeration matching Xbox controller layout
+/// Gamepad button enumeration
 enum GamepadButton {
-  a, // Button 1
-  b, // Button 2
-  x, // Button 3
-  y, // Button 4
-  leftBumper, // Button 5
-  rightBumper, // Button 6
-  view, // Button 7
-  menu, // Button 8
-  leftStick, // Button 9
-  rightStick, // Button 10
-  guide; // Button 11
-
-  @override
-  String toString() => switch (this) {
-    GamepadButton.a => 'A',
-    GamepadButton.b => 'B',
-    GamepadButton.x => 'X',
-    GamepadButton.y => 'Y',
-    GamepadButton.leftBumper => 'LB',
-    GamepadButton.rightBumper => 'RB',
-    GamepadButton.view => 'View',
-    GamepadButton.menu => 'Menu',
-    GamepadButton.leftStick => 'LS',
-    GamepadButton.rightStick => 'RS',
-    GamepadButton.guide => 'Guide',
-  };
+  a,
+  b,
+  x,
+  y,
+  leftBumper,
+  rightBumper,
+  view,
+  menu,
+  leftStick,
+  rightStick,
+  guide,
+  extra,
 }
 
-/// Analog stick report (16-bit unsigned, 0-65535)
+/// Analog stick report (8-bit unsigned, 0-255, center at 128)
 class AnalogStick {
-  int _x = 32768;
-  int _y = 32768;
+  int _x = 128;
+  int _y = 128;
 
   int get x => _x;
 
   int get y => _y;
 
-  set x(int value) => _x = value.clamp(0, 65535);
+  set x(int value) => _x = value.clamp(0, 255);
 
-  set y(int value) => _y = value.clamp(0, 65535);
+  set y(int value) => _y = value.clamp(0, 255);
 
   void setPosition(int x, int y) {
     this.x = x;
@@ -111,12 +101,9 @@ class AnalogStick {
   }
 
   void center() {
-    _x = 32768;
-    _y = 32768;
+    _x = 128;
+    _y = 128;
   }
-
-  @override
-  String toString() => '($x, $y)';
 }
 
 /// Trigger report (8-bit, 0-255)
@@ -128,9 +115,6 @@ class Trigger {
   set value(int v) => _value = v.clamp(0, 255);
 
   void reset() => _value = 0;
-
-  @override
-  String toString() => '$_value';
 }
 
 /// Gamepad report for HID reports
@@ -141,15 +125,16 @@ class GamepadReport {
   final Trigger rightTrigger = Trigger();
 
   int _buttons = 0;
-  int _dpad = 8;
+  int _dpad = 15;
 
   int get buttons => _buttons;
 
   int get dpad => _dpad;
 
-  set dpad(int value) => _dpad = value.clamp(0, 8);
+  set dpad(int value) => _dpad = value.clamp(0, 15);
 
-  final Uint8List _reportBytes = Uint8List(14);
+  // Report structure: 2 bytes buttons + 2 bytes left stick + 2 bytes right stick + 2 bytes triggers + 1 byte dpad = 9 bytes
+  final Uint8List _reportBytes = Uint8List(9);
   late final ByteData _reportBuffer = ByteData.view(_reportBytes.buffer);
 
   void setButton(GamepadButton button, bool pressed) {
@@ -172,7 +157,7 @@ class GamepadReport {
 
   void reset() {
     _buttons = 0;
-    _dpad = 8;
+    _dpad = 15;
     leftStick.center();
     rightStick.center();
     leftTrigger.reset();
@@ -181,15 +166,14 @@ class GamepadReport {
 
   Uint8List toBytes() {
     _reportBuffer
-      ..setUint16(0, _buttons, Endian.little)
-      ..setUint16(2, leftStick.x, Endian.little)
-      ..setUint16(4, leftStick.y, Endian.little)
-      ..setUint16(6, rightStick.x, Endian.little)
-      ..setUint16(8, rightStick.y, Endian.little)
-      ..setUint8(10, leftTrigger.value)
-      ..setUint8(11, rightTrigger.value)
-      ..setUint8(12, _dpad)
-      ..setUint8(13, 0);
+      ..setUint16(0, _buttons, Endian.little) // Buttons (2 bytes)
+      ..setUint8(2, leftStick.x) // Left X
+      ..setUint8(3, leftStick.y) // Left Y
+      ..setUint8(4, rightStick.x) // Right X
+      ..setUint8(5, rightStick.y) // Right Y
+      ..setUint8(6, leftTrigger.value) // Left Trigger
+      ..setUint8(7, rightTrigger.value) // Right Trigger
+      ..setUint8(8, _dpad); // D-pad (lower 4 bits) + padding (upper 4 bits)
     return _reportBytes;
   }
 }
@@ -201,13 +185,10 @@ class SimpleGamepad extends HIDFunctionFs {
         reportDescriptor: _descriptor,
         subclass: .none,
         protocol: .none,
-        endpointConfig: const .inputOnly(
-          maxPacketSize: 14,
-          pollingIntervalMs: 8,
-        ),
+        config: const .inputOnly(maxPacketSize: 9, reportIntervalMs: 8),
         speeds: {.fullSpeed, .highSpeed},
         strings: {
-          .enUS: ['Simple Gamepad'],
+          .enUS: ['Generic USB Gamepad'],
         },
       );
 
@@ -221,13 +202,13 @@ class SimpleGamepad extends HIDFunctionFs {
     super.onEnable();
     await waitUSBDeviceState(.configured);
     _reportTimer = Timer.periodic(
-      Duration(milliseconds: endpointConfig.pollingIntervalMs),
+      Duration(milliseconds: config.reportIntervalMs),
       (timer) {
         if (state != .enabled) {
           return timer.cancel();
         }
         _animateFrame();
-        sendReport(report.toBytes());
+        epIn.write(report.toBytes());
       },
     );
   }
@@ -241,17 +222,17 @@ class SimpleGamepad extends HIDFunctionFs {
 
   void _animateFrame() {
     _frameCounter++;
-    final time = _frameCounter * endpointConfig.pollingIntervalMs / 1000.0;
+    final time = _frameCounter * config.reportIntervalMs / 1000.0;
 
     // Left stick: circular motion (slow rotation)
     final leftAngle = time * 0.5 * (2 * pi);
-    report.leftStick.x = (32768 + 25000 * cos(leftAngle)).round();
-    report.leftStick.y = (32768 + 25000 * sin(leftAngle)).round();
+    report.leftStick.x = (128 + 100 * cos(leftAngle)).round();
+    report.leftStick.y = (128 + 100 * sin(leftAngle)).round();
 
     // Right stick: figure-8 pattern (Lissajous curve)
     final rightAngle = time * 0.8 * (2 * pi);
-    report.rightStick.x = (32768 + 20000 * cos(rightAngle)).round();
-    report.rightStick.y = (32768 + 20000 * sin(2 * rightAngle)).round();
+    report.rightStick.x = (128 + 80 * cos(rightAngle)).round();
+    report.rightStick.y = (128 + 80 * sin(2 * rightAngle)).round();
 
     // Left trigger: sine wave (0-255)
     report.leftTrigger.value = ((sin(time * 2) + 1) * 127.5).round();
@@ -262,7 +243,9 @@ class SimpleGamepad extends HIDFunctionFs {
 
     // D-pad: rotate through all 8 directions (plus center)
     final dpadCycle = (time * 0.5).floor() % 9;
-    report.dpad = dpadCycle; // 0-7 = directions, 8 = center
+    report.dpad = dpadCycle < 8
+        ? dpadCycle
+        : 15; // 0-7 = directions, 15 = center
 
     // Buttons: sequential toggle pattern
     report.releaseAllButtons();
@@ -274,21 +257,21 @@ class SimpleGamepad extends HIDFunctionFs {
 Future<void> main() async {
   final gamepad = SimpleGamepad();
   final gadget = Gadget(
-    name: 'simple_gamepad',
-    idVendor: 0x1234,
-    idProduct: 0x5678,
+    name: 'generic_gamepad',
+    idVendor: 0x1209,
+    idProduct: 0x0001,
     deviceClass: .composite,
     strings: const {
       .enUS: .new(
-        manufacturer: 'Custom',
-        product: 'Simple Gamepad',
-        serialnumber: 'GAMEPAD001',
+        manufacturer: 'Generic',
+        product: 'USB Gamepad',
+        serialnumber: 'GP000001',
       ),
     },
     config: .new(
       attributes: .busPowered,
       maxPower: .fromMilliAmps(500),
-      strings: const {.enUS: 'Gamepad Configuration'},
+      strings: const {.enUS: 'USB Gamepad Configuration'},
       functions: [gamepad],
     ),
   );
