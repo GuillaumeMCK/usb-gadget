@@ -208,7 +208,7 @@ class SimpleGamepad extends HIDFunctionFs {
           return timer.cancel();
         }
         _animateFrame();
-        epIn.write(report.toBytes());
+        epIn.writeAsync(report.toBytes());
       },
     );
   }
