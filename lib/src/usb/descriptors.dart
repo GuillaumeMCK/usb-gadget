@@ -222,7 +222,7 @@ abstract class USBDescriptor {
   /// Use this to supply pre-built descriptors without needing explicit
   /// Dart structures. The first byte must contain the descriptor length,
   /// and the second byte must contain the descriptor type.
-  factory USBDescriptor.raw(List<int> bytes) = _RawUSBDescriptor;
+  factory USBDescriptor.raw(List<int> bytes) = RawUSBDescriptor;
 
   /// Parses a descriptor from bytes.
   ///
@@ -273,7 +273,7 @@ abstract class USBDescriptor {
       0x30 => USBSSEPCompDescriptor.parse(bytes),
       0x31 => USBSSPIsocEndpointDescriptor.parse(bytes),
       0x0B => USBInterfaceAssocDescriptor.parse(bytes),
-      _ => _RawUSBDescriptor(bytes),
+      _ => RawUSBDescriptor(bytes),
     };
   }
 
@@ -298,8 +298,8 @@ abstract class USBDescriptor {
 }
 
 /// Raw USB descriptor wrapper.
-class _RawUSBDescriptor implements USBDescriptor {
-  _RawUSBDescriptor(List<int> bytes)
+class RawUSBDescriptor implements USBDescriptor {
+  RawUSBDescriptor(List<int> bytes)
     : assert(bytes.length >= 2, 'Descriptor data must be at least 2 bytes'),
       _data = Uint8List.fromList(bytes);
 
