@@ -347,11 +347,9 @@ class Gadget with USBGadgetLogger {
       throw StateError('Gadget is not bound to any UDC');
     }
 
-    final statePath = '/sys/class/udc/$_boundUdc/state';
-    final stateFile = File(statePath);
-
+    final stateFile = File('/sys/class/udc/$_boundUdc/state');
     if (!stateFile.existsSync()) {
-      throw StateError('UDC state file not found: $statePath');
+      throw StateError('UDC state file not found: ${stateFile.path}');
     }
 
     final startTime = DateTime.now();
