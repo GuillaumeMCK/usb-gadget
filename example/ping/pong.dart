@@ -29,15 +29,16 @@ class PongFunction extends FunctionFs {
         speeds: {.fullSpeed, .highSpeed},
       );
 
-  late final epIn = getEndpoint<EndpointInFile>(1);
+  late final epIn = getEndpoint<EndpointInFile>(.ep1);
 
-  late final epOut = getEndpoint<EndpointOutFile>(2);
+  late final epOut = getEndpoint<EndpointOutFile>(.ep2);
 
   StreamSubscription<Uint8List>? _dataSubscription;
 
   @override
-  void onEnable() {
+  Future<void> onEnable() async {
     super.onEnable();
+    await waitUSBDeviceState(.configured);
     _dataSubscription = epOut.stream().listen((data) {
       stdout.writeln('Received data:');
       data.xxd();
