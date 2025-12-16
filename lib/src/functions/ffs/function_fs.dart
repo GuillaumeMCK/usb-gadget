@@ -67,8 +67,8 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
   /// Control endpoint (ep0) file
   late EndpointControlFile _ep0;
 
-  /// Map of endpoint address to endpoint file
-  final Map<int, EndpointFile> _endpointByAddress = {};
+  /// Map of endpoints by their addresses
+  final Map<EndpointAddress, EndpointFile> _endpoints = {};
 
   /// State stream
   final StreamController<FunctionFsState> _stateController = .broadcast();
@@ -182,21 +182,21 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
     await _eventSubscription?.cancel();
     _eventSubscription = null;
 
-    if (_endpointByAddress.isNotEmpty) {
-      for (final ep in _endpointByAddress.values) {
+    if (_endpoints.isNotEmpty) {
+      for (final ep in _endpoints.values) {
         try {
           log?.info('Closing endpoint: ${ep.fd}');
-          ep.close();
+          await ep.close();
         } catch (err) {
           log?.warn('Failed to close endpoint: $err');
         }
       }
-      _endpointByAddress.clear();
+      _endpoints.clear();
     }
 
     try {
       log?.info('Closing EP0 and unmounting FunctionFs...');
-      _ep0.close();
+      await _ep0.close();
     } catch (err) {
       log?.warn('Failed to close EP0: $err');
     }
@@ -228,7 +228,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
       final endpoint = desc.address.isIn
           ? EndpointInFile(epPath)
           : EndpointOutFile(epPath, config: desc.config);
-      _endpointByAddress[desc.address.value] = endpoint;
+      _endpoints[desc.address] = endpoint;
       endpoint.open();
       log?.info('Opened ${desc.address} at $epPath (fd: ${endpoint.fd})');
       index++;
@@ -272,22 +272,19 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
   };
 
   /// Gets an endpoint by number and direction.
-  T getEndpoint<T extends EndpointFile>(int number) {
-    assert(
-      number >= 0 && number <= 15,
-      'Endpoint number must be between 0 and 15',
-    );
-    final address = T == EndpointInFile ? 0x80 | number : number;
-    final endpoint = _endpointByAddress[address];
+  T getEndpoint<T extends EndpointFile>(EndpointNumber number) {
+    final address = switch (T) {
+      const (EndpointInFile) => EndpointAddress.in_(number),
+      const (EndpointOutFile) => EndpointAddress.out(number),
+      Type() => throw StateError('Unsupported endpoint type $T'),
+    };
+    final endpoint = _endpoints[address];
     if (endpoint == null) {
-      throw StateError(
-        'No endpoint found with address ${address.toHex()}. '
-        'Available: ${_endpointByAddress.keys.map((k) => k.toHex()).join(', ')}',
-      );
+      throw StateError('No endpoint found with the number $number');
     }
     if (endpoint is! T) {
       throw StateError(
-        'Endpoint ${address.toHex()} is ${endpoint.runtimeType}, not $T',
+        'Endpoint $number is not of expected type ${T.runtimeType}',
       );
     }
     return endpoint;
@@ -365,7 +362,8 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
           if (index != 0) return _ep0.halt();
           status = 0;
         case .endpoint:
-          final endpoint = _endpointByAddress[index];
+          final address = EndpointAddress.fromByte(index);
+          final endpoint = _endpoints[address];
           if (endpoint == null) return _ep0.halt();
           status = endpoint.isHalted ? 1 : 0;
         default:
@@ -381,7 +379,8 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
     if ((isSet || isClear) && direction.isOut && length == 0) {
       final enable = isSet;
       if (recipient == .endpoint && value == USBFeature.endpointHalt.value) {
-        final endpoint = _endpointByAddress[index];
+        final address = EndpointAddress.fromByte(index);
+        final endpoint = _endpoints[address];
         if (endpoint == null) return _ep0.halt();
         if (enable) {
           endpoint.halt();
