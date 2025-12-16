@@ -12,30 +12,39 @@ import '/usb_gadget.dart';
 /// - Output-only (LED controllers, rare)
 sealed class HIDFunctionFsConfig {
   const HIDFunctionFsConfig({
-    required this.pollingIntervalMs,
     required this.maxPacketSize,
+    this.pollingIntervalMs = 10,
+    this.reportIntervalMs = 10,
   });
 
   /// Creates an output-only HID configuration (single OUT endpoint).
   const factory HIDFunctionFsConfig.outputOnly({
     int pollingIntervalMs,
     int maxPacketSize,
+    EndpointNumber endpointNumber,
   }) = _OutputOnlyConfig;
 
   /// Creates an input-only HID configuration (single IN endpoint).
   const factory HIDFunctionFsConfig.inputOnly({
-    int pollingIntervalMs,
+    int reportIntervalMs,
     int maxPacketSize,
+    EndpointNumber endpointNumber,
   }) = _InputOnlyConfig;
 
   /// Creates a bidirectional HID configuration (IN + OUT endpoints).
   const factory HIDFunctionFsConfig.bidirectional({
     int pollingIntervalMs,
+    int reportIntervalMs,
     int maxPacketSize,
+    EndpointNumber inEndpointNumber,
+    EndpointNumber outEndpointNumber,
   }) = _BidirectionalConfig;
 
-  /// Polling interval in milliseconds (1-255 for Full-Speed).
+  /// Polling interval in milliseconds (for OUT endpoint, if applicable).
   final int pollingIntervalMs;
+
+  /// Report interval in milliseconds (for IN endpoint, if applicable).
+  final int reportIntervalMs;
 
   /// Maximum packet size for interrupt endpoints.
   final int maxPacketSize;
@@ -51,14 +60,23 @@ sealed class HIDFunctionFsConfig {
 
   /// Whether this config has an OUT endpoint.
   bool get hasOutputEndpoint;
+
+  /// Endpoint number for IN transfers (null if not applicable).
+  EndpointNumber? get inEndpointNumber => null;
+
+  /// Endpoint number for OUT transfers (null if not applicable).
+  EndpointNumber? get outEndpointNumber => null;
 }
 
 /// Input-only HID configuration (IN endpoint only).
 final class _InputOnlyConfig extends HIDFunctionFsConfig {
   const _InputOnlyConfig({
-    super.pollingIntervalMs = 10,
+    super.reportIntervalMs,
     super.maxPacketSize = 64,
+    this.endpointNumber = EndpointNumber.ep1,
   });
+
+  final EndpointNumber endpointNumber;
 
   @override
   int get numEndpoints => 1;
@@ -70,9 +88,12 @@ final class _InputOnlyConfig extends HIDFunctionFsConfig {
   bool get hasOutputEndpoint => false;
 
   @override
+  EndpointNumber get inEndpointNumber => endpointNumber;
+
+  @override
   List<USBDescriptor> get descriptors => [
     EndpointTemplate(
-      address: const EndpointAddress.in_(EndpointNumber.ep1),
+      address: EndpointAddress.in_(endpointNumber),
       config: EndpointConfig.interrupt(
         pollingMs: pollingIntervalMs,
         maxPacketSize: maxPacketSize,
@@ -84,9 +105,18 @@ final class _InputOnlyConfig extends HIDFunctionFsConfig {
 /// Bidirectional HID configuration (IN + OUT endpoints).
 final class _BidirectionalConfig extends HIDFunctionFsConfig {
   const _BidirectionalConfig({
-    super.pollingIntervalMs = 10,
+    super.pollingIntervalMs,
+    super.reportIntervalMs,
     super.maxPacketSize = 64,
+    this.inEndpointNumber = EndpointNumber.ep1,
+    this.outEndpointNumber = EndpointNumber.ep2,
   });
+
+  @override
+  final EndpointNumber inEndpointNumber;
+
+  @override
+  final EndpointNumber outEndpointNumber;
 
   @override
   int get numEndpoints => 2;
@@ -100,14 +130,14 @@ final class _BidirectionalConfig extends HIDFunctionFsConfig {
   @override
   List<USBDescriptor> get descriptors => [
     EndpointTemplate(
-      address: const EndpointAddress.in_(EndpointNumber.ep1),
+      address: EndpointAddress.in_(inEndpointNumber),
       config: EndpointConfig.interrupt(
-        pollingMs: pollingIntervalMs,
+        pollingMs: reportIntervalMs,
         maxPacketSize: maxPacketSize,
       ),
     ),
     EndpointTemplate(
-      address: const EndpointAddress.out(EndpointNumber.ep2),
+      address: EndpointAddress.out(outEndpointNumber),
       config: EndpointConfig.interrupt(
         pollingMs: pollingIntervalMs,
         maxPacketSize: maxPacketSize,
@@ -121,7 +151,10 @@ final class _OutputOnlyConfig extends HIDFunctionFsConfig {
   const _OutputOnlyConfig({
     super.pollingIntervalMs = 10,
     super.maxPacketSize = 64,
+    this.endpointNumber = EndpointNumber.ep1,
   });
+
+  final EndpointNumber endpointNumber;
 
   @override
   int get numEndpoints => 1;
@@ -133,9 +166,12 @@ final class _OutputOnlyConfig extends HIDFunctionFsConfig {
   bool get hasOutputEndpoint => true;
 
   @override
+  EndpointNumber get outEndpointNumber => endpointNumber;
+
+  @override
   List<USBDescriptor> get descriptors => [
     EndpointTemplate(
-      address: const EndpointAddress.out(EndpointNumber.ep1),
+      address: EndpointAddress.out(endpointNumber),
       config: EndpointConfig.interrupt(
         pollingMs: pollingIntervalMs,
         maxPacketSize: maxPacketSize,
@@ -151,7 +187,7 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
     required this.reportDescriptor,
     required this.subclass,
     required this.protocol,
-    required this.endpointConfig,
+    required this.config,
     super.speeds,
     super.strings,
     super.flags,
@@ -159,13 +195,13 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
          descriptors: [
            USBInterfaceDescriptor(
              interfaceNumber: InterfaceNumber.interface0,
-             numEndpoints: EndpointCount(endpointConfig.numEndpoints),
+             numEndpoints: EndpointCount(config.numEndpoints),
              interfaceClass: USBClass.hid,
              interfaceSubClass: subclass.value,
              interfaceProtocol: protocol.value,
            ),
            USBHIDDescriptor(reportDescriptorLength: reportDescriptor.length),
-           ...endpointConfig.descriptors,
+           ...config.descriptors,
          ],
        );
 
@@ -179,7 +215,7 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   final HIDProtocol protocol;
 
   /// Endpoint configuration (input-only, bidirectional, output-only).
-  final HIDFunctionFsConfig endpointConfig;
+  final HIDFunctionFsConfig config;
 
   /// Current idle rate for input reports (in 4ms units).
   /// 0 means infinite (only report on change).
@@ -197,27 +233,46 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   /// Interrupt OUT endpoint for receiving reports from the host.
   EndpointOutFile? _interruptOut;
 
+  /// Interrupt IN endpoint for sending reports to the host.
+  EndpointInFile get epIn {
+    assert(
+      _interruptIn != null,
+      'Device has no input endpoint. Ensure config.hasInputEndpoint '
+      'is true and device is enabled.',
+    );
+    return _interruptIn!;
+  }
+
+  /// Interrupt OUT endpoint for receiving reports from the host.
+  EndpointOutFile get epOut {
+    assert(
+      _interruptOut != null,
+      'Device has no output endpoint. Ensure config.hasOutputEndpoint '
+      'is true and device is enabled.',
+    );
+    return _interruptOut!;
+  }
+
   @override
   @mustCallSuper
   void onEnable() {
-    // Get IN endpoint if present (always EP1 for input-only or bidirectional)
-    if (endpointConfig.hasInputEndpoint) {
+    // Get IN endpoint if present
+    if (config.hasInputEndpoint) {
+      final epNum = config.inEndpointNumber!;
       try {
-        _interruptIn = getEndpoint<EndpointInFile>(1);
-        log?.info('IN endpoint ready: EP1');
+        _interruptIn = getEndpoint<EndpointInFile>(epNum);
+        log?.info('IN endpoint ready: $epNum');
       } catch (err) {
         log?.error('Failed to get IN endpoint: $err');
       }
     }
 
-    // Get OUT endpoint:
-    // - EP2 for bidirectional (EP1 is IN)
-    // - EP1 for output-only (no IN endpoint)
-    if (endpointConfig.hasOutputEndpoint) {
-      final epNumber = endpointConfig.hasInputEndpoint ? 2 : 1;
+    // Get OUT endpoint if present
+    if (config.hasOutputEndpoint) {
+      final epNum = config.outEndpointNumber!;
       try {
-        _interruptOut = getEndpoint<EndpointOutFile>(epNumber);
-        log?.info('OUT endpoint ready: EP$epNumber');
+        _interruptOut = getEndpoint<EndpointOutFile>(epNum);
+        log?.info('OUT endpoint ready: $epNum');
       } catch (err) {
         log?.error('Failed to get OUT endpoint: $err');
       }
@@ -397,21 +452,11 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
 
   // Public API for subclasses
 
-  /// Sends a HID input report to the host via the interrupt IN endpoint.
-  void sendReport(Uint8List report) {
-    assert(
-      _interruptIn != null,
-      'Device has no input endpoint. Ensure endpointConfig.hasInputEndpoint '
-      'is true and device is enabled.',
-    );
-    _interruptIn!.write(report);
-  }
-
   /// Streams reports from the interrupt OUT endpoint.
   Stream<Uint8List> streamReports() {
     assert(
       _interruptOut != null,
-      'Device has no output endpoint. Ensure endpointConfig.hasOutputEndpoint '
+      'Device has no output endpoint. Ensure config.hasOutputEndpoint '
       'is true and device is enabled.',
     );
     return _interruptOut!.stream();
