@@ -34,8 +34,8 @@ class PrinterFunction extends KernelFunction {
 
   @override
   Map<String, String> getConfigAttributes() => {
-    if (pnpString != null) 'pnp_string': pnpString!,
-    if (queueLength != null) 'q_len': queueLength.toString(),
+    'pnp_string': ?pnpString,
+    'q_len': ?queueLength?.toString(),
   };
 
   /// Gets the printer device path (e.g., /dev/g_printer0).

@@ -246,8 +246,6 @@ class StringIndex {
 /// - Bits 2-3: Synchronization type
 /// - Bits 4-5: Usage type
 class EndpointAttributes {
-  const EndpointAttributes._(this.transferType, this._extraBits);
-
   /// Control transfer endpoint.
   ///
   /// Structured transfers for device configuration. All devices have a
@@ -422,10 +420,8 @@ enum IsoUsageType {
 /// SuperSpeed limits (USB 3.0+, 5+ Gbps):
 /// - All: 512 or 1024 bytes
 class MaxPacketSize {
-  const MaxPacketSize._(this.size, this._extraBits);
-
   /// Full-speed control endpoint (8, 16, 32, or 64 bytes).
-  MaxPacketSize.fullSpeedControl(this.size)
+  const MaxPacketSize.fullSpeedControl(this.size)
     : assert(
         size == 8 || size == 16 || size == 32 || size == 64,
         'Full-speed control must be 8, 16, 32, or 64 bytes',
@@ -433,7 +429,7 @@ class MaxPacketSize {
       _extraBits = 0;
 
   /// Full-speed bulk endpoint (8, 16, 32, or 64 bytes).
-  MaxPacketSize.fullSpeedBulk(this.size)
+  const MaxPacketSize.fullSpeedBulk(this.size)
     : assert(
         size == 8 || size == 16 || size == 32 || size == 64,
         'Full-speed bulk must be 8, 16, 32, or 64 bytes',
@@ -441,7 +437,7 @@ class MaxPacketSize {
       _extraBits = 0;
 
   /// Full-speed interrupt endpoint (0-64 bytes).
-  MaxPacketSize.fullSpeedInterrupt(this.size)
+  const MaxPacketSize.fullSpeedInterrupt(this.size)
     : assert(
         size >= 0 && size <= 64,
         'Full-speed interrupt must be 0-64 bytes',
@@ -449,7 +445,7 @@ class MaxPacketSize {
       _extraBits = 0;
 
   /// Full-speed isochronous endpoint (0-1023 bytes).
-  MaxPacketSize.fullSpeedIsochronous(this.size)
+  const MaxPacketSize.fullSpeedIsochronous(this.size)
     : assert(
         size >= 0 && size <= 1023,
         'Full-speed isochronous must be 0-1023 bytes',
@@ -463,7 +459,7 @@ class MaxPacketSize {
   const MaxPacketSize.highSpeedBulk() : size = 512, _extraBits = 0;
 
   /// High-speed interrupt endpoint (0-1024 bytes).
-  MaxPacketSize.highSpeedInterrupt(this.size)
+  const MaxPacketSize.highSpeedInterrupt(this.size)
     : assert(
         size >= 0 && size <= 1024,
         'High-speed interrupt must be 0-1024 bytes',
@@ -476,7 +472,7 @@ class MaxPacketSize {
   /// microframe (1-3). The actual value is encoded as (value - 1) in bits 11-12.
   /// This allows high-bandwidth isochronous endpoints to transfer multiple
   /// packets per 125μs microframe.
-  MaxPacketSize.highSpeedIsochronous({
+  const MaxPacketSize.highSpeedIsochronous({
     required this.size,
     required int transactionsPerMicroframe,
   }) : assert(
@@ -490,7 +486,7 @@ class MaxPacketSize {
        _extraBits = (transactionsPerMicroframe - 1) << 11;
 
   /// SuperSpeed endpoint (512 or 1024 bytes).
-  MaxPacketSize.superSpeed(this.size)
+  const MaxPacketSize.superSpeed(this.size)
     : assert(
         size == 512 || size == 1024,
         'SuperSpeed must be 512 or 1024 bytes',
@@ -547,15 +543,13 @@ class MaxPacketSize {
 /// - Bulk/Control: Ignored (set to 0)
 /// - Interrupt/Isochronous: 1-16 (actual interval = 2^(value-1) × 125μs)
 class PollingInterval {
-  const PollingInterval._(this.value);
-
   /// No polling (for control/bulk endpoints).
   const PollingInterval.none() : value = 0;
 
   /// Full-speed interrupt/isochronous interval (1-255 frames).
   ///
   /// Each frame is 1 millisecond, so valid intervals are 1-255 ms.
-  PollingInterval.fullSpeed(int frames)
+  const PollingInterval.fullSpeed(int frames)
     : assert(
         frames >= 1 && frames <= 255,
         'Full-speed interval must be 1-255 frames',
@@ -566,7 +560,7 @@ class PollingInterval {
   ///
   /// The actual interval is 2^(exponent-1) microframes (125μs units).
   /// For example, exponent=4 gives 2^3 = 8 microframes = 1 ms.
-  PollingInterval.highSpeedInterrupt(int exponent)
+  const PollingInterval.highSpeedInterrupt(int exponent)
     : assert(
         exponent >= 1 && exponent <= 16,
         'High-speed interrupt interval must be 1-16',
@@ -581,7 +575,7 @@ class PollingInterval {
   /// SuperSpeed interval (1-16).
   ///
   /// The actual interval is 2^(exponent-1) × 125μs.
-  PollingInterval.superSpeed(int exponent)
+  const PollingInterval.superSpeed(int exponent)
     : assert(
         exponent >= 1 && exponent <= 16,
         'SuperSpeed interval must be 1-16',
@@ -741,9 +735,9 @@ class EndpointConfig {
 
     if (transferType == .isochronous) {
       return switch (speed) {
-        USBSpeed.fullSpeed => .fullSpeed(1),
+        USBSpeed.fullSpeed => const .fullSpeed(1),
         USBSpeed.highSpeed => const .highSpeedIsochronous(),
-        _ => .superSpeed(1),
+        _ => const .superSpeed(1),
       };
     }
 
@@ -793,25 +787,25 @@ extension on TransferType {
 
   /// Default full-speed packet size for this transfer type.
   MaxPacketSize get defaultFullSpeedPacketSize => switch (this) {
-    TransferType.control => .fullSpeedControl(64),
-    TransferType.bulk => .fullSpeedBulk(64),
-    TransferType.interrupt => .fullSpeedInterrupt(64),
-    TransferType.isochronous => .fullSpeedIsochronous(1023),
+    TransferType.control => const .fullSpeedControl(64),
+    TransferType.bulk => const .fullSpeedBulk(64),
+    TransferType.interrupt => const .fullSpeedInterrupt(64),
+    TransferType.isochronous => const .fullSpeedIsochronous(1023),
   };
 
   /// Default high-speed packet size for this transfer type.
   MaxPacketSize get defaultHighSpeedPacketSize => switch (this) {
     TransferType.control => const .highSpeedControl(),
     TransferType.bulk => const .highSpeedBulk(),
-    TransferType.interrupt => .highSpeedInterrupt(1024),
-    TransferType.isochronous => .highSpeedIsochronous(
+    TransferType.interrupt => const .highSpeedInterrupt(1024),
+    TransferType.isochronous => const .highSpeedIsochronous(
       size: 1024,
       transactionsPerMicroframe: 1,
     ),
   };
 
   /// Default SuperSpeed packet size for this transfer type.
-  MaxPacketSize get defaultSuperSpeedPacketSize => .superSpeed(512);
+  MaxPacketSize get defaultSuperSpeedPacketSize => const .superSpeed(512);
 }
 
 /// Type-safe SuperSpeed burst size (0-15).
@@ -861,8 +855,6 @@ class BurstSize {
 /// - Isochronous endpoints: Bits 0-1 specify mult (0-2)
 /// - Interrupt/Control endpoints: Reserved, must be 0
 class SSEndpointAttributes {
-  const SSEndpointAttributes._(this.value);
-
   /// Bulk endpoint attributes.
   ///
   /// [streams] specifies the maximum number of bulk streams supported.
