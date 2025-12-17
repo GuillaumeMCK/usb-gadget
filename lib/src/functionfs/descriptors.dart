@@ -107,7 +107,7 @@ class FunctionFsStrings {
   ///   - lang_id (2 bytes)
   ///   - NULL-separated, NULL-terminated UTF-8 strings
   ///
-  /// Returns a byte array ready to be written to /dev/usb-gadget/<function>/ep0
+  /// Returns a byte array ready to be written to /dev/usb-gadget/&ltfunction&gt/ep0
   /// after writing the descriptors.
   Uint8List toBytes() {
     final buffer = BytesBuilder(copy: false);
