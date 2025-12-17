@@ -80,7 +80,6 @@ final class _WriterIsolate {
 
   int _fd = -1;
   int _bufferSize = 0;
-  int _maxInFlight = 0;
   int _fileOffset = 0;
   int _nextOpId = 0;
 
@@ -121,7 +120,6 @@ final class _WriterIsolate {
   void _initialize(int fd, int bufferSize, int maxInFlight) {
     _fd = fd;
     _bufferSize = bufferSize;
-    _maxInFlight = maxInFlight;
 
     _context = AioContext(maxConcurrent: maxInFlight);
     _bufferPool = BufferPool(bufferSize, maxInFlight);
