@@ -1,6 +1,7 @@
 name: usb_gadget
-description: A Dart library for interfacing with Linux FunctionFs to create USB gadget functions. Supports USB device emulation on Linux systems with configfs.
-version: 1.0.0
+description: Expose standard or fully custom USB peripherals (gadgets) through a USB device controller (UDC) on Linux.
+version: 0.1.0
+homepage: https://github.com/GuillaumeMCK/usb-gadget
 
 environment:
   sdk: ^3.10.0
