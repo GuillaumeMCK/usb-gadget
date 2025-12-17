@@ -39,6 +39,9 @@ class HIDFunction extends KernelFunction {
   /// Gets the HID device file handle for writing reports.
   /// Lazily opens the file on first access.
   RandomAccessFile get file {
+    if (_file != null) {
+      return _file!;
+    }
     final (major, minor) = device();
     final path = '/dev/hidg$minor';
     return _file ??= File(path).openSync(mode: .writeOnlyAppend);
