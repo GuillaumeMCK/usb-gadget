@@ -1,39 +1,46 @@
 /// USB speed levels.
 ///
 /// Defines the different USB speed modes that affect endpoint configuration,
-/// packet sizes, and polling intervals.
-enum USBSpeed {
-  /// Full-Speed (USB 1.1, 12 Mbps).
-  ///
-  /// Original USB speed supporting:
-  /// - Control: 8/16/32/64 byte packets
-  /// - Bulk: 8/16/32/64 byte packets
-  /// - Interrupt: 1-64 byte packets, 1ms polling
-  /// - Isochronous: 1-1023 byte packets, 1ms polling
-  fullSpeed,
+/// packet sizes, and polling intervals. Implements [Comparable] to allow
+/// speed comparisons (faster > slower).
+enum Speed implements Comparable<Speed> {
+  /// USB 3.1: 10 Gbit/s.
+  superSpeedPlus('super-speed-plus', 6),
 
-  /// High-Speed (USB 2.0, 480 Mbps).
-  ///
-  /// Enhanced speed supporting:
-  /// - Control: 64 byte packets
-  /// - Bulk: 512 byte packets
-  /// - Interrupt: 1-1024 byte packets, 125μs-4096ms
-  /// - Isochronous: 1-1024 byte packets, up to 3 per microframe
-  highSpeed,
+  /// USB 3.0: 5 Gbit/s.
+  superSpeed('super-speed', 5),
 
-  /// SuperSpeed (USB 3.0/3.1, 5-10 Gbps).
-  ///
-  /// High performance supporting:
-  /// - All transfer types: 512 or 1024 byte packets
-  /// - Burst transfers for improved throughput
-  /// - Stream support for bulk endpoints
-  superSpeed,
+  /// USB 2.0: 480 Mbit/s.
+  highSpeed('high-speed', 4),
 
-  /// SuperSpeedPlus (USB 3.2, 10+ Gbps).
+  /// USB 1.0: 12 Mbit/s.
+  fullSpeed('full-speed', 3),
+
+  /// USB 1.0: 1.5 Mbit/s.
+  lowSpeed('low-speed', 2),
+
+  /// Unknown speed.
+  unknown('UNKNOWN', 0);
+
+  const Speed(this.value, this._priority);
+
+  /// The string value as it appears in sysfs/configfs files.
+  final String value;
+
+  /// Priority for comparison (higher = faster).
+  final int _priority;
+
+  /// Parses a string value into a [Speed].
   ///
-  /// Highest speed supporting same features as SuperSpeed
-  /// with doubled bandwidth through multi-lane operation.
-  superSpeedPlus;
+  /// Matches the format used in sysfs/configfs (e.g., "super-speed", "high-speed").
+  /// Returns [Speed.unknown] if the string doesn't match any speed.
+  static Speed fromString(String value) {
+    final trimmed = value.trim();
+    return Speed.values.firstWhere(
+      (s) => s.value == trimmed,
+      orElse: () => Speed.unknown,
+    );
+  }
 
   /// True if this is Full-Speed.
   bool get isFullSpeed => this == fullSpeed;
@@ -46,4 +53,19 @@ enum USBSpeed {
 
   /// True if this is SuperSpeedPlus.
   bool get isSuperSpeedPlus => this == superSpeedPlus;
+
+  /// True if this is Low-Speed.
+  bool get isLowSpeed => this == lowSpeed;
+
+  /// True if speed is unknown.
+  bool get isUnknown => this == unknown;
+
+  @override
+  int compareTo(Speed other) => _priority.compareTo(other._priority);
+
+  @override
+  String toString() => value;
 }
+
+// Legacy alias for backwards compatibility
+typedef USBSpeed = Speed;
