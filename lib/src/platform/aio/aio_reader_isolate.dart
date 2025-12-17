@@ -176,13 +176,9 @@ final class _ReaderIsolate {
       }
 
       try {
-        final completions = _context!.getCompletions(
-          timeout: const Duration(milliseconds: 10),
-        );
-
-        for (final completion in completions) {
-          _handleCompletion(completion);
-        }
+        _context!
+            .getCompletions(timeout: const Duration(milliseconds: 10))
+            .forEach(_handleCompletion);
       } catch (e, st) {
         mainPort.send(ReaderError(e, st));
         _stopped = true;
