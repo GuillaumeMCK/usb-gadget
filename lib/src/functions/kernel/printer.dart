@@ -2,6 +2,9 @@ import 'base.dart';
 
 /// Printer function (USB printer class).
 class PrinterFunction extends KernelFunction {
+  PrinterFunction({required super.name, this.pnpString, this.queueLength})
+    : super(kernelType: .printer);
+
   /// Get printer status ioctl ID.
   ///
   /// Use with ioctl() calls to get current printer status flags.
@@ -22,9 +25,6 @@ class PrinterFunction extends KernelFunction {
 
   /// Printer out of paper.
   static const int statusPaperEmpty = 1 << 5;
-
-  PrinterFunction({required super.name, this.pnpString, this.queueLength})
-    : super(kernelType: .printer);
 
   /// PNP ID string used for this printer.
   final String? pnpString;
