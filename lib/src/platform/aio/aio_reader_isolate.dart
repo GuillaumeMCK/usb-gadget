@@ -68,7 +68,6 @@ final class _ReaderIsolate {
 
   int _fd = -1;
   int _bufferSize = 0;
-  int _windowSize = 0;
   int _fileOffset = 0;
   int _nextOpId = 0;
   int _nextSeqId = 0;
@@ -106,7 +105,6 @@ final class _ReaderIsolate {
   void _initialize(int fd, int bufferSize, int windowSize) {
     _fd = fd;
     _bufferSize = bufferSize;
-    _windowSize = windowSize;
 
     _context = AioContext(maxConcurrent: windowSize);
     _bufferPool = BufferPool(bufferSize, windowSize);
