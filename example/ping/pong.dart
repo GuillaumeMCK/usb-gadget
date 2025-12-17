@@ -78,6 +78,6 @@ Future<void> main() async {
     stdout.writeln('Pong Device ready. Press Ctrl+C to exit.');
     await ProcessSignal.sigint.watch().first;
   } finally {
-    gadget.unbind();
+    await gadget.unbind();
   }
 }

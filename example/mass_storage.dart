@@ -63,6 +63,6 @@ Future<void> main(List<String> args) async {
     stdout.writeln('Ctrl+C to exit.');
     await ProcessSignal.sigint.watch().first;
   } finally {
-    gadget.unbind();
+    await gadget.unbind();
   }
 }

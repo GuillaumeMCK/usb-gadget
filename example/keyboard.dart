@@ -80,6 +80,6 @@ Future<void> main() async {
     stdout.writeln('Ctrl+C to exit.');
     await ProcessSignal.sigint.watch().first;
   } finally {
-    gadget.unbind();
+    await gadget.unbind();
   }
 }
