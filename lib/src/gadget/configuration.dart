@@ -87,7 +87,7 @@ final class GadgetMaxPower {
   /// - 50 = 100 mA
   /// - 250 = 500 mA
   ///
-  /// Most users should prefer [fromMilliAmps] for clarity.
+  /// Most users should prefer [GadgetMaxPower.fromMilliAmps] for clarity.
   ///
   /// Throws [ArgumentError] if value is outside the 0-255 range.
   GadgetMaxPower(this.value) {
