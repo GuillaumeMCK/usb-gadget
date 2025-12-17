@@ -274,9 +274,7 @@ abstract final class Mount {
       filesystemType: filesystemType,
       mountFlags: mountFlags,
       data: data,
-    );
-
-    options.validate();
+    )..validate();
 
     final sourcePtr = (options.source ?? '').toNativeUtf8();
     final targetPtr = options.target.toNativeUtf8();
