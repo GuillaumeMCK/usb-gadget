@@ -255,7 +255,7 @@ class Gadget with USBGadgetLogger {
       log?.success('Gadget bound to UDC: $_boundUdc');
     } catch (err, st) {
       log?.error('Bind failed: $err', err, st);
-      unbind();
+      await unbind();
       rethrow;
     }
   }
