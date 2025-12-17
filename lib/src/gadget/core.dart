@@ -629,4 +629,238 @@ class Gadget with USBGadgetLogger {
     linkFile.createSync(target);
     _createdSymlinks.add(link);
   }
+
+  // Static gadget management methods
+
+  /// Get all USB gadgets registered on the system.
+  ///
+  /// This returns all USB gadgets in configfs, including gadgets not created
+  /// by the running program or registered by other means.
+  ///
+  /// Example:
+  /// ```dart
+  /// final gadgets = Gadget.queryRegistered();
+  /// for (final gadget in gadgets) {
+  ///   print('Gadget: ${gadget.name}');
+  ///   print('  Path: ${gadget.path}');
+  ///   print('  UDC: ${gadget.udc ?? "(unbound)"}');
+  /// }
+  /// ```
+  static List<RegisteredGadget> queryRegistered() {
+    const gadgetDir = '/sys/kernel/config/usb_gadget';
+    final dir = Directory(gadgetDir);
+    if (!dir.existsSync()) {
+      return [];
+    }
+
+    final gadgets = <RegisteredGadget>[];
+    for (final entry in dir.listSync()) {
+      if (entry is Directory) {
+        gadgets.add(RegisteredGadget._fromDirectory(entry));
+      }
+    }
+
+    return gadgets;
+  }
+
+  /// Remove all USB gadgets defined on the system.
+  ///
+  /// This unbinds and removes all USB gadgets in configfs, including gadgets
+  /// not created by the running program or registered by other means.
+  ///
+  /// Useful for cleanup between tests or resetting the USB gadget state.
+  ///
+  /// Example:
+  /// ```dart
+  /// Gadget.removeAll();  // Clean slate
+  /// ```
+  static void removeAll() {
+    final gadgets = queryRegistered();
+    for (final gadget in gadgets) {
+      try {
+        gadget.remove();
+      } catch (err) {
+        // Continue with other gadgets even if one fails
+      }
+    }
+  }
+
+  /// Unbind all USB gadgets defined on the system.
+  ///
+  /// This unbinds all gadgets from their UDCs but leaves the configfs
+  /// structure intact. Gadgets can be re-bound by writing to their UDC file.
+  ///
+  /// Example:
+  /// ```dart
+  /// Gadget.unbindAll();  // Disconnect all but keep configuration
+  /// ```
+  static void unbindAll() {
+    final gadgets = queryRegistered();
+    for (final gadget in gadgets) {
+      try {
+        gadget.unbind();
+      } catch (err) {
+        // Continue with other gadgets even if one fails
+      }
+    }
+  }
+}
+
+/// Lightweight representation of a registered USB gadget.
+///
+/// This class represents a gadget that exists in configfs, whether it was
+/// created by the current program or by other means. It provides read-only
+/// access to gadget properties and methods to unbind or remove the gadget.
+///
+/// Use [Gadget.queryRegistered] to get all registered gadgets.
+class RegisteredGadget {
+  RegisteredGadget._fromDirectory(this._directory);
+
+  /// The configfs directory for this gadget.
+  final Directory _directory;
+
+  /// Name of this USB gadget in configfs (directory name).
+  String get name => _directory.path.split('/').last;
+
+  /// Full path of this USB gadget in configfs.
+  String get path => _directory.path;
+
+  /// The name of the USB device controller (UDC) this gadget is bound to.
+  ///
+  /// Returns null if the gadget is not bound to any UDC.
+  String? get udc {
+    final udcFile = File('${_directory.path}/UDC');
+    if (!udcFile.existsSync()) {
+      return null;
+    }
+
+    final content = udcFile.readAsStringSync().trim();
+    return content.isEmpty ? null : content;
+  }
+
+  /// Unbinds the gadget from its UDC.
+  ///
+  /// After unbinding, the gadget structure remains in configfs but is not
+  /// active on any USB device controller.
+  void unbind() {
+    final udcFile = File('${_directory.path}/UDC');
+    if (udcFile.existsSync()) {
+      try {
+        udcFile.writeAsStringSync('');
+      } catch (err) {
+        throw FileSystemException(
+          'Failed to unbind gadget $name from UDC: $err',
+        );
+      }
+    }
+  }
+
+  /// Removes the gadget from configfs.
+  ///
+  /// This method:
+  /// 1. Unbinds the gadget from any UDC
+  /// 2. Removes all symlinks (function links in configs)
+  /// 3. Removes all subdirectories (strings, configs, functions)
+  /// 4. Removes the gadget directory
+  ///
+  /// The gadget must be unbound before removal. If already unbound,
+  /// this is handled automatically.
+  void remove() {
+    // Unbind first
+    unbind();
+
+    // Remove OS descriptor symlinks
+    final osDescDir = Directory('${_directory.path}/os_desc');
+    if (osDescDir.existsSync()) {
+      for (final entry in osDescDir.listSync()) {
+        if (entry is Link) {
+          try {
+            entry.deleteSync();
+          } catch (err) {
+            // Continue even if symlink removal fails
+          }
+        }
+      }
+    }
+
+    // Remove function symlinks from configs
+    final configsDir = Directory('${_directory.path}/configs');
+    if (configsDir.existsSync()) {
+      for (final configEntry in configsDir.listSync()) {
+        if (configEntry is! Directory) continue;
+
+        // Remove function symlinks
+        for (final entry in configEntry.listSync()) {
+          if (entry is Link) {
+            try {
+              entry.deleteSync();
+            } catch (err) {
+              // Continue
+            }
+          }
+        }
+
+        // Remove string directories
+        final stringsDir = Directory('${configEntry.path}/strings');
+        if (stringsDir.existsSync()) {
+          for (final langEntry in stringsDir.listSync()) {
+            if (langEntry is Directory) {
+              try {
+                langEntry.deleteSync();
+              } catch (err) {
+                // Continue
+              }
+            }
+          }
+        }
+
+        // Remove config directory
+        try {
+          configEntry.delete();
+        } catch (err) {
+          // Continue
+        }
+      }
+    }
+
+    // Remove function directories
+    final functionsDir = Directory('${_directory.path}/functions');
+    if (functionsDir.existsSync()) {
+      for (final funcEntry in functionsDir.listSync()) {
+        if (funcEntry is Directory) {
+          try {
+            funcEntry.deleteSync();
+          } catch (err) {
+            // Continue
+          }
+        }
+      }
+    }
+
+    // Remove string directories
+    final stringsDir = Directory('${_directory.path}/strings');
+    if (stringsDir.existsSync()) {
+      for (final langEntry in stringsDir.listSync()) {
+        if (langEntry is Directory) {
+          try {
+            langEntry.deleteSync();
+          } catch (err) {
+            // Continue
+          }
+        }
+      }
+    }
+
+    // Remove gadget directory
+    try {
+      _directory.deleteSync();
+    } catch (err) {
+      throw FileSystemException(
+        'Failed to remove gadget directory $path: $err',
+      );
+    }
+  }
+
+  @override
+  String toString() => 'RegisteredGadget(name: $name, udc: $udc)';
 }
