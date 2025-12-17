@@ -99,9 +99,9 @@ class Udc {
   }
 
   /// Reads a sysfs attribute file for this UDC.
-  Future<String> _readAttribute(String name) async {
+  Future<String> _readAttribute(String name) {
     final file = File('${_directory.path}/$name');
-    return await file.readAsString();
+    return file.readAsString();
   }
 
   /// Writes to a sysfs attribute file for this UDC.
