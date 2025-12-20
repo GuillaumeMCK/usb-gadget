@@ -1,9 +1,8 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'hex.dart';
 
 extension XXDExt on Uint8List {
-  void xxd() {
+  String xxd() {
     final hexDump = StringBuffer();
     for (var i = 0; i < length; i += 16) {
       hexDump.write('${i.toHex(padding: 4)}:  ');
@@ -26,6 +25,6 @@ extension XXDExt on Uint8List {
       }
       hexDump.write('|\n');
     }
-    stdout.write(hexDump.toString());
+    return '\n$hexDump';
   }
 }

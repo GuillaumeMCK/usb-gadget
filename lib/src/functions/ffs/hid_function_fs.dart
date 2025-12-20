@@ -299,14 +299,13 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
           reportDescriptorLength: reportDescriptor.length,
         );
         final bytes = hidDesc.toBytes();
-        if (log?.level == .debug) bytes.xxd();
+        log?.debug(bytes.xxd());
         final sendLength = length < bytes.length ? length : bytes.length;
         ep0.write(bytes.sublist(0, sendLength));
         return;
       }
       if (descriptorType == HIDDescriptorType.report) {
-        log?.info('Providing HID report descriptor');
-        if (log?.level == .debug) reportDescriptor.xxd();
+        log?.debug('Providing HID report descriptor:${reportDescriptor.xxd()}');
         final sendLength = length < reportDescriptor.length
             ? length
             : reportDescriptor.length;

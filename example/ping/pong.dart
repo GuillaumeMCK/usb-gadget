@@ -41,7 +41,7 @@ class PongFunction extends FunctionFs {
     await waitUSBDeviceState(.configured);
     _dataSubscription = epOut.stream().listen((data) {
       stdout.writeln('Received data:');
-      data.xxd();
+      log?.debug(data.xxd());
       epIn.write(data);
     }, cancelOnError: false);
   }

@@ -144,15 +144,11 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
       if (generatedSsDs != null) descBuilder.superSpeed = generatedSsDs;
       if (generatedSspDs != null) descBuilder.superSpeedPlus = generatedSspDs;
 
-      log?.info('Writing descriptors to EP0...');
       final descriptor = descBuilder.build().toBytes();
-      if (log?.level == .debug) descriptor.xxd();
+      log?.debug('Writing descriptors to EP0:${descriptor.xxd()}');
       _ep0.write(descriptor);
 
       if (strings.isNotEmpty) {
-        log?.info(
-          'Writing string descriptors (${strings.length} language(s))...',
-        );
         final builder = FunctionFsStringsBuilder();
         for (final entry in strings.entries) {
           builder.addLanguage(
@@ -160,7 +156,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
           );
         }
         final stringBytes = builder.build().toBytes();
-        if (log?.level == .debug) stringBytes.xxd();
+        log?.debug('Writing strings to EP0:${stringBytes.xxd()}');
         _ep0.write(stringBytes);
       }
 
