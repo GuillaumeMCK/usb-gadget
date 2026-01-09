@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import '/src/utils/utils.dart';
 import '/usb_gadget.dart';
 
 /// Event type constants.

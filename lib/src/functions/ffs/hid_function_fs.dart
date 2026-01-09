@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
 
+import '/src/logger/logger.dart';
+import '/src/utils/utils.dart';
 import '/usb_gadget.dart';
 
 /// Configuration for HID endpoint topology and parameters.

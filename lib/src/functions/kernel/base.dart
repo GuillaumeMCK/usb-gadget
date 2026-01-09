@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:meta/meta.dart';
 
+import '/src/logger/logger.dart';
 import '/usb_gadget.dart';
 
 /// Types of kernel-based USB gadget functions

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:usb_gadget/src/utils/utils.dart';
 import 'package:usb_gadget/usb_gadget.dart';
 
 class PongFunction extends FunctionFs {

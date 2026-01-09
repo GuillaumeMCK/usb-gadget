@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
 
+import '/src/logger/logger.dart';
+import '/src/utils/utils.dart';
 import '/usb_gadget.dart';
 
 /// FunctionFs lifecycle states
@@ -145,7 +147,9 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
       if (generatedSspDs != null) descBuilder.superSpeedPlus = generatedSspDs;
 
       final descriptor = descBuilder.build().toBytes();
-      log?.debug('Writing descriptors to EP0:${descriptor.xxd()}');
+      log?.debug(
+        'Writing descriptors to EP0 (${descriptor.length}) :${descriptor.xxd()}',
+      );
       _ep0.write(descriptor);
 
       if (strings.isNotEmpty) {

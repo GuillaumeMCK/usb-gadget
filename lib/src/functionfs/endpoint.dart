@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import '/src/logger/logger.dart';
+import '/src/platform/platform.dart';
 import '/usb_gadget.dart';
 
 /// Base class for FunctionFs endpoint file descriptors.

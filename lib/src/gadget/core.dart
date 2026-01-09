@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import '/src/logger/logger.dart';
+import '/src/utils/utils.dart';
 import '/usb_gadget.dart';
 
 /// USB Device Controller (UDC) states.
