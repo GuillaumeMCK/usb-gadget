@@ -2,16 +2,19 @@ import 'dart:ffi' as ffi;
 import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:meta/meta.dart';
+import 'package:using/using.dart';
 import '/src/logger/logger.dart';
 import '../errno/errno.dart';
 import 'aio.ffi.dart' hide iocb;
 import 'aio.ffi.dart' as aio_ffi show iocb;
 
+/// Internal bindings for Linux kernel AIO (libaio).
 class AioBindings {
   AioBindings._();
 
   static final Aio _instance = Aio(ffi.DynamicLibrary.open('libaio.so'));
 
+  /// The singleton instance of the [Aio] bindings.
   static Aio get instance => _instance;
 }
 
@@ -19,17 +22,31 @@ class AioBindings {
 // Resource Pool - Reusable buffers
 // ============================================================================
 
-final class BufferPool {
+/// A pool of reusable memory buffers for AIO operations.
+///
+/// This class manages native memory buffers allocated via `calloc`.
+/// It is [Releasable] and will free all buffers when released.
+final class BufferPool with Releasable {
+  /// Creates a new [BufferPool] with [poolSize] buffers of [bufferSize] bytes each.
   BufferPool(this.bufferSize, this.poolSize) {
     _pool = List.generate(poolSize, (_) => calloc<ffi.Uint8>(bufferSize));
   }
 
+  /// The size of each buffer in bytes.
   final int bufferSize;
+
+  /// The total number of buffers in the pool.
   final int poolSize;
   late final List<ffi.Pointer<ffi.Uint8>> _pool;
   final Set<ffi.Pointer<ffi.Uint8>> _inUse = {};
 
+  /// Acquires a buffer from the pool.
+  ///
+  /// Returns a pointer to a buffer if one is available and the pool is not released,
+  /// otherwise returns `null`.
   ffi.Pointer<ffi.Uint8>? acquire() {
+    if (isReleased) return null;
+
     final available = _pool.where((p) => !_inUse.contains(p));
     if (available.isEmpty) return null;
 
@@ -38,19 +55,26 @@ final class BufferPool {
     return buffer;
   }
 
-  void release(ffi.Pointer<ffi.Uint8> buffer) {
+  /// Marks a [buffer] as available for reuse.
+  void releaseBuffer(ffi.Pointer<ffi.Uint8> buffer) {
     _inUse.remove(buffer);
   }
 
-  void dispose() {
-    _pool
-      ..forEach(calloc.free)
-      ..clear();
-    _inUse.clear();
+  @override
+  void release() {
+    if (!isReleased) {
+      _pool
+        ..forEach(calloc.free)
+        ..clear();
+      _inUse.clear();
+      super.release();
+    }
   }
 
-  int get available => poolSize - _inUse.length;
+  /// The number of available buffers in the pool.
+  int get available => isReleased ? 0 : poolSize - _inUse.length;
 
+  /// The number of buffers currently in use.
   int get inUse => _inUse.length;
 }
 
@@ -58,10 +82,13 @@ final class BufferPool {
 // Operation Tracking - Proper lifecycle management
 // ============================================================================
 
+/// A unique identifier for an AIO operation.
 @immutable
 final class OperationId {
+  /// Creates an [OperationId] with the given integer [value].
   const OperationId(this.value);
 
+  /// The raw value of the operation identifier.
   final int value;
 
   @override
@@ -72,9 +99,18 @@ final class OperationId {
   int get hashCode => value.hashCode;
 }
 
-enum OperationType { read, write }
+/// The type of AIO operation.
+enum OperationType {
+  /// Read operation.
+  read,
 
+  /// Write operation.
+  write,
+}
+
+/// Represents an AIO operation that has been submitted and is being tracked.
 final class TrackedOperation {
+  /// Creates a new [TrackedOperation].
   TrackedOperation({
     required this.id,
     required this.type,
@@ -85,14 +121,28 @@ final class TrackedOperation {
     this.userData,
   });
 
+  /// The unique identifier for this operation.
   final OperationId id;
+
+  /// The type of operation (read or write).
   final OperationType type;
+
+  /// The native buffer used for the operation.
   final ffi.Pointer<ffi.Uint8> buffer;
+
+  /// The size of the data to be transferred in bytes.
   final int size;
+
+  /// The file offset where the operation should occur.
   final int offset;
+
+  /// The native AIO control block.
   final ffi.Pointer<aio_ffi.iocb> iocb;
+
+  /// Optional opaque user data associated with the operation.
   final Object? userData;
 
+  /// Frees the native resources associated with this operation.
   void free() {
     calloc.free(iocb);
   }
@@ -102,7 +152,13 @@ final class TrackedOperation {
 // AIO Context - Event-driven completion handling
 // ============================================================================
 
+/// A context for managed Linux kernel AIO operations.
+///
+/// This class encapsulates an `io_context` and provides high-level methods for
+/// submitting operations and retrieving completion events.
 final class AioContext with PlatformLogger {
+  /// Creates an [AioContext] capable of handling up to [maxConcurrent]
+  /// pending operations.
   factory AioContext({required int maxConcurrent}) {
     if (maxConcurrent <= 0 || maxConcurrent > 65536) {
       throw ArgumentError.value(
@@ -135,12 +191,16 @@ final class AioContext with PlatformLogger {
   final Map<OperationId, TrackedOperation> _inFlight = {};
   bool _disposed = false;
 
+  /// The maximum number of concurrent operations allowed in this context.
   int get maxConcurrent => _maxConcurrent;
 
+  /// The number of operations currently in-flight.
   int get inFlightCount => _inFlight.length;
 
+  /// Whether this context has been disposed.
   bool get isDisposed => _disposed;
 
+  /// Whether a new operation can be submitted without exceeding [maxConcurrent].
   bool get canSubmit => _inFlight.length < _maxConcurrent;
 
   /// Submit operations - returns number submitted
@@ -256,7 +316,10 @@ final class AioContext with PlatformLogger {
     }
   }
 
-  /// Cancel all in-flight operations
+  /// Cancels all in-flight operations.
+  ///
+  /// Note: This does not inform the kernel of the cancellation, but removes
+  /// them from local tracking and frees their native control blocks.
   void cancelAll() {
     _checkNotDisposed();
 
@@ -266,6 +329,7 @@ final class AioContext with PlatformLogger {
     _inFlight.clear();
   }
 
+  /// Disposes this [AioContext] and releases all associated native resources.
   void dispose() {
     if (_disposed) return;
     _disposed = true;
@@ -291,24 +355,36 @@ final class AioContext with PlatformLogger {
   }
 }
 
+/// Represents the result of a completed AIO operation.
 @immutable
 final class CompletedOperation {
+  /// Creates a new [CompletedOperation].
   const CompletedOperation({
     required this.operation,
     required this.bytesTransferred,
     required this.errorCode,
   });
 
+  /// The original operation that completed.
   final TrackedOperation operation;
+
+  /// The number of bytes successfully transferred.
   final int bytesTransferred;
+
+  /// The error code, if any (0 indicates success).
   final int errorCode;
 
+  /// Whether the operation succeeded.
   bool get isSuccess => errorCode == 0;
 
+  /// Whether the end-of-file was reached during the operation.
   bool get isEof => isSuccess && bytesTransferred == 0;
 
+  /// An [OSError] representation of the result, or `null` if the operation
+  /// was successful.
   OSError? get error => isSuccess ? null : OSError('I/O error', errorCode);
 
+  /// Throws an [OSError] if the operation failed.
   void throwIfError() {
     if (!isSuccess) {
       throw Errno.toOSError(errorCode, 'I/O operation failed');

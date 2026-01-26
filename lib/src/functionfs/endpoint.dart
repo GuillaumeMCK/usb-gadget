@@ -401,7 +401,7 @@ class EndpointInFile extends EndpointFile {
     if (_fd == null) return;
 
     // Dispose AIO writer
-    _writer?.dispose();
+    await _writer?.dispose();
     _writer = null;
 
     // Close file descriptor
@@ -530,7 +530,7 @@ class EndpointOutFile extends EndpointFile {
     _streamController = null;
 
     // Dispose AIO reader
-    _reader?.dispose();
+    await _reader?.dispose();
     _reader = null;
 
     // Close file descriptor

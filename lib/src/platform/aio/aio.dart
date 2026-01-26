@@ -4,8 +4,5 @@
 /// interfaces for efficient file I/O operations.
 library;
 
-// Core primitives for advanced use
 export 'aio_context.dart' show AioContext;
-
-// High-level streaming API
-export 'aio_stream.dart' show AioReader, AioWriter;
+export 'aio_stream.dart' show AioConfig, AioReader, AioWriter;
