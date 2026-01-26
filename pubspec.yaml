@@ -9,6 +9,8 @@ environment:
 dependencies:
   ffi: ^2.1.4
   meta: ^1.17.0
+  squadron: ^7.4.0
+  using: ^1.0.5
 
 dev_dependencies:
   custom_lint: ^0.8.1
