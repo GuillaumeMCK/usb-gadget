@@ -421,10 +421,8 @@ class Gadget with USBGadgetLogger {
 
     while (_boundUdc != null) {
       final currentState = getCurrentUsbState();
-
       if (currentState != lastState) {
-        lastState = currentState;
-        yield currentState;
+        yield lastState = currentState;
       }
 
       await Future<void>.delayed(pollInterval);
