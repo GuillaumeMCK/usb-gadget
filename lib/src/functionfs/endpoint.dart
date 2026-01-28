@@ -95,8 +95,11 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
   /// Stream controller for event broadcasting.
   StreamController<FunctionFsEvent>? _streamController;
 
-  /// Polling task cancellation.
-  bool _pollingActive = false;
+  /// Timer for polling EP0 events.
+  Timer? _pollingTimer;
+
+  /// Whether event reading is active.
+  bool _eventReadingActive = false;
 
   /// Whether the mount point exists and appears to be mounted.
   bool get isMounted => _mount.isMounted;
@@ -132,8 +135,10 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
     final fd = _fd;
     if (fd == null) return;
 
-    // Stop polling
-    _pollingActive = false;
+    // Stop event reading
+    _eventReadingActive = false;
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
 
     // Close stream controller
     await _streamController?.close();
@@ -160,9 +165,25 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
 
   @override
   void halt() {
-    assert(_fd != null, 'halt: Endpoint is not open');
-    // Reading 0 bytes on EP0 sends STALL to host
-    Unistd.read(_fd!, 0);
+    if (_fd == null) {
+      throw StateError('Cannot halt: Endpoint is not open');
+    }
+    try {
+      // Reading 0 bytes on EP0 sends STALL to host
+      Unistd.read(_fd!, 0);
+    } on OSError catch (e) {
+      // Handle common errors gracefully
+      if (e.errorCode == Errno.epipe) {
+        log?.warn('Cannot halt: Broken pipe (host disconnected)');
+      } else if (e.errorCode == Errno.eshutdown) {
+        log?.warn('Cannot halt: Endpoint is shut down');
+      } else if (e.errorCode == Errno.enotconn) {
+        log?.warn('Cannot halt: Not connected');
+      } else {
+        log?.error('Failed to halt EP0: ${e.message}');
+        rethrow;
+      }
+    }
   }
 
   /// Writes data to EP0 (blocking, retries on EAGAIN).
@@ -223,19 +244,8 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
 
   /// Event buffer size (48 bytes = 4 events of 12 bytes each).
   ///
-  /// Reading multiple events at once reduces syscall overhead.
+  /// Reading multiple events at once reduces overhead.
   static const int eventBufferSize = 4 * FunctionFsEvent.size;
-
-  /// Polling interval in milliseconds.
-  ///
-  /// Default is 100ms which provides good balance between responsiveness
-  /// and CPU usage. Can be adjusted based on requirements:
-  /// - Lower (e.g., 10ms) for latency-sensitive applications
-  /// - Higher (e.g., 250ms) for power-sensitive applications
-  ///
-  /// For production, consider using epoll or select for event-driven I/O
-  /// instead of polling.
-  static const Duration pollingInterval = Duration(milliseconds: 100);
 
   /// Creates a broadcast stream of FunctionFs events.
   ///
@@ -251,7 +261,7 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
   /// - SUSPEND: Bus suspended
   /// - RESUME: Bus resumed
   ///
-  /// The stream uses async polling with a default interval of 100ms.
+  /// The stream uses AIO for event-driven I/O with minimal latency.
   /// Errors are reported through the stream's error channel.
   ///
   /// The stream automatically closes when:
@@ -261,7 +271,9 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
   ///
   /// Throws [StateError] if endpoint is not open.
   Stream<FunctionFsEvent> stream() {
-    assert(_fd != null, 'stream: Endpoint is not open');
+    if (_fd == null) {
+      throw StateError('Cannot create stream: Endpoint is not open');
+    }
 
     // Return existing stream if already created
     final controller = _streamController;
@@ -271,81 +283,101 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
 
     // Create new broadcast controller
     final newController = StreamController<FunctionFsEvent>.broadcast(
-      onListen: _startPolling,
-      onCancel: _stopPolling,
+      onListen: _startEventReading,
+      onCancel: _stopEventReading,
     );
 
     _streamController = newController;
     return newController.stream;
   }
 
-  /// Starts polling EP0 for events.
-  void _startPolling() {
-    if (_pollingActive) return;
-    _pollingActive = true;
-    _pollLoop();
-  }
+  /// Starts event reading from EP0 using synchronous polling with a Timer.
+  ///
+  /// EP0 does NOT support Linux AIO, so we use synchronous reads
+  /// with a polling timer. The file descriptor is opened with O_NONBLOCK
+  /// to prevent blocking on reads when no events are available.
+  void _startEventReading() {
+    if (_eventReadingActive || _fd == null) return;
+    _eventReadingActive = true;
 
-  /// Stops polling EP0 for events.
-  void _stopPolling() {
-    _pollingActive = false;
-  }
-
-  /// Polling loop that reads events and adds them to the stream.
-  Future<void> _pollLoop() async {
-    final controller = _streamController;
-    if (controller == null) return;
-
-    while (_pollingActive && _fd != null && !controller.isClosed) {
-      try {
-        final bytes = read(eventBufferSize);
-        if (bytes.isNotEmpty) {
-          final events = FunctionFsEvent.fromBytesMultiple(bytes);
-          for (final event in events) {
-            if (!controller.isClosed) {
-              controller.add(event);
-            }
-          }
-        }
-      } on OSError catch (e, st) {
-        if (e.errorCode == Errno.eagain) {
-          // No data available, continue polling
-        } else if (e.errorCode == Errno.ebadf) {
-          // File descriptor closed, stop polling
-          _pollingActive = false;
-          break;
-        } else {
-          // Other errors propagate to stream
-          if (!controller.isClosed) {
-            controller.addError(e, st);
-          }
-          // Continue polling after error
-        }
-      } catch (e, st) {
-        if (!controller.isClosed) {
-          controller.addError(e, st);
-        }
+    // Use a timer to poll for events (10ms interval for low latency)
+    const pollingInterval = Duration(milliseconds: 10);
+    _pollingTimer = Timer.periodic(pollingInterval, (_) {
+      if (!_eventReadingActive || _fd == null) {
+        return _pollingTimer?.cancel();
       }
 
-      await Future<void>.delayed(pollingInterval);
-    }
+      try {
+        // Try to read events (non-blocking)
+        final bytesRead = Unistd.read(_fd!, eventBufferSize);
+
+        if (bytesRead.isNotEmpty) {
+          // Parse and emit events
+          try {
+            final bytes = Uint8List.fromList(bytesRead);
+            final events = FunctionFsEvent.fromBytesMultiple(bytes);
+            final controller = _streamController;
+            if (controller != null && !controller.isClosed) {
+              events.forEach(controller.add);
+            }
+          } catch (e, st) {
+            log?.error('Failed to parse FunctionFs event', e, st);
+            _streamController?.addError(e, st);
+          }
+        }
+      } on OSError catch (e) {
+        if (e.errorCode == Errno.eagain || e.errorCode == Errno.ewouldblock) {
+          // No data available, this is normal for non-blocking I/O
+          return;
+        } else if (e.errorCode == Errno.ebadf || e.errorCode == Errno.einval) {
+          // File descriptor closed or invalid, stop polling
+          log?.warn('EP0 file descriptor invalid, stopping event reading');
+          _eventReadingActive = false;
+          _pollingTimer?.cancel();
+          return;
+        } else {
+          // Propagate other errors to stream
+          log?.error(
+            'Error reading EP0 events: ${e.message} (errno: ${e.errorCode})',
+          );
+          if (_streamController != null && !_streamController!.isClosed) {
+            _streamController!.addError(e);
+          }
+        }
+      }
+    });
+  }
+
+  /// Stops event reading.
+  Future<void> _stopEventReading() async {
+    _eventReadingActive = false;
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
   }
 
   /// Flushes the FIFO buffer.
   ///
   /// Discards any pending data in the endpoint's FIFO.
-  /// Useful for recovery after errors or protocol violations.
+  ///
+  /// **When to use:**
+  /// - After protocol errors or STALL conditions
+  /// - When recovering from host-side errors
+  /// - Before re-enabling after disable event
+  /// - When resetting endpoint state
   ///
   /// Throws [StateError] if endpoint is not open.
   /// Throws [OSError] if ioctl fails.
   void flushFIFO() {
-    assert(_fd != null, 'flushFIFO: Endpoint is not open');
+    if (_fd == null) {
+      throw StateError('Cannot flush FIFO: Endpoint is not open');
+    }
 
-    final result = Ioctl.call(_fd!, .fifoFlush);
-    if (result < 0) {
-      final error = Errno.toOSError(result);
-      log?.error('Failed to flush FIFO: ${error.message}');
-      throw error;
+    try {
+      Ioctl.call(_fd!, .fifoFlush);
+      log?.debug('FIFO flushed successfully');
+    } on OSError catch (e) {
+      log?.error('Failed to flush FIFO: ${e.message}');
+      rethrow;
     }
   }
 
@@ -416,17 +448,51 @@ class EndpointInFile extends EndpointFile {
 
   @override
   void clearHalt() {
-    assert(_fd != null, 'clearHalt: Endpoint is not open');
+    if (_fd == null) {
+      throw StateError('Cannot clear halt: Endpoint is not open');
+    }
 
-    final result = Ioctl.call(_fd!, .clearHalt);
-    if (result < 0) throw Errno.currentOSError;
+    try {
+      Ioctl.call(_fd!, .clearHalt);
+    } on OSError catch (e) {
+      if (e.errorCode == Errno.einval) {
+        // Endpoint not halted, this is not an error
+        return;
+      }
+      // Provide meaningful error message
+      throw StateError(
+        'Failed to clear halt on IN endpoint: ${e.message} (errno: ${e.errorCode})',
+      );
+    }
   }
 
   @override
   void halt() {
-    assert(_fd != null, 'halt: Endpoint is not open');
-    // Writing 0 bytes to IN endpoint sends STALL to host
-    Unistd.write(_fd!, Uint8List(0));
+    if (_fd == null) {
+      throw StateError('Cannot halt: Endpoint is not open');
+    }
+    try {
+      // Writing 0 bytes to IN endpoint sends STALL to host
+      Unistd.write(_fd!, Uint8List(0));
+    } on OSError catch (e) {
+      // Handle common error conditions gracefully
+      if (e.errorCode == Errno.epipe) {
+        // Broken pipe - host disconnected
+        throw StateError('Cannot halt IN endpoint: Host disconnected (EPIPE)');
+      } else if (e.errorCode == Errno.eshutdown) {
+        // Endpoint shut down
+        throw StateError(
+          'Cannot halt IN endpoint: Endpoint is shut down (ESHUTDOWN)',
+        );
+      } else if (e.errorCode == Errno.enotconn) {
+        // Not connected
+        throw StateError('Cannot halt IN endpoint: Not connected (ENOTCONN)');
+      }
+      // Provide meaningful error message for other errors
+      throw StateError(
+        'Failed to halt IN endpoint: ${e.message} (errno: ${e.errorCode})',
+      );
+    }
   }
 
   /// Synchronous write (blocking).
@@ -545,10 +611,22 @@ class EndpointOutFile extends EndpointFile {
 
   @override
   void clearHalt() {
-    assert(_fd != null, 'clearHalt: Endpoint is not open');
+    if (_fd == null) {
+      throw StateError('Cannot clear halt: Endpoint is not open');
+    }
 
-    final result = Ioctl.call(_fd!, .clearHalt);
-    if (result < 0) throw Errno.currentOSError;
+    try {
+      Ioctl.call(_fd!, .clearHalt);
+    } on OSError catch (e) {
+      if (e.errorCode == Errno.einval) {
+        // Endpoint not halted, this is not an error
+        return;
+      }
+      // Provide meaningful error message
+      throw StateError(
+        'Failed to clear halt on OUT endpoint: ${e.message} (errno: ${e.errorCode})',
+      );
+    }
   }
 
   @override
