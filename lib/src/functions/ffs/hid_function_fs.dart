@@ -219,12 +219,13 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   /// Endpoint configuration (input-only, bidirectional, output-only).
   final HIDFunctionFsConfig config;
 
-  /// Current idle rate for input reports (in 4ms units).
-  /// 0 means infinite (only report on change).
-  int _idleRate = 0;
+  /// Idle rates per report ID (in 4ms units).
+  /// Key: Report ID (0 = all reports)
+  /// Value: Idle rate (0 = infinite, only report on change)
+  final Map<int, int> _idleRates = {};
 
   /// Current HID protocol mode (boot or report).
-  HIDProtocol _currentProtocol = HIDProtocol.none;
+  late HIDProtocol _currentProtocol;
 
   /// Getter for current protocol.
   HIDProtocol get currentProtocol => _currentProtocol;
@@ -237,27 +238,32 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
 
   /// Interrupt IN endpoint for sending reports to the host.
   EndpointInFile get epIn {
-    assert(
-      _interruptIn != null,
-      'Device has no input endpoint. Ensure config.hasInputEndpoint '
-      'is true and device is enabled.',
-    );
+    if (_interruptIn == null) {
+      throw StateError(
+        'Device has no input endpoint. Ensure config.hasInputEndpoint '
+        'is true and device is enabled.',
+      );
+    }
     return _interruptIn!;
   }
 
   /// Interrupt OUT endpoint for receiving reports from the host.
   EndpointOutFile get epOut {
-    assert(
-      _interruptOut != null,
-      'Device has no output endpoint. Ensure config.hasOutputEndpoint '
-      'is true and device is enabled.',
-    );
+    if (_interruptOut == null) {
+      throw StateError(
+        'Device has no output endpoint. Ensure config.hasOutputEndpoint '
+        'is true and device is enabled.',
+      );
+    }
     return _interruptOut!;
   }
 
   @override
   @mustCallSuper
   void onEnable() {
+    // Initialize protocol from constructor parameter
+    _currentProtocol = protocol;
+
     // Get IN endpoint if present
     if (config.hasInputEndpoint) {
       final epNum = config.inEndpointNumber!;
@@ -357,8 +363,8 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
       log?.error('GET_REPORT: No data available');
       return ep0.halt();
     }
-    // Prepare response matching requested length
-    final response = _prepareReportData(reportData, length);
+    // Prepare response matching requested length and prepend Report ID if needed
+    final response = _prepareReportData(reportData, length, reportId);
     // IN transfer - write data, kernel handles status
     ep0.write(response);
   }
@@ -394,9 +400,11 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
       return ep0.halt();
     }
     final reportId = value & 0xFF;
-    log?.info('GET_IDLE: reportId=$reportId, rate=$_idleRate');
+    // Look up idle rate for this specific report ID, or use "all reports" (0)
+    final idleRate = _idleRates[reportId] ?? _idleRates[0] ?? 0;
+    log?.info('GET_IDLE: reportId=$reportId, rate=$idleRate');
     // IN transfer - write response, kernel handles status
-    ep0.write(Uint8List(1)..[0] = _idleRate);
+    ep0.write(Uint8List(1)..[0] = idleRate);
   }
 
   /// Handles SET_IDLE request (OUT transfer, no data phase).
@@ -407,7 +415,17 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
     }
     final duration = (value >> 8) & 0xFF;
     final reportId = value & 0xFF;
-    _idleRate = duration;
+
+    // Store idle rate per report ID
+    // reportId=0 means "all reports"
+    if (reportId == 0) {
+      // Set idle rate for all reports
+      _idleRates[0] = duration;
+    } else {
+      // Set idle rate for specific report ID
+      _idleRates[reportId] = duration;
+    }
+
     log?.info(
       'SET_IDLE: reportId=$reportId, duration=$duration (${duration * 4}ms)',
     );
@@ -441,13 +459,29 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   }
 
   /// Prepares report data to match the requested length.
-  Uint8List _prepareReportData(Uint8List data, int requestedLength) {
-    if (data.length == requestedLength) {
-      return data;
-    } else if (data.length > requestedLength) {
-      return Uint8List.fromList(data.sublist(0, requestedLength));
+  ///
+  /// If [reportId] is non-zero, prepends the Report ID byte to the data.
+  /// This is required by the HID specification for devices with multiple reports.
+  Uint8List _prepareReportData(
+    Uint8List data,
+    int requestedLength,
+    int reportId,
+  ) {
+    // Prepend Report ID if needed
+    final withReportId = reportId != 0
+        ? (Uint8List(data.length + 1)
+            ..[0] = reportId
+            ..setRange(1, data.length + 1, data))
+        : data;
+
+    // Adjust to requested length
+    if (withReportId.length == requestedLength) {
+      return withReportId;
+    } else if (withReportId.length > requestedLength) {
+      return Uint8List.fromList(withReportId.sublist(0, requestedLength));
     } else {
-      return Uint8List(requestedLength)..setRange(0, data.length, data);
+      return Uint8List(requestedLength)
+        ..setRange(0, withReportId.length, withReportId);
     }
   }
 
@@ -466,7 +500,15 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   // Override hooks for subclasses
 
   /// Called when the host requests a report via GET_REPORT.
+  ///
+  /// Subclasses MUST override this method to provide report data.
+  /// Return null to STALL the request.
+  ///
+  /// The returned data should NOT include the Report ID byte - it will be
+  /// prepended automatically if reportId != 0.
+  @protected
   Uint8List? onGetReport(HIDReportType type, int reportId) {
+    log?.warn('onGetReport not overridden - returning null (will STALL)');
     return null;
   }
 
