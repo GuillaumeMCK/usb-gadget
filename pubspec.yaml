@@ -1,6 +1,6 @@
 name: usb_gadget
 description: Expose standard or fully custom USB peripherals (gadgets) through a USB device controller (UDC) on Linux.
-version: 0.2.1
+version: 0.2.2
 homepage: https://github.com/GuillaumeMCK/usb-gadget
 
 environment:
