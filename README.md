@@ -202,29 +202,30 @@ dart pub add usb_gadget
 This example creates a USB HID keyboard that types "hello world" when connected:
 
 ```dart
+import 'dart:io';
+import 'dart:typed_data';
 
-final _descriptor = Uint8List.fromList([ /* ... */]);
+import 'package:usb_gadget/usb_gadget.dart';
+
+final _descriptor = Uint8List.fromList([0x05, 0x01, 0x09, 0x06, 0xA1, 0x01, 0x05, 0x07, 0x19, 0xE0, 0x29, 0xE7, 0x15, 0x00, 0x25, 0x01, 0x75, 0x01, 0x95, 0x08, 0x81, 0x02, 0x95, 0x01, 0x75, 0x08, 0x81, 0x01, 0x95, 0x06, 0x75, 0x08, 0x15, 0x00, 0x25, 0x65, 0x05, 0x07, 0x19, 0x00, 0x29, 0x65, 0x81, 0x00, 0xC0]);
 
 class Keyboard extends HIDFunction {
   Keyboard()
-      : super(
-    name: 'keyboard',
-    descriptor: _descriptor,
-    protocol: HIDProtocol.keyboard,
-    subclass: HIDSubclass.boot,
-    reportLength: 8,
-  );
+    : super(
+        name: 'keyboard',
+        descriptor: _descriptor,
+        protocol: .keyboard,
+        subclass: .boot,
+        reportLength: 8,
+      );
 
-  void sendKey(int keyCode, {int modifiers = 0}) {
-    // Press key
-    file.writeFromSync(
+  void sendKey(int keyCode, {int modifiers = 0}) => file
+    ..writeFromSync(
       Uint8List(8)
         ..[0] = modifiers
         ..[2] = keyCode,
-    );
-    // Release key
-    file.writeFromSync(Uint8List(8));
-  }
+    )
+    ..writeFromSync(Uint8List(8));
 }
 
 Future<void> main() async {
@@ -233,28 +234,29 @@ Future<void> main() async {
     name: 'hid_keyboard',
     idVendor: 0x1234,
     idProduct: 0x5679,
-    deviceClass: USBClass.composite,
-    deviceSubClass: USBSubClass.none,
-    deviceProtocol: USBProtocol.none,
+    deviceClass: .composite,
+    deviceSubClass: .none,
+    deviceProtocol: .none,
     strings: {
-      Language.enUS: const GadgetStrings(
+      .enUS: const .new(
         manufacturer: 'ACME Corp',
         product: 'USB Keyboard',
         serialnumber: 'KB001',
       ),
     },
-    config: Config(functions: [keyboard]),
+    config: .new(functions: [keyboard]),
   );
+
   try {
     await gadget.bind();
     await gadget.waitForState(.configured);
     // An additional delay here prevents the first few keypresses from
     // being missed on some hosts.
-    await Future.delayed(const .new(milliseconds: 100));
+    await Future<void>.delayed(const .new(milliseconds: 100));
     [0x0B, 0x08, 0x0F, 0x0F, 0x12, 0x2C, 0x1A, 0x12, 0x15, 0x0F, 0x07, 0x28]
-    // Write "hello world\n" keycodes
+    // Write "hello world\n"
     .forEach(keyboard.sendKey);
-    stdout.writeln('Keyboard ready. Press Ctrl+C to exit.');
+    stdout.writeln('Ctrl+C to exit.');
     await ProcessSignal.sigint.watch().first;
   } finally {
     await gadget.unbind();
