@@ -150,7 +150,16 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
       log?.debug(
         'Writing descriptors to EP0 (${descriptor.length}) :${descriptor.xxd()}',
       );
-      _ep0.write(descriptor);
+
+      // Write descriptors with error recovery
+      try {
+        _ep0.write(descriptor);
+      } catch (e) {
+        log?.error('Failed to write descriptors: $e');
+        await _ep0.close();
+        _setState(.uninitialized);
+        rethrow;
+      }
 
       if (strings.isNotEmpty) {
         final builder = FunctionFsStringsBuilder();
@@ -161,10 +170,27 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
         }
         final stringBytes = builder.build().toBytes();
         log?.debug('Writing strings to EP0:${stringBytes.xxd()}');
-        _ep0.write(stringBytes);
+
+        try {
+          _ep0.write(stringBytes);
+        } catch (e) {
+          log?.error('Failed to write strings: $e');
+          await _ep0.close();
+          _setState(.uninitialized);
+          rethrow;
+        }
       }
 
-      _openEndpointFiles();
+      // Open endpoint files with error recovery
+      try {
+        await _openEndpointFiles();
+      } catch (e) {
+        log?.error('Failed to open endpoint files: $e');
+        await _ep0.close();
+        _setState(.uninitialized);
+        rethrow;
+      }
+
       _startEventListener();
       _setState(.ready);
       log?.success('Ready for UDC binding');
@@ -220,19 +246,60 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
   }
 
   /// Opens all endpoint files after descriptors have been written to EP0.
-  void _openEndpointFiles() {
-    var index = 1; // Start from ep1
-    for (final desc in descriptors) {
-      if (desc is! EndpointTemplate) continue;
-      final epPath = '$_mountPoint/ep$index';
-      final endpoint = desc.address.isIn
-          ? EndpointInFile(epPath)
-          : EndpointOutFile(epPath, config: desc.config);
-      _endpoints[desc.address] = endpoint;
-      endpoint.open();
-      log?.info('Opened ${desc.address} at $epPath (fd: ${endpoint.fd})');
-      index++;
+  ///
+  /// FunctionFS uses sequential endpoint numbering: ep1, ep2, ep3, etc.
+  /// The order matches the order of EndpointTemplate descriptors.
+  ///
+  /// If any endpoint fails to open, all previously opened endpoints are closed
+  /// and the error is propagated.
+  Future<void> _openEndpointFiles() async {
+    var index = 1; // Start from ep1 (ep0 is control)
+    final openedEndpoints = <EndpointAddress, EndpointFile>{};
+
+    try {
+      for (final desc in descriptors) {
+        if (desc is! EndpointTemplate) continue;
+
+        final epPath = '$_mountPoint/ep$index';
+        final endpoint = desc.address.isIn
+            ? EndpointInFile(epPath)
+            : EndpointOutFile(epPath, config: desc.config);
+
+        try {
+          await endpoint.open();
+          openedEndpoints[desc.address] = endpoint;
+          log?.info('Opened ${desc.address} at $epPath (fd: ${endpoint.fd})');
+        } catch (e) {
+          log?.error('Failed to open ${desc.address} at $epPath: $e');
+          // Close all previously opened endpoints
+          await _closeEndpoints(openedEndpoints);
+          rethrow;
+        }
+
+        index++;
+      }
+
+      // All endpoints opened successfully, commit to instance map
+      _endpoints.addAll(openedEndpoints);
+    } catch (e) {
+      // Ensure cleanup on any error
+      await _closeEndpoints(openedEndpoints);
+      rethrow;
     }
+  }
+
+  /// Closes a map of endpoints (helper for error recovery).
+  Future<void> _closeEndpoints(
+    Map<EndpointAddress, EndpointFile> endpoints,
+  ) async {
+    for (final ep in endpoints.values) {
+      try {
+        await ep.close();
+      } catch (e) {
+        log?.warn('Error closing endpoint during cleanup: $e');
+      }
+    }
+    endpoints.clear();
   }
 
   /// Starts listening for events from EP0 using Linux AIO.
