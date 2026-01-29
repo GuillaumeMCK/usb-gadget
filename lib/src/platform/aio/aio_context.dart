@@ -12,7 +12,13 @@ import 'aio.ffi.dart' as aio_ffi show iocb;
 class AioBindings {
   AioBindings._();
 
-  static final Aio _instance = Aio(ffi.DynamicLibrary.open('libaio.so'));
+  static final Aio _instance = Aio(() {
+    try {
+      return ffi.DynamicLibrary.open('libaio.so');
+    } catch (_) {
+      return ffi.DynamicLibrary.process();
+    }
+  }());
 
   /// The singleton instance of the [Aio] bindings.
   static Aio get instance => _instance;
