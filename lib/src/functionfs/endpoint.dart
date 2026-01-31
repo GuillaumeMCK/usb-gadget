@@ -116,10 +116,8 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
       throw StateError('Endpoint is already open');
     }
 
-    // Ensure FunctionFs is mounted
     await _mount.ensureMounted();
 
-    // Open the EP0 file
     try {
       _fd = Unistd.open(path, const [OpenFlag.rdWr, OpenFlag.nonBlock]);
     } on OSError catch (e) {
@@ -160,7 +158,6 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
   @override
   void clearHalt() {
     // EP0 doesn't support halt/clear operations
-    log?.debug('clearHalt() called on EP0 (no-op)');
   }
 
   @override
@@ -301,8 +298,7 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
     _eventReadingActive = true;
 
     // Use a timer to poll for events (10ms interval for low latency)
-    const pollingInterval = Duration(milliseconds: 10);
-    _pollingTimer = Timer.periodic(pollingInterval, (_) {
+    _pollingTimer = Timer.periodic(const .new(milliseconds: 10), (_) {
       if (!_eventReadingActive || _fd == null) {
         return _pollingTimer?.cancel();
       }
@@ -314,8 +310,7 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
         if (bytesRead.isNotEmpty) {
           // Parse and emit events
           try {
-            final bytes = Uint8List.fromList(bytesRead);
-            final events = FunctionFsEvent.fromBytesMultiple(bytes);
+            final events = FunctionFsEvent.fromBytesMultiple(bytesRead);
             final controller = _streamController;
             if (controller != null && !controller.isClosed) {
               events.forEach(controller.add);
@@ -336,7 +331,6 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
           _pollingTimer?.cancel();
           return;
         } else {
-          // Propagate other errors to stream
           log?.error(
             'Error reading EP0 events: ${e.message} (errno: ${e.errorCode})',
           );
@@ -432,7 +426,6 @@ class EndpointInFile extends EndpointFile {
   Future<void> close() async {
     if (_fd == null) return;
 
-    // Dispose AIO writer
     await _writer?.dispose();
     _writer = null;
 
@@ -459,7 +452,7 @@ class EndpointInFile extends EndpointFile {
         // Endpoint not halted, this is not an error
         return;
       }
-      // Provide meaningful error message
+
       throw StateError(
         'Failed to clear halt on IN endpoint: ${e.message} (errno: ${e.errorCode})',
       );
@@ -475,17 +468,13 @@ class EndpointInFile extends EndpointFile {
       // Writing 0 bytes to IN endpoint sends STALL to host
       Unistd.write(_fd!, Uint8List(0));
     } on OSError catch (e) {
-      // Handle common error conditions gracefully
       if (e.errorCode == Errno.epipe) {
-        // Broken pipe - host disconnected
         throw StateError('Cannot halt IN endpoint: Host disconnected (EPIPE)');
       } else if (e.errorCode == Errno.eshutdown) {
-        // Endpoint shut down
         throw StateError(
           'Cannot halt IN endpoint: Endpoint is shut down (ESHUTDOWN)',
         );
       } else if (e.errorCode == Errno.enotconn) {
-        // Not connected
         throw StateError('Cannot halt IN endpoint: Not connected (ENOTCONN)');
       }
       // Provide meaningful error message for other errors
@@ -534,7 +523,6 @@ class EndpointInFile extends EndpointFile {
     assert(bufferSize > 0, 'Buffer size must be positive');
     assert(concurrency > 0, 'Concurrency must be positive');
 
-    // Lazy-create writer with locked configuration using ??=
     _writer ??= AioWriter(
       _fd!,
       .new(bufferSize: bufferSize, windowSize: concurrency),
@@ -591,15 +579,12 @@ class EndpointOutFile extends EndpointFile {
   Future<void> close() async {
     if (_fd == null) return;
 
-    // Close stream controller
     await _streamController?.close();
     _streamController = null;
 
-    // Dispose AIO reader
     await _reader?.dispose();
     _reader = null;
 
-    // Close file descriptor
     try {
       Unistd.close(_fd!);
     } on OSError {
@@ -711,7 +696,6 @@ class EndpointOutFile extends EndpointFile {
     // Store subscription so we can cancel it later if needed
     _reader?.stream.listen(
       (data) {
-        // Forward data
         if (_streamController != null && !_streamController!.isClosed) {
           _streamController!.add(data);
         }
@@ -724,7 +708,7 @@ class EndpointOutFile extends EndpointFile {
       onDone: () {
         _streamController?.close();
       },
-      cancelOnError: false, // Keep stream alive after errors
+      cancelOnError: false,
     );
 
     return _streamController!.stream;
