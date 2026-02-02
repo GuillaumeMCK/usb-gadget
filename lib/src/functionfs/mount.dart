@@ -160,14 +160,10 @@ class FunctionFsMount with USBGadgetLogger {
     }
 
     try {
-      Errno.retry(
-        () => Mount.umount(mountPoint),
-        retryOn: [Errno.ebusy],
-        maxRetries: 2,
-      );
+      Errno.retry(() => Mount.umount(mountPoint), retryOn: [Errno.ebusy]);
       log?.info('Unmounted FunctionFs from $mountPoint');
     } catch (_) {
-      log?.warn('Normal unmount failed, attempting force unmount (MNT_DETACH)');
+      log?.warn('Unmount failed, attempting force unmount (MNT_DETACH)');
       try {
         Errno.retry(
           () => Mount.umount2(mountPoint, [.detach]),
