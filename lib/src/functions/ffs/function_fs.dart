@@ -193,7 +193,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
 
       _startEventListener();
       _setState(.ready);
-      log?.success('Ready for UDC binding');
+      log?.debug('Ready for UDC binding');
     } catch (err, st) {
       _setState(.uninitialized);
       log?.error('Error preparing FunctionFs function: $err', err, st);
