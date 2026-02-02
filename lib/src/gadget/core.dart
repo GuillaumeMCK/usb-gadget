@@ -290,10 +290,10 @@ class Gadget with USBGadgetLogger {
 
     for (final function in config.functions) {
       try {
-        await function.dispose();
-        log?.debug('Disposed function: ${function.name}');
+        function.release();
+        log?.debug('Released function: ${function.name}');
       } catch (err) {
-        log?.warn('Failed to dispose function ${function.name}: $err');
+        log?.warn('Failed to release function ${function.name}: $err');
       }
     }
 
@@ -516,7 +516,7 @@ class Gadget with USBGadgetLogger {
         function.prepare(functionPath);
       } catch (err, st) {
         log?.error('Function preparation failed: $err', err, st);
-        function.dispose();
+        function.release();
         rethrow;
       }
     }

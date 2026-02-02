@@ -214,10 +214,12 @@ class SimpleGamepad extends HIDFunctionFs {
   }
 
   @override
-  Future<void> dispose() async {
-    _reportTimer?.cancel();
-    _reportTimer = null;
-    await super.dispose();
+  void release() {
+    if (!isReleased) {
+      _reportTimer?.cancel();
+      _reportTimer = null;
+      super.release();
+    }
   }
 
   void _animateFrame() {

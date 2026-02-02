@@ -234,9 +234,9 @@ final class TrackedOperation {
 /// final operations = [/* ... */];
 /// context.submit(operations);
 /// final completions = context.getCompletions();
-/// context.dispose();
+/// context.release();
 /// ```
-final class AioContext with PlatformLogger {
+final class AioContext with PlatformLogger, Releasable {
   /// Creates an [AioContext] capable of handling up to [maxConcurrent]
   /// pending operations.
   ///
@@ -275,16 +275,12 @@ final class AioContext with PlatformLogger {
   final ffi.Pointer<io_context> _handle;
   final int _maxConcurrent;
   final Map<OperationId, TrackedOperation> _inFlight = {};
-  bool _disposed = false;
 
   /// The maximum number of concurrent operations allowed in this context.
   int get maxConcurrent => _maxConcurrent;
 
   /// The number of operations currently in-flight.
   int get inFlightCount => _inFlight.length;
-
-  /// Whether this context has been disposed.
-  bool get isDisposed => _disposed;
 
   /// Whether a new operation can be submitted without exceeding [maxConcurrent].
   bool get canSubmit => _inFlight.length < _maxConcurrent;
@@ -432,28 +428,30 @@ final class AioContext with PlatformLogger {
     _inFlight.clear();
   }
 
-  /// Disposes this [AioContext] and releases all associated native resources.
-  void dispose() {
-    if (_disposed) return;
-    _disposed = true;
+  /// Releases this [AioContext] and frees all associated native resources.
+  @override
+  void release() {
+    if (!isReleased) {
+      // Clean up any remaining operations
+      for (final op in _inFlight.values) {
+        op.free();
+      }
+      _inFlight.clear();
 
-    // Clean up any remaining operations
-    for (final op in _inFlight.values) {
-      op.free();
-    }
-    _inFlight.clear();
+      final result = AioBindings.instance.io_destroy(_handle);
+      if (result != 0) {
+        log?.warn(
+          'io_destroy returned error code $result (${Errno.describe(result)})',
+        );
+      }
 
-    final result = AioBindings.instance.io_destroy(_handle);
-    if (result != 0) {
-      log?.warn(
-        'io_destroy returned error code $result (${Errno.describe(result)})',
-      );
+      super.release();
     }
   }
 
   void _checkNotDisposed() {
-    if (_disposed) {
-      throw StateError('AioContext has been disposed');
+    if (isReleased) {
+      throw StateError('AioContext has been released');
     }
   }
 }

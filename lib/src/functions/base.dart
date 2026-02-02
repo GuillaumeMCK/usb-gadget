@@ -2,6 +2,8 @@ import 'dart:async' show TimeoutException;
 
 import 'dart:io' show FileSystemException;
 
+import 'package:using/using.dart';
+
 import '/usb_gadget.dart';
 
 /// Core abstraction for all USB gadget functions.
@@ -17,9 +19,9 @@ import '/usb_gadget.dart';
 ///    write configuration attributes, open files).
 /// 2. **waitState()**: Wait until the function is ready for UDC binding.
 ///    This ensures all setup is complete before hardware activation.
-/// 3. **dispose()**: Clean up resources when the gadget is unbound (close
+/// 3. **release()**: Clean up resources when the gadget is unbound (close
 ///    files, unmount filesystems, release handles).
-abstract class GadgetFunction {
+abstract class GadgetFunction with Releasable {
   /// Creates a gadget function with the specified name.
   ///
   /// Parameters:
@@ -124,5 +126,6 @@ abstract class GadgetFunction {
   ///
   /// After this method completes, the function should be in a clean state
   /// and ready for garbage collection.
-  Future<void> dispose();
+  @override
+  void release();
 }

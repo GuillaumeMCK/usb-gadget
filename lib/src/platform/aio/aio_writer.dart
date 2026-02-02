@@ -236,7 +236,7 @@ final class AioWriter with Releasable {
       _bufferPool?.release();
       _bufferPool = null;
 
-      _context?.dispose();
+      _context?.release();
       _context = null;
 
       super.release();

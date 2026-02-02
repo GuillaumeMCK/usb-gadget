@@ -203,32 +203,35 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
 
   @override
   @mustCallSuper
-  Future<void> dispose() async {
-    log?.info('Disposing function (current state: $_state)');
-    await _eventSubscription?.cancel();
-    _eventSubscription = null;
+  void release() {
+    if (!isReleased) {
+      log?.info('Releasing function (current state: $_state)');
+      _eventSubscription?.cancel();
+      _eventSubscription = null;
 
-    if (_endpoints.isNotEmpty) {
-      for (final ep in _endpoints.values) {
-        try {
-          log?.info('Closing endpoint: ${ep.fd}');
-          await ep.close();
-        } catch (err) {
-          log?.warn('Failed to close endpoint: $err');
+      if (_endpoints.isNotEmpty) {
+        for (final ep in _endpoints.values) {
+          try {
+            log?.info('Closing endpoint: ${ep.fd}');
+            ep.close();
+          } catch (err) {
+            log?.warn('Failed to close endpoint: $err');
+          }
         }
+        _endpoints.clear();
       }
-      _endpoints.clear();
-    }
 
-    try {
-      log?.info('Closing EP0 and unmounting FunctionFs...');
-      await _ep0.close();
-    } catch (err) {
-      log?.warn('Failed to close EP0: $err');
-    }
+      try {
+        log?.info('Closing EP0 and unmounting FunctionFs...');
+        _ep0.close();
+      } catch (err) {
+        log?.warn('Failed to close EP0: $err');
+      }
 
-    await _eventController.close();
-    _setState(.disposed);
+      _eventController.close();
+      _setState(.disposed);
+      super.release();
+    }
   }
 
   /// Generates descriptors for a specific speed if enabled.
