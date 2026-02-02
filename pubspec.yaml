@@ -9,7 +9,6 @@ environment:
 dependencies:
   ffi: ^2.1.5
   meta: ^1.18.0
-  squadron: ^7.4.0
   using: ^1.0.5
 
 dev_dependencies:
