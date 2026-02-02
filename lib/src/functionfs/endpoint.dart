@@ -426,6 +426,8 @@ class EndpointInFile extends EndpointFile {
   Future<void> close() async {
     if (_fd == null) return;
 
+    // Flush any pending writes before releasing
+    await _writer?.flush();
     _writer?.release();
     _writer = null;
 
