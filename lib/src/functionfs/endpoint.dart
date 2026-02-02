@@ -426,7 +426,7 @@ class EndpointInFile extends EndpointFile {
   Future<void> close() async {
     if (_fd == null) return;
 
-    await _writer?.dispose();
+    _writer?.release();
     _writer = null;
 
     // Close file descriptor
@@ -518,6 +518,7 @@ class EndpointInFile extends EndpointFile {
     Uint8List data, {
     int bufferSize = 16384,
     int concurrency = 4,
+    Duration? interval,
   }) {
     assert(_fd != null, 'writeAsync: Endpoint is not open');
     assert(bufferSize > 0, 'Buffer size must be positive');
@@ -525,7 +526,11 @@ class EndpointInFile extends EndpointFile {
 
     _writer ??= AioWriter(
       _fd!,
-      .new(bufferSize: bufferSize, windowSize: concurrency),
+      AioConfig(
+        bufferSize: bufferSize,
+        maxConcurrent: concurrency,
+        interval: interval ?? const .new(milliseconds: 1),
+      ),
     );
 
     return _writer!.write(data);
@@ -582,7 +587,7 @@ class EndpointOutFile extends EndpointFile {
     await _streamController?.close();
     _streamController = null;
 
-    await _reader?.dispose();
+    _reader?.release();
     _reader = null;
 
     try {
@@ -634,7 +639,7 @@ class EndpointOutFile extends EndpointFile {
   ///
   /// Throws [StateError] if endpoint is not open.
   /// Throws [ArgumentError] if length is negative.
-  List<int> read(int length) {
+  Uint8List read(int length) {
     assert(_fd != null, 'read: Endpoint is not open');
     try {
       return Unistd.read(_fd!, length);
@@ -669,7 +674,7 @@ class EndpointOutFile extends EndpointFile {
   ///
   /// Throws [StateError] if endpoint is not open.
   /// Throws [ArgumentError] if concurrency is invalid.
-  Stream<Uint8List> stream({int concurrency = 4}) {
+  Stream<Uint8List> stream({int concurrency = 4, Duration? interval}) {
     assert(_fd != null, 'stream: Endpoint is not open');
     assert(concurrency > 0, 'Concurrency must be positive');
 
@@ -688,7 +693,11 @@ class EndpointOutFile extends EndpointFile {
 
     _reader ??= AioReader(
       _fd!,
-      .new(bufferSize: bufferSize, windowSize: concurrency),
+      AioConfig(
+        bufferSize: bufferSize,
+        maxConcurrent: concurrency,
+        interval: interval ?? const .new(milliseconds: 1),
+      ),
     );
 
     _streamController = StreamController<Uint8List>.broadcast();
