@@ -229,7 +229,7 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
   /// Throws [StateError] if endpoint is not open.
   /// Throws [OSError] on unrecoverable read errors.
   /// Throws [ArgumentError] if length is negative.
-  List<int> read(int length) {
+  Uint8List read(int length) {
     assert(_fd != null, 'read: Endpoint is not open');
     try {
       return Unistd.read(_fd!, length);
