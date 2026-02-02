@@ -166,7 +166,7 @@ class GamepadReport {
 
   Uint8List toBytes() {
     _reportBuffer
-      ..setUint16(0, _buttons, Endian.little) // Buttons (2 bytes)
+      ..setUint16(0, _buttons, .little) // Buttons (2 bytes)
       ..setUint8(2, leftStick.x) // Left X
       ..setUint8(3, leftStick.y) // Left Y
       ..setUint8(4, rightStick.x) // Right X

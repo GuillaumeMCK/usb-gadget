@@ -439,7 +439,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
         default:
           return _ep0.halt();
       }
-      final bytes = ByteData(2)..setUint16(0, status, Endian.little);
+      final bytes = ByteData(2)..setUint16(0, status, .little);
       return _ep0.write(bytes.buffer.asUint8List());
     }
 

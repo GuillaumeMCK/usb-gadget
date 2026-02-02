@@ -86,17 +86,17 @@ class USBHIDDescriptor implements USBDescriptor {
     final bytes = ByteData(bLength)
       ..setUint8(0, bLength)
       ..setUint8(1, bDescriptorType)
-      ..setUint16(2, hidVersion, Endian.little)
+      ..setUint16(2, hidVersion, .little)
       ..setUint8(4, countryCode)
       ..setUint8(5, numDescriptors)
       // First subordinate descriptor (report descriptor)
       ..setUint8(6, HIDDescriptorType.report.value)
-      ..setUint16(7, reportDescriptorLength, Endian.little);
+      ..setUint16(7, reportDescriptorLength, .little);
     if (physicalDescriptorLength > 0) {
       // Second subordinate descriptor (physical descriptor)
       bytes
         ..setUint8(9, HIDDescriptorType.physical.value)
-        ..setUint16(10, physicalDescriptorLength, Endian.little);
+        ..setUint16(10, physicalDescriptorLength, .little);
     }
     return bytes.buffer.asUint8List();
   }

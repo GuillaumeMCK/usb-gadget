@@ -128,10 +128,10 @@ class FunctionFsStrings {
 
     // Write header
     final header = ByteData(16)
-      ..setUint32(0, FunctionFsMagic.strings.value, Endian.little)
-      ..setUint32(4, length, Endian.little)
-      ..setUint32(8, strCount, Endian.little)
-      ..setUint32(12, languageCount, Endian.little);
+      ..setUint32(0, FunctionFsMagic.strings.value, .little)
+      ..setUint32(4, length, .little)
+      ..setUint32(8, strCount, .little)
+      ..setUint32(12, languageCount, .little);
     buffer.add(header.buffer.asUint8List());
 
     // Write language data
@@ -217,27 +217,27 @@ class FunctionFsDescriptors {
 
     // Write header
     final header = ByteData(12)
-      ..setUint32(0, magic.value, Endian.little)
-      ..setUint32(4, length, Endian.little)
-      ..setUint32(8, flags.toUint32(), Endian.little);
+      ..setUint32(0, magic.value, .little)
+      ..setUint32(4, length, .little)
+      ..setUint32(8, flags.toUint32(), .little);
     buffer.add(header.buffer.asUint8List());
 
     // Write all counts first
     if (flags.hasFullSpeed && fullSpeed != null) {
-      final count = ByteData(4)..setUint32(0, fullSpeed!.count, Endian.little);
+      final count = ByteData(4)..setUint32(0, fullSpeed!.count, .little);
       buffer.add(count.buffer.asUint8List());
     }
     if (flags.hasHighSpeed && highSpeed != null) {
-      final count = ByteData(4)..setUint32(0, highSpeed!.count, Endian.little);
+      final count = ByteData(4)..setUint32(0, highSpeed!.count, .little);
       buffer.add(count.buffer.asUint8List());
     }
     if (flags.hasSuperSpeed && superSpeed != null) {
-      final count = ByteData(4)..setUint32(0, superSpeed!.count, Endian.little);
+      final count = ByteData(4)..setUint32(0, superSpeed!.count, .little);
       buffer.add(count.buffer.asUint8List());
     }
     if (flags.hasSuperSpeedPlus && superSpeedPlus != null) {
       final count = ByteData(4)
-        ..setUint32(0, superSpeedPlus!.count, Endian.little);
+        ..setUint32(0, superSpeedPlus!.count, .little);
       buffer.add(count.buffer.asUint8List());
     }
 
@@ -271,9 +271,9 @@ class FunctionFsDescriptors {
 
     // Write counts
     final header = ByteData(12)
-      ..setUint32(0, fsCount, Endian.little)
-      ..setUint32(4, hsCount, Endian.little)
-      ..setUint32(8, ssCount, Endian.little);
+      ..setUint32(0, fsCount, .little)
+      ..setUint32(4, hsCount, .little)
+      ..setUint32(8, ssCount, .little);
     buffer.add(header.buffer.asUint8List());
 
     // Write descriptor data

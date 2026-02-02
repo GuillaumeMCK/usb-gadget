@@ -144,7 +144,7 @@ class LanguageStrings {
     final buffer = BytesBuilder(copy: false);
 
     // Write language ID
-    final langId = ByteData(2)..setUint16(0, language.value, Endian.little);
+    final langId = ByteData(2)..setUint16(0, language.value, .little);
     buffer.add(langId.buffer.asUint8List());
 
     // Write NULL-separated, NULL-terminated strings
@@ -481,7 +481,7 @@ class USBEndpointDescriptorNoAudio implements USBDescriptor {
       ..setUint8(1, bDescriptorType)
       ..setUint8(2, address.value)
       ..setUint8(3, attributes.value)
-      ..setUint16(4, maxPacketSize.value, Endian.little)
+      ..setUint16(4, maxPacketSize.value, .little)
       ..setUint8(6, interval.value);
     return bytes.buffer.asUint8List();
   }
@@ -598,7 +598,7 @@ class USBSSEPCompDescriptor implements USBDescriptor {
       ..setUint8(1, bDescriptorType)
       ..setUint8(2, maxBurst.value)
       ..setUint8(3, attributes.value)
-      ..setUint16(4, bytesPerInterval.toUint16(), Endian.little);
+      ..setUint16(4, bytesPerInterval.toUint16(), .little);
     return bytes.buffer.asUint8List();
   }
 }
@@ -661,8 +661,8 @@ class USBSSPIsocEndpointDescriptor implements USBDescriptor {
     final bytes = ByteData(8)
       ..setUint8(0, bLength)
       ..setUint8(1, bDescriptorType)
-      ..setUint16(2, wReserved, Endian.little)
-      ..setUint32(4, bytesPerInterval.toUint32(), Endian.little);
+      ..setUint16(2, wReserved, .little)
+      ..setUint32(4, bytesPerInterval.toUint32(), .little);
     return bytes.buffer.asUint8List();
   }
 }

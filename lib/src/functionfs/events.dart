@@ -158,9 +158,9 @@ class SetupEvent implements FunctionFsEvent {
     return SetupEvent(
       bRequestType: buffer.getUint8(0),
       bRequest: buffer.getUint8(1),
-      wValue: buffer.getUint16(2, Endian.little),
-      wIndex: buffer.getUint16(4, Endian.little),
-      wLength: buffer.getUint16(6, Endian.little),
+      wValue: buffer.getUint16(2, .little),
+      wIndex: buffer.getUint16(4, .little),
+      wLength: buffer.getUint16(6, .little),
     );
   }
 
