@@ -5,17 +5,61 @@ import 'package:meta/meta.dart';
 import 'package:using/using.dart';
 import '/src/logger/logger.dart';
 import '../errno/errno.dart';
-import 'aio.ffi.dart' hide iocb;
-import 'aio.ffi.dart' as aio_ffi show iocb;
+import 'aio.ffi.dart';
+import 'aio_bindings.dart';
 
-/// Internal bindings for Linux kernel AIO (libaio).
-class AioBindings {
-  AioBindings._();
+// ============================================================================
+// Configuration
+// ============================================================================
 
-  static final Aio _instance = Aio(ffi.DynamicLibrary.open('libaio.so'));
+/// Configuration for AIO operations.
+///
+/// Defines buffer size, concurrency limits, and polling intervals for both
+/// [AioReader] and [AioWriter] instances.
+///
+/// Example:
+///
+/// ```dart
+/// final config = AioConfig(
+///   bufferSize: 32768,
+///   maxConcurrent: 8,
+///   interval: Duration(milliseconds: 2),
+/// );
+/// ```
+final class AioConfig {
+  /// Creates an [AioConfig] with the specified parameters.
+  ///
+  /// All parameters have sensible defaults optimized for typical USB gadget
+  /// I/O workloads.
+  ///
+  /// Throws [ArgumentError] if any parameter is invalid.
+  const AioConfig({
+    this.bufferSize = 16384,
+    this.maxConcurrent = 4,
+    this.interval = const Duration(milliseconds: 1),
+  }) : assert(
+         bufferSize > 0 && bufferSize <= 1048576,
+         'bufferSize must be between 1 and 1048576 bytes',
+       ),
+       assert(
+         maxConcurrent > 0 && maxConcurrent <= 256,
+         'maxConcurrent must be between 1 and 256',
+       );
 
-  /// The singleton instance of the [Aio] bindings.
-  static Aio get instance => _instance;
+  /// Size of each I/O buffer in bytes.
+  ///
+  /// Default: 16384 (16 KiB)
+  final int bufferSize;
+
+  /// Maximum number of concurrent operations.
+  ///
+  /// Default: 4
+  final int maxConcurrent;
+
+  /// Interval for polling completions.
+  ///
+  /// Default: 1ms
+  final Duration interval;
 }
 
 // ============================================================================
@@ -24,12 +68,25 @@ class AioBindings {
 
 /// A pool of reusable memory buffers for AIO operations.
 ///
-/// This class manages native memory buffers allocated via `calloc`.
-/// It is [Releasable] and will free all buffers when released.
+/// Manages native memory buffers allocated via `calloc` to avoid repeated
+/// allocations and deallocations during I/O operations. Implements [Releasable]
+/// to ensure proper cleanup of native resources.
+///
+/// Example:
+///
+/// ```dart
+/// final pool = BufferPool(16384, 4);
+/// final buffer = pool.acquire();
+/// if (buffer != null) {
+///   // Use buffer...
+///   pool.releaseBuffer(buffer);
+/// }
+/// pool.release();
+/// ```
 final class BufferPool with Releasable {
   /// Creates a new [BufferPool] with [poolSize] buffers of [bufferSize] bytes each.
   BufferPool(this.bufferSize, this.poolSize) {
-    _pool = List.generate(poolSize, (_) => calloc<ffi.Uint8>(bufferSize));
+    _pool = .generate(poolSize, (_) => calloc<ffi.Uint8>(bufferSize));
   }
 
   /// The size of each buffer in bytes.
@@ -83,6 +140,10 @@ final class BufferPool with Releasable {
 // ============================================================================
 
 /// A unique identifier for an AIO operation.
+///
+/// Used to track operations through their lifecycle from submission to
+/// completion. The [value] corresponds to the operation's position in the
+/// submission sequence.
 @immutable
 final class OperationId {
   /// Creates an [OperationId] with the given integer [value].
@@ -109,15 +170,22 @@ enum OperationType {
 }
 
 /// Represents an AIO operation that has been submitted and is being tracked.
+///
+/// Contains all the metadata and native resources associated with a pending
+/// I/O operation. The [iocb] pointer must be freed when the operation completes
+/// or is cancelled.
 final class TrackedOperation {
   /// Creates a new [TrackedOperation].
+  ///
+  /// All parameters are required except [userData], which can be used to attach
+  /// arbitrary application data to the operation.
   TrackedOperation({
     required this.id,
     required this.type,
     required this.buffer,
     required this.size,
     required this.offset,
-    required this.iocb,
+    required this.block,
     this.userData,
   });
 
@@ -137,14 +205,14 @@ final class TrackedOperation {
   final int offset;
 
   /// The native AIO control block.
-  final ffi.Pointer<aio_ffi.iocb> iocb;
+  final ffi.Pointer<iocb> block;
 
   /// Optional opaque user data associated with the operation.
   final Object? userData;
 
   /// Frees the native resources associated with this operation.
   void free() {
-    calloc.free(iocb);
+    calloc.free(block);
   }
 }
 
@@ -154,11 +222,28 @@ final class TrackedOperation {
 
 /// A context for managed Linux kernel AIO operations.
 ///
-/// This class encapsulates an `io_context` and provides high-level methods for
-/// submitting operations and retrieving completion events.
+/// Encapsulates a Linux kernel `io_context` and provides high-level methods for
+/// submitting I/O operations and retrieving completion events. Manages the
+/// lifecycle of in-flight operations and ensures proper cleanup of native
+/// resources.
+///
+/// Example:
+///
+/// ```dart
+/// final context = AioContext(maxConcurrent: 4);
+/// final operations = [/* ... */];
+/// context.submit(operations);
+/// final completions = context.getCompletions();
+/// context.dispose();
+/// ```
 final class AioContext with PlatformLogger {
   /// Creates an [AioContext] capable of handling up to [maxConcurrent]
   /// pending operations.
+  ///
+  /// The [maxConcurrent] parameter must be between 1 and 65536.
+  ///
+  /// Throws [ArgumentError] if [maxConcurrent] is out of range.
+  /// Throws [OSError] if the kernel fails to create the AIO context.
   factory AioContext({required int maxConcurrent}) {
     if (maxConcurrent <= 0 || maxConcurrent > 65536) {
       throw ArgumentError.value(
@@ -178,6 +263,7 @@ final class AioContext with PlatformLogger {
       if (handle == ffi.nullptr) {
         throw Errno.toOSError(Errno.einval, 'AIO context handle is null');
       }
+
       return AioContext._(handle, maxConcurrent);
     } finally {
       calloc.free(ctxPtr);
@@ -203,7 +289,15 @@ final class AioContext with PlatformLogger {
   /// Whether a new operation can be submitted without exceeding [maxConcurrent].
   bool get canSubmit => _inFlight.length < _maxConcurrent;
 
-  /// Submit operations - returns number submitted
+  /// Submits a batch of operations to the kernel.
+  ///
+  /// Returns the number of operations successfully submitted. If the return
+  /// value is less than `operations.length`, only the first N operations were
+  /// submitted.
+  ///
+  /// Throws [StateError] if the context is disposed or if submitting would
+  /// exceed [maxConcurrent].
+  /// Throws [OSError] if the kernel rejects the submission.
   int submit(List<TrackedOperation> operations) {
     _checkNotDisposed();
 
@@ -215,10 +309,10 @@ final class AioContext with PlatformLogger {
       );
     }
 
-    final iocbArray = calloc<ffi.Pointer<aio_ffi.iocb>>(operations.length);
+    final iocbArray = calloc<ffi.Pointer<iocb>>(operations.length);
     try {
       for (var i = 0; i < operations.length; i++) {
-        iocbArray[i] = operations[i].iocb;
+        iocbArray[i] = operations[i].block;
         _inFlight[operations[i].id] = operations[i];
       }
 
@@ -249,7 +343,16 @@ final class AioContext with PlatformLogger {
     }
   }
 
-  /// Get completed operations - blocks up to timeout
+  /// Retrieves completed operations from the kernel.
+  ///
+  /// Blocks until at least [minEvents] operations complete or [timeout] expires.
+  /// Returns up to [maxEvents] completions (defaults to [maxConcurrent]).
+  ///
+  /// If [timeout] is `null`, waits indefinitely. If [timeout] is [Duration.zero],
+  /// returns immediately with any available completions.
+  ///
+  /// Throws [ArgumentError] if [minEvents] is invalid.
+  /// Throws [OSError] if the kernel call fails.
   List<CompletedOperation> getCompletions({
     int minEvents = 0,
     int? maxEvents,
@@ -356,6 +459,9 @@ final class AioContext with PlatformLogger {
 }
 
 /// Represents the result of a completed AIO operation.
+///
+/// Contains the original operation metadata along with the completion status,
+/// including bytes transferred and any error code.
 @immutable
 final class CompletedOperation {
   /// Creates a new [CompletedOperation].
@@ -383,11 +489,4 @@ final class CompletedOperation {
   /// An [OSError] representation of the result, or `null` if the operation
   /// was successful.
   OSError? get error => isSuccess ? null : OSError('I/O error', errorCode);
-
-  /// Throws an [OSError] if the operation failed.
-  void throwIfError() {
-    if (!isSuccess) {
-      throw Errno.toOSError(errorCode, 'I/O operation failed');
-    }
-  }
 }
