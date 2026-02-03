@@ -4,7 +4,6 @@ import 'dart:typed_data';
 import 'package:meta/meta.dart';
 
 import '/src/logger/logger.dart';
-import '/src/utils/utils.dart';
 import '/usb_gadget.dart';
 
 /// FunctionFs lifecycle states
@@ -39,7 +38,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
   FunctionFs({
     required super.name,
     this.descriptors = const [],
-    this.speeds = const {USBSpeed.fullSpeed, USBSpeed.highSpeed},
+    this.speeds = const {.fullSpeed, .highSpeed},
     this.strings = const {},
     this.flags = const FunctionFsFlags(),
     String? mountPoint,
@@ -71,6 +70,20 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
 
   /// Map of endpoints by their addresses
   final Map<EndpointAddress, EndpointFile> _endpoints = {};
+
+  /// Per-endpoint status buffers, keyed by [EndpointAddress].
+  /// Each value is the raw 2-byte payload returned by GET_STATUS (endpoint).
+  /// Bit 0 of byte 0: endpoint halted (STALL).
+  /// Entries are created on first SET_FEATURE and persist for the lifetime
+  /// of the function so that GET_STATUS can return them without allocation.
+  final Map<EndpointAddress, Uint8List> _endpointStatus = {};
+
+  /// Raw 2-byte device-status buffer, returned verbatim by GET_STATUS (device).
+  /// Bit 0: self-powered (0 = bus-powered, 1 = self-powered).
+  /// Bit 1: remote-wakeup enabled.
+  /// Set bit 0 after construction when the powered state of your hardware
+  /// is known; bit 1 is managed by SET/CLEAR_FEATURE (DEVICE_REMOTE_WAKEUP).
+  final Uint8List _deviceStatus = Uint8List(2);
 
   /// State stream
   final StreamController<FunctionFsState> _stateController = .broadcast();
@@ -105,7 +118,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
 
   @override
   Future<void> prepare(String path) async {
-    if (_state != FunctionFsState.uninitialized) {
+    if (_state != .uninitialized) {
       return log?.error(
         'Cannot prepare function in state $_state. Function must be in uninitialized state.',
       );
@@ -264,9 +277,10 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
         if (desc is! EndpointTemplate) continue;
 
         final epPath = '$_mountPoint/ep$index';
-        final endpoint = desc.address.isIn
-            ? EndpointInFile(epPath)
-            : EndpointOutFile(epPath, config: desc.config);
+        final endpoint = switch (desc.address.direction) {
+          .in_ => EndpointInFile(epPath),
+          .out => EndpointOutFile(epPath, config: desc.config),
+        };
 
         try {
           await endpoint.open();
@@ -305,7 +319,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
     endpoints.clear();
   }
 
-  /// Starts listening for events from EP0 using Linux AIO.
+  /// Starts listening for events from EP0.
   void _startEventListener() {
     log?.info('Starting event listener on EP0');
     _eventSubscription = _ep0.stream().listen(
@@ -332,7 +346,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
     .suspend => onSuspend(),
     .resume => onResume(),
     .setup when event is SetupEvent => onSetup(
-      event.bRequestType,
+      event.bmRequestType,
       event.bRequest,
       event.wValue,
       event.wIndex,
@@ -402,67 +416,91 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
 
   /// Called when a USB control request is received on EP0.
   @mustCallSuper
-  void onSetup(int requestType, int request, int value, int index, int length) {
+  void onSetup(
+    int bmRequestType,
+    int bRequest,
+    int wValue,
+    int wIndex,
+    int wLength,
+  ) {
     log?.debug(
-      'Setup Request: '
-      'bmRequestType=${requestType.toHex()}'
-      'bRequest=${request.toHex()}'
-      'wValue=${value.toHex()}'
-      'wIndex=${index.toHex()}'
-      'wLength=${length.toHex()}',
+      'Standard Setup: '
+      'bmRequestType=${bmRequestType.toHex()} '
+      'bRequest=${bRequest.toHex()} '
+      'wValue=${wValue.toHex()} '
+      'wIndex=${wIndex.toHex()} '
+      'wLength=${wLength.toHex()}',
     );
 
-    final type = USBRequestType.fromByte(requestType);
-    final recipient = USBRecipient.fromByte(requestType);
-    final direction = USBDirection.fromByte(requestType);
+    final recipient = USBRecipient.fromByte(bmRequestType);
+    final type = USBRequestType.fromByte(bmRequestType);
+    final direction = USBDirection.fromByte(bmRequestType);
+    final request = USBRequest.fromByte(bRequest);
+    final feature = USBFeature.fromByte(wValue.lowByte, recipient);
+    final address = EndpointAddress.fromByte(wIndex.lowByte);
 
     if (type != .standard) {
       log?.warn('Non-standard request, halting');
       return _ep0.halt();
     }
 
-    final usbRequest = USBRequest.fromValue(request);
+    switch ((request, direction, feature, recipient)) {
+      // Clear endpoint halt
+      case (.clearFeature, .out, .endpointHalt, _):
+        getEndpoint<EndpointInFile>(address.number).clearHalt();
+        // clear bit 0 (halted)
+        _endpointStatus[address]?[0] &= 0x01;
+        log?.debug('Cleared halt on $address');
+        _ep0.halt();
 
-    // GET_STATUS
-    if (usbRequest == .getStatus && direction.isIn && length == 2) {
-      if (value != 0) return _ep0.halt();
-      var status = 0;
-      switch (recipient) {
-        case .interface:
-          if (index != 0) return _ep0.halt();
-          status = 0;
-        case .endpoint:
-          final address = EndpointAddress.fromByte(index);
-          final endpoint = _endpoints[address];
-          if (endpoint == null) return _ep0.halt();
-          status = endpoint.isHalted ? 1 : 0;
-        default:
-          return _ep0.halt();
-      }
-      final bytes = ByteData(2)..setUint16(0, status, .little);
-      return _ep0.write(bytes.buffer.asUint8List());
-    }
+      // Set endpoint halt
+      case (.setFeature, .out, .endpointHalt, _):
+        _endpoints[address]?.halt();
+        // set bit 0 (halted) if not already present
+        (_endpointStatus[address] ??= Uint8List(2))[0] |= 0x01;
+        _ep0.halt();
 
-    // CLEAR_FEATURE / SET_FEATURE
-    final isSet = usbRequest == .setFeature;
-    final isClear = usbRequest == .clearFeature;
-    if ((isSet || isClear) && direction.isOut && length == 0) {
-      final enable = isSet;
-      if (recipient == .endpoint && value == USBFeature.endpointHalt.value) {
-        final address = EndpointAddress.fromByte(index);
+      // Get endpoint status - IN transfer
+      case (.getStatus, .in_, _, .endpoint):
         final endpoint = _endpoints[address];
-        if (endpoint == null) return _ep0.halt();
-        if (enable) {
-          endpoint.halt();
+        if (endpoint != null) {
+          final status = _endpointStatus[address] ??= Uint8List(2);
+          _ep0.write(status);
+          log?.debug(
+            'Returned status for $address (halted: ${status[0].bitAt(0)})',
+          );
         } else {
-          endpoint.clearHalt();
+          log?.warn('Cannot get status for $address: Endpoint not found');
+          _ep0.halt();
         }
-        _ep0.read(0);
-        return;
-      }
-    }
 
-    log?.warn('Unhandled: type=${requestType.toHex()} req=${request.toHex()}');
-    return _ep0.halt();
+      // Get device status - IN transfer
+      case (.getStatus, .in_, _, .device):
+        _ep0.write(_deviceStatus);
+        log?.debug(
+          'Returned device status '
+          '(self-powered: ${_deviceStatus[0].bitAt(0)}, '
+          'remote-wakeup: ${_deviceStatus[0].bitAt(1)})',
+        );
+
+      // Set device remote wakeup - OUT transfer
+      case (.setFeature, .out, .deviceRemoteWakeup, _):
+        _deviceStatus[0] |= 0x02; // set bit 1 (remote wakeup)
+        _ep0.halt(); // ACK the OUT transfer
+        log?.debug('Enabled remote wakeup');
+
+      // Clear device remote wakeup - OUT transfer
+      case (.clearFeature, .out, .deviceRemoteWakeup, _):
+        _deviceStatus[0] &= 0x02; // clear bit 1 (remote wakeup)
+        _ep0.halt(); // ACK the OUT transfer
+        log?.debug('Disabled remote wakeup');
+
+      default:
+        log?.warn(
+          'Unhandled: request=$request, direction=$direction, '
+          'feature=$feature, recipient=$recipient',
+        );
+        _ep0.halt();
+    }
   }
 }
