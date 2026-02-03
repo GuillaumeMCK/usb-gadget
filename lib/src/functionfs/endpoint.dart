@@ -40,23 +40,41 @@ abstract class EndpointFile {
   /// Safe to call multiple times (idempotent).
   Future<void> close();
 
-  /// Whether the endpoint is currently halted (STALL state).
-  ///
-  /// Note: Most endpoints cannot read their halt state, so this
-  /// returns false by default. Override if halt state tracking is needed.
-  bool get isHalted => false;
-
-  /// Clears the halt (STALL) condition on the endpoint.
-  ///
-  /// Throws [OSError] if the operation fails.
-  /// Throws [StateError] if endpoint is not open.
-  void clearHalt();
-
   /// Halts (STALLs) the endpoint.
   ///
   /// The implementation differs based on endpoint type.
   /// Throws [StateError] if endpoint is not open.
   void halt();
+
+  /// Flushes the FIFO buffer.
+  ///
+  /// Discards any pending data in the endpoint's FIFO.
+  ///
+  /// Throws [StateError] if endpoint is not open.
+  /// Throws [OSError] if ioctl fails.
+  void flushFIFO() {
+    if (_fd == null) {
+      throw StateError('Cannot flush FIFO: Endpoint is not open');
+    }
+    Ioctl.call(_fd!, .fifoFlush);
+  }
+
+  /// Gets the FIFO status (number of bytes in buffer).
+  ///
+  /// Returns the number of bytes currently in the endpoint's FIFO.
+  ///
+  /// Throws [StateError] if endpoint is not open.
+  /// Throws [OSError] if ioctl fails.
+  int getFIFOStatus() {
+    if (_fd == null) {
+      throw StateError('Cannot get FIFO status: Endpoint is not open');
+    }
+    final result = Ioctl.call(_fd!, .fifoStatus);
+    if (result < 0) {
+      throw Errno.toOSError(result);
+    }
+    return result;
+  }
 
   /// The file descriptor for this endpoint.
   ///
@@ -65,17 +83,6 @@ abstract class EndpointFile {
 }
 
 /// Manages the USB control endpoint (EP0) for FunctionFs.
-///
-/// EP0 is special:
-/// - Handles control transfers and setup requests
-/// - Can have multiple stream listeners (broadcast)
-/// - Manages FunctionFs mounting/unmounting
-/// - Provides blocking read/write for descriptor setup
-/// - Provides event stream for asynchronous operation
-///
-/// ## Thread Safety
-/// This class is NOT thread-safe. All operations should be performed
-/// from the same isolate. Stream operations are safe for multiple listeners.
 class EndpointControlFile extends EndpointFile with USBGadgetLogger {
   EndpointControlFile(
     super.path, {
@@ -155,18 +162,29 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
     _mount.cleanupIfNeeded();
   }
 
-  @override
-  void clearHalt() {
-    // EP0 doesn't support halt/clear operations
-  }
-
+  /// Sends a STALL response to the host.
+  ///
+  /// EP0 STALL behavior depends on the transfer direction:
+  /// - For IN transfers (device→host): Write 0 bytes
+  /// - For OUT transfers (host→device): Read 0 bytes
+  ///
+  /// However, since we typically don't know the direction when calling halt(),
+  /// and reading 0 bytes is more commonly used for STALL in examples,
+  /// we use read(0) as the default STALL mechanism.
+  ///
+  /// Used for:
+  /// - Invalid or unsupported control requests
+  /// - Malformed requests
+  /// - Requests the device cannot fulfill
+  ///
+  /// Throws [StateError] if endpoint is not open.
   @override
   void halt() {
     if (_fd == null) {
       throw StateError('Cannot halt: Endpoint is not open');
     }
     try {
-      // Reading 0 bytes on EP0 sends STALL to host
+      // Reading 0 bytes on EP0 sends STALL to host (works for most cases)
       Unistd.read(_fd!, 0);
     } on OSError catch (e) {
       // Handle common errors gracefully
@@ -176,6 +194,8 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
         log?.warn('Cannot halt: Endpoint is shut down');
       } else if (e.errorCode == Errno.enotconn) {
         log?.warn('Cannot halt: Not connected');
+      } else if (e.errorCode == Errno.el2hlt) {
+        log?.warn('Cannot halt: Transfer already completed (EL2HLT)');
       } else {
         log?.error('Failed to halt EP0: ${e.message}');
         rethrow;
@@ -220,7 +240,6 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
   /// Reads up to [length] bytes from EP0 (non-blocking).
   ///
   /// Used for:
-  /// - Reading 0 bytes to ACK OUT control transfers
   /// - Reading data from SET_REPORT or other OUT transfers
   ///
   /// Returns empty list if no data available (EAGAIN).
@@ -258,7 +277,7 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
   /// - SUSPEND: Bus suspended
   /// - RESUME: Bus resumed
   ///
-  /// The stream uses AIO for event-driven I/O with minimal latency.
+  /// The stream uses polling for event-driven I/O with minimal latency.
   /// Errors are reported through the stream's error channel.
   ///
   /// The stream automatically closes when:
@@ -348,50 +367,6 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
     _pollingTimer?.cancel();
     _pollingTimer = null;
   }
-
-  /// Flushes the FIFO buffer.
-  ///
-  /// Discards any pending data in the endpoint's FIFO.
-  ///
-  /// **When to use:**
-  /// - After protocol errors or STALL conditions
-  /// - When recovering from host-side errors
-  /// - Before re-enabling after disable event
-  /// - When resetting endpoint state
-  ///
-  /// Throws [StateError] if endpoint is not open.
-  /// Throws [OSError] if ioctl fails.
-  void flushFIFO() {
-    if (_fd == null) {
-      throw StateError('Cannot flush FIFO: Endpoint is not open');
-    }
-
-    try {
-      Ioctl.call(_fd!, .fifoFlush);
-      log?.debug('FIFO flushed successfully');
-    } on OSError catch (e) {
-      log?.error('Failed to flush FIFO: ${e.message}');
-      rethrow;
-    }
-  }
-
-  /// Gets the FIFO status (number of bytes in buffer).
-  ///
-  /// Returns the number of bytes currently in the endpoint's FIFO.
-  ///
-  /// Throws [StateError] if endpoint is not open.
-  /// Throws [OSError] if ioctl fails.
-  int getFIFOStatus() {
-    assert(_fd != null, 'getFIFOStatus: Endpoint is not open');
-
-    final result = Ioctl.call(_fd!, .fifoStatus);
-    if (result < 0) {
-      final error = Errno.toOSError(result);
-      log?.error('Failed to get FIFO status: ${error.message}');
-      throw error;
-    }
-    return result;
-  }
 }
 
 /// Manages a USB IN endpoint (device-to-host).
@@ -441,7 +416,14 @@ class EndpointInFile extends EndpointFile {
     }
   }
 
-  @override
+  /// Clears the halt (STALL) condition on the endpoint.
+  ///
+  /// Sends the CLEAR_HALT ioctl to the endpoint to clear a previously
+  /// set halt condition. Used to recover from error conditions after
+  /// the host has acknowledged the STALL.
+  ///
+  /// Throws [StateError] if endpoint is not open.
+  /// Throws [OSError] if the operation fails.
   void clearHalt() {
     if (_fd == null) {
       throw StateError('Cannot clear halt: Endpoint is not open');
@@ -546,12 +528,6 @@ class EndpointInFile extends EndpointFile {
 }
 
 /// Manages a USB OUT endpoint (host-to-device).
-///
-/// OUT endpoints receive data from the host.
-/// Common uses:
-/// - HID output reports (keyboard LEDs)
-/// - Bulk data transfers (file downloads)
-/// - Control/command channels
 class EndpointOutFile extends EndpointFile {
   EndpointOutFile(super.path, {required this.config});
 
@@ -601,35 +577,18 @@ class EndpointOutFile extends EndpointFile {
     }
   }
 
+  /// Cannot halt OUT endpoints in FunctionFs.
+  ///
+  /// OUT endpoints use a 'no-stall' approach in USB Bulk-Only spec
+  /// to avoid race conditions. The host controls data flow on OUT
+  /// endpoints, not the device.
+  ///
+  /// Always throws [UnsupportedError].
   @override
-  void clearHalt() {
-    if (_fd == null) {
-      throw StateError('Cannot clear halt: Endpoint is not open');
-    }
-
-    try {
-      Ioctl.call(_fd!, .clearHalt);
-    } on OSError catch (e) {
-      if (e.errorCode == Errno.einval) {
-        // Endpoint not halted, this is not an error
-        return;
-      }
-      // Provide meaningful error message
-      throw StateError(
-        'Failed to clear halt on OUT endpoint: ${e.message} (errno: ${e.errorCode})',
-      );
-    }
-  }
-
-  @override
-  void halt() {
-    // Cannot halt OUT endpoints in FunctionFs.
-    // The host controls data flow on OUT endpoints.
-    throw UnsupportedError(
-      'Cannot halt OUT endpoints in FunctionFs. '
-      'The host controls data flow on OUT endpoints.',
-    );
-  }
+  void halt() => throw UnsupportedError(
+    'Cannot halt OUT endpoints in FunctionFs. '
+    'The host controls data flow on OUT endpoints.',
+  );
 
   /// Synchronous read (non-blocking).
   ///
