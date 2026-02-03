@@ -117,6 +117,9 @@ abstract final class Errno {
   /// No message of desired type
   static const enomsg = 42;
 
+  /// EL2HLT (Level 2 halted)
+  static const el2hlt = 51;
+
   /// Identifier removed
   static const eidrm = 43;
 
