@@ -1,9 +1,9 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
 
 import '/src/logger/logger.dart';
-import '/src/utils/utils.dart';
 import '/usb_gadget.dart';
 
 /// Configuration for HID endpoint topology and parameters.
@@ -196,9 +196,9 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   }) : super(
          descriptors: [
            USBInterfaceDescriptor(
-             interfaceNumber: InterfaceNumber.interface0,
+             interfaceNumber: .interface0,
              numEndpoints: EndpointCount(config.numEndpoints),
-             interfaceClass: USBClass.hid,
+             interfaceClass: .hid,
              interfaceSubClass: subclass.value,
              interfaceProtocol: protocol.value,
            ),
@@ -289,203 +289,155 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   }
 
   @override
-  @protected
-  void onSetup(int requestType, int request, int value, int index, int length) {
-    final type = USBRequestType.fromByte(requestType);
-    final recipient = USBRecipient.fromByte(requestType);
-    final direction = USBDirection.fromByte(requestType);
-
-    // Handle standard interface descriptor requests
-    if (type == USBRequestType.standard &&
-        recipient == USBRecipient.interface &&
-        direction.isIn &&
-        request == USBRequest.getDescriptor.value) {
-      final descriptorType = HIDDescriptorType.fromValue((value >> 8) & 0xFF);
-      if (descriptorType == HIDDescriptorType.hid) {
-        log?.info('Providing HID descriptor');
-        final hidDesc = USBHIDDescriptor(
-          reportDescriptorLength: reportDescriptor.length,
-        );
-        final bytes = hidDesc.toBytes();
-        log?.debug(bytes.xxd());
-        final sendLength = length < bytes.length ? length : bytes.length;
-        ep0.write(bytes.sublist(0, sendLength));
-        return;
-      }
-      if (descriptorType == HIDDescriptorType.report) {
-        log?.debug('Providing HID report descriptor:${reportDescriptor.xxd()}');
-        final sendLength = length < reportDescriptor.length
-            ? length
-            : reportDescriptor.length;
-        ep0.write(reportDescriptor.sublist(0, sendLength));
-        return;
-      }
-    }
-
-    // Handle HID class-specific interface requests
-    if (type == USBRequestType.class_ && recipient == USBRecipient.interface) {
-      final hidRequest = HIDRequest.fromValue(request);
-      if (hidRequest == null) {
-        log?.warn('Unknown HID request: ${request.toHex()}');
-        return ep0.halt();
-      }
-
-      return switch (hidRequest) {
-        .getReport => _handleGetReport(value, length, direction),
-        .setReport => _handleSetReport(value, length, direction),
-        .getIdle => _handleGetIdle(value, length, direction),
-        .setIdle => _handleSetIdle(value, direction),
-        .getProtocol => _handleGetProtocol(value, length, direction),
-        .setProtocol => _handleSetProtocol(value, direction),
-      };
-    }
-
-    // Fall back to standard USB request handling
-    super.onSetup(requestType, request, value, index, length);
-  }
-
-  /// Handles GET_REPORT request (IN transfer).
-  void _handleGetReport(int value, int length, USBDirection direction) {
-    if (!direction.isIn || length == 0) {
-      log?.error('GET_REPORT: Invalid direction or length');
-      return ep0.halt();
-    }
-    final reportType = HIDReportType.fromValue((value >> 8) & 0xFF);
-    final reportId = value & 0xFF;
-    if (reportType == null) {
-      log?.error('GET_REPORT: Invalid report type: ${(value >> 8) & 0xFF}');
-      return ep0.halt();
-    }
-    log?.info('GET_REPORT: type=${reportType.name}, id=$reportId, len=$length');
-
-    final reportData = onGetReport(reportType, reportId);
-    if (reportData == null) {
-      log?.error('GET_REPORT: No data available');
-      return ep0.halt();
-    }
-    // Prepare response matching requested length and prepend Report ID if needed
-    final response = _prepareReportData(reportData, length, reportId);
-    // IN transfer - write data, kernel handles status
-    ep0.write(response);
-  }
-
-  /// Handles SET_REPORT request (OUT transfer).
-  void _handleSetReport(int value, int length, USBDirection direction) {
-    if (!direction.isOut) {
-      log?.error('SET_REPORT: Invalid direction');
-      return ep0.halt();
-    }
-    final reportType = HIDReportType.fromValue((value >> 8) & 0xFF);
-    final reportId = value & 0xFF;
-    if (reportType == null) {
-      log?.error('SET_REPORT: Invalid report type');
-      return ep0.halt();
-    }
-    log?.info('SET_REPORT: type=${reportType.name}, id=$reportId, len=$length');
-
-    // Read report data from EP0
-    final data = length > 0
-        ? Uint8List.fromList(ep0.read(length))
-        : Uint8List(0);
-    // Notify subclass
-    onSetReport(reportType, reportId, data);
-    // OUT transfer - send ACK
-    ep0.read(0);
-  }
-
-  /// Handles GET_IDLE request (IN transfer).
-  void _handleGetIdle(int value, int length, USBDirection direction) {
-    if (!direction.isIn || length != 1) {
-      log?.error('GET_IDLE: Invalid parameters');
-      return ep0.halt();
-    }
-    final reportId = value & 0xFF;
-    // Look up idle rate for this specific report ID, or use "all reports" (0)
-    final idleRate = _idleRates[reportId] ?? _idleRates[0] ?? 0;
-    log?.info('GET_IDLE: reportId=$reportId, rate=$idleRate');
-    // IN transfer - write response, kernel handles status
-    ep0.write(Uint8List(1)..[0] = idleRate);
-  }
-
-  /// Handles SET_IDLE request (OUT transfer, no data phase).
-  void _handleSetIdle(int value, USBDirection direction) {
-    if (direction.isIn) {
-      log?.error('SET_IDLE: Invalid direction');
-      return ep0.halt();
-    }
-    final duration = (value >> 8) & 0xFF;
-    final reportId = value & 0xFF;
-
-    // Store idle rate per report ID
-    // reportId=0 means "all reports"
-    if (reportId == 0) {
-      // Set idle rate for all reports
-      _idleRates[0] = duration;
-    } else {
-      // Set idle rate for specific report ID
-      _idleRates[reportId] = duration;
-    }
-
-    log?.info(
-      'SET_IDLE: reportId=$reportId, duration=$duration (${duration * 4}ms)',
-    );
-    onSetIdle(reportId, duration);
-    // OUT transfer - send ACK
-    ep0.read(0);
-  }
-
-  /// Handles GET_PROTOCOL request (IN transfer).
-  void _handleGetProtocol(int value, int length, USBDirection direction) {
-    if (!direction.isIn || length != 1 || value != 0) {
-      log?.error('GET_PROTOCOL: Invalid parameters');
-      return ep0.halt();
-    }
-    log?.info('GET_PROTOCOL: returning ${_currentProtocol.name}');
-    // IN transfer - write response, kernel handles status
-    ep0.write(Uint8List(1)..[0] = _currentProtocol.value);
-  }
-
-  /// Handles SET_PROTOCOL request (OUT transfer, no data phase).
-  void _handleSetProtocol(int value, USBDirection direction) {
-    if (!direction.isOut) {
-      log?.error('SET_PROTOCOL: Invalid direction');
-      return ep0.halt();
-    }
-    _currentProtocol = HIDProtocol.fromValue(value);
-    log?.info('SET_PROTOCOL: set to ${_currentProtocol.name}');
-    onSetProtocol(_currentProtocol);
-    // OUT transfer - send ACK
-    ep0.read(0);
-  }
-
-  /// Prepares report data to match the requested length.
-  ///
-  /// If [reportId] is non-zero, prepends the Report ID byte to the data.
-  /// This is required by the HID specification for devices with multiple reports.
-  Uint8List _prepareReportData(
-    Uint8List data,
-    int requestedLength,
-    int reportId,
+  @mustCallSuper
+  void onSetup(
+    int bmRequestType,
+    int bRequest,
+    int wValue,
+    int wIndex,
+    int wLength,
   ) {
-    // Prepend Report ID if needed
-    final withReportId = reportId != 0
-        ? (Uint8List(data.length + 1)
-            ..[0] = reportId
-            ..setRange(1, data.length + 1, data))
-        : data;
+    log?.debug(
+      'HID Setup: '
+      'bmRequestType=${bmRequestType.toHex()} '
+      'bRequest=${bRequest.toHex()} '
+      'wValue=${wValue.toHex()} '
+      'wIndex=${wIndex.toHex()} '
+      'wLength=${wLength.toHex()}',
+    );
 
-    // Adjust to requested length
-    if (withReportId.length == requestedLength) {
-      return withReportId;
-    } else if (withReportId.length > requestedLength) {
-      return Uint8List.fromList(withReportId.sublist(0, requestedLength));
-    } else {
-      return Uint8List(requestedLength)
-        ..setRange(0, withReportId.length, withReportId);
-    }
+    final type = USBRequestType.fromByte(bmRequestType);
+    final recipient = USBRecipient.fromByte(bmRequestType);
+    final direction = USBDirection.fromByte(bmRequestType);
+    final request = type == .standard
+        ? USBRequest.fromByte(bRequest)
+        : HIDRequest.fromByte(bRequest);
+
+    return switch (type) {
+      /// Handle HID standard interface requests
+      .standard when request is USBRequest => switch ((request, direction)) {
+        (.getDescriptor, .in_) => switch (HIDDescriptorType.fromByte(
+          wValue.byte1,
+        )) {
+          .hid => () {
+            log?.debug('Providing HID descriptor');
+            final hidDesc = USBHIDDescriptor(
+              reportDescriptorLength: reportDescriptor.length,
+            );
+            final bytes = hidDesc.toBytes();
+            log?.debug(bytes.xxd());
+            final size = wLength < bytes.length ? wLength : bytes.length;
+            // Write completes IN transfer, .little
+            ep0.write(bytes.sublist(0, size));
+          }(),
+          .report => () {
+            log?.debug(
+              'Providing HID report descriptor:${reportDescriptor.xxd()}',
+            );
+            final size = math.min(wLength, reportDescriptor.length);
+            // Write completes IN transfer, .little
+            ep0.write(reportDescriptor.sublist(0, size));
+          }(),
+          _ => super.onSetup(bmRequestType, bRequest, wValue, wIndex, wLength),
+        },
+        _ => super.onSetup(bmRequestType, bRequest, wValue, wIndex, wLength),
+      },
+
+      /// Handle HID class-specific interface requests
+      .class_ => switch ((HIDRequest.fromByte(bRequest), direction)) {
+        (.getReport, .in_) => () {
+          final reportId = wValue.byte0;
+          final reportType = HIDReportType.fromByte(wValue.byte1);
+          log?.info(
+            'GET_REPORT: type=${reportType.name}, id=$reportId, len=$wLength',
+          );
+          final data = onGetReport(reportType, reportId);
+          if (data == null) {
+            log?.error('GET_REPORT: No data available');
+            return ep0.halt();
+          }
+
+          final response = switch (reportId) {
+            0 => data,
+            _ => Uint8List.fromList([reportId, ...data]),
+          };
+
+          // Write completes IN transfer, .little
+          ep0.write(switch ((response.length, wLength)) {
+            (final a, final b) when a == b => response,
+            (final a, final b) when a > b => .fromList(response.sublist(0, b)),
+            (final a, final b) when a < b => .new(b)..setRange(0, a, response),
+            _ => throw StateError('Unreachable'),
+          });
+        }(),
+        (.setReport, .out) => () {
+          final reportId = wValue.byte0;
+          final reportType = HIDReportType.fromByte(wValue.byte1);
+          log?.info(
+            'SET_REPORT: type=${reportType.name}, id=$reportId, len=$wLength',
+          );
+          final data = ep0.read(wLength);
+          onSetReport(reportType, reportId, data);
+        }(),
+        (.getIdle, .in_) => () {
+          if (wLength != 1) {
+            log?.error('GET_IDLE: Invalid parameters');
+            return ep0.halt();
+          }
+          final reportId = wValue.byte0;
+          // Look up idle rate for this specific report ID, or use "all reports" (0)
+          final idleRate = _idleRates[reportId] ?? _idleRates[0] ?? 0;
+          log?.info('GET_IDLE: reportId=$reportId, rate=$idleRate');
+          // Write completes IN transfer, .little
+          ep0.write(Uint8List(1)..[0] = idleRate);
+        }(),
+        (.setIdle, .out) => () {
+          final reportId = wValue.byte0;
+          final duration = wValue.byte1;
+
+          // Store idle rate per report ID
+          // reportId=0 means "all reports"
+          if (reportId == 0) {
+            _idleRates[0] = duration;
+          } else {
+            _idleRates[reportId] = duration;
+          }
+          log?.info(
+            'SET_IDLE: reportId=$reportId, duration=$duration (${duration * 4}ms)',
+          );
+          onSetIdle(reportId, duration);
+          // ACK the OUT transfer after processing
+          ep0.halt();
+        }(),
+        (.getProtocol, .in_) => () {
+          if (wLength != 1 || wValue != 0) {
+            log?.error('GET_PROTOCOL: Invalid parameters');
+            return ep0.halt();
+          }
+          log?.info('GET_PROTOCOL: returning ${_currentProtocol.name}');
+          // Write completes IN transfer, .little
+          ep0.write(Uint8List(1)..[0] = _currentProtocol.value);
+        }(),
+        (.setProtocol, .out) => () {
+          _currentProtocol = HIDProtocol.fromByte(wValue.byte0);
+          log?.info('SET_PROTOCOL: set to ${_currentProtocol.name}');
+          onSetProtocol(_currentProtocol);
+          // ACK the OUT transfer after processing
+          ep0.halt();
+        }(),
+        _ => log?.warn(
+          'Invalid HID class request: bRequest=${bRequest.toHex()}',
+        ),
+      },
+      .reserved || .vendor || .standard => super.onSetup(
+        bmRequestType,
+        bRequest,
+        wValue,
+        wIndex,
+        wLength,
+      ),
+    };
   }
-
-  // Public API for subclasses
 
   /// Streams reports from the interrupt OUT endpoint.
   Stream<Uint8List> streamReports() {
