@@ -1,12 +1,16 @@
 import 'dart:ffi' as ffi;
 import 'dart:io';
+
 import 'package:ffi/ffi.dart';
 import 'package:meta/meta.dart';
 import 'package:using/using.dart';
+
 import '/src/logger/logger.dart';
-import '../errno/errno.dart';
+import '/src/platform/errno/errno.dart';
 import 'aio.ffi.dart';
 import 'aio_bindings.dart';
+import 'aio_reader.dart';
+import 'aio_writer.dart';
 
 // ============================================================================
 // Configuration
