@@ -224,59 +224,6 @@ abstract class USBDescriptor {
   /// and the second byte must contain the descriptor type.
   factory USBDescriptor.raw(List<int> bytes) = RawUSBDescriptor;
 
-  /// Parses a descriptor from bytes.
-  ///
-  /// Automatically detects the descriptor type and returns the appropriate
-  /// descriptor class. Supports interface, endpoint, SuperSpeed companion,
-  /// and interface association descriptors.
-  ///
-  /// Throws [FormatException] if the descriptor is invalid or too short.
-  static USBDescriptor parse(List<int> bytes) {
-    if (bytes.length < 2) {
-      throw FormatException('Descriptor too short: ${bytes.length}');
-    }
-
-    return switch (bytes[1]) {
-      0x04 => USBInterfaceDescriptor.parse(bytes),
-      0x05 => () {
-        if (bytes.length < 7) {
-          throw FormatException(
-            'Endpoint descriptor too short: ${bytes.length}',
-          );
-        }
-
-        final address = EndpointAddress.fromByte(bytes[2]);
-        final attributes = EndpointAttributes.fromByte(bytes[3]);
-        final maxPacketSize = MaxPacketSize.raw(bytes[4] | (bytes[5] << 8));
-        final interval = PollingInterval.raw(bytes[6]);
-
-        return switch (bytes.length) {
-          7 => USBEndpointDescriptorNoAudio(
-            address: address,
-            attributes: attributes,
-            maxPacketSize: maxPacketSize,
-            interval: interval,
-          ),
-          9 => USBEndpointDescriptor(
-            address: address,
-            attributes: attributes,
-            maxPacketSize: maxPacketSize,
-            interval: interval,
-            bRefresh: bytes[7],
-            bSynchAddress: bytes[8],
-          ),
-          _ => throw FormatException(
-            'Invalid endpoint descriptor length: ${bytes.length}',
-          ),
-        };
-      }(),
-      0x30 => USBSSEPCompDescriptor.parse(bytes),
-      0x31 => USBSSPIsocEndpointDescriptor.parse(bytes),
-      0x0B => USBInterfaceAssocDescriptor.parse(bytes),
-      _ => RawUSBDescriptor(bytes),
-    };
-  }
-
   /// Length of the descriptor in bytes.
   ///
   /// This includes the bLength and bDescriptorType fields themselves.
