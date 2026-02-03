@@ -55,16 +55,16 @@ enum HIDProtocol {
 
   const HIDProtocol(this.value);
 
+  /// Creates a protocol from its raw value.
+  factory HIDProtocol.fromByte(int byte) => switch (byte) {
+    0x00 => .none,
+    0x01 => .keyboard,
+    0x02 => .mouse,
+    _ => throw Exception('Unknown HIDProtocol'),
+  };
+
   /// Raw protocol code value.
   final int value;
-
-  /// Creates a protocol from its raw value.
-  static HIDProtocol fromValue(int value) {
-    return HIDProtocol.values.firstWhere(
-      (p) => p.value == value,
-      orElse: () => none,
-    );
-  }
 }
 
 /// HID class-specific request codes (bRequest).
@@ -142,17 +142,19 @@ enum HIDRequest {
 
   const HIDRequest(this.value);
 
+  /// Creates a request from its raw value.
+  factory HIDRequest.fromByte(int byte) => switch (byte) {
+    0x01 => .getReport,
+    0x02 => .getIdle,
+    0x03 => .getProtocol,
+    0x09 => .setReport,
+    0x0A => .setIdle,
+    0x0B => .setProtocol,
+    _ => throw Exception('Unknown HIDRequest'),
+  };
+
   /// Raw request code value.
   final int value;
-
-  /// Creates a request from its raw value.
-  static HIDRequest? fromValue(int value) {
-    try {
-      return HIDRequest.values.firstWhere((r) => r.value == value);
-    } catch (_) {
-      return null;
-    }
-  }
 }
 
 /// HID descriptor type codes (bDescriptorType).
@@ -180,22 +182,19 @@ enum HIDDescriptorType {
   /// of the device (like button locations). Rarely used in practice.
   physical(0x23);
 
+  /// Creates a HID descriptor type.
   const HIDDescriptorType(this.value);
+
+  /// Creates a descriptor type from its raw value.
+  factory HIDDescriptorType.fromByte(int byte) => switch (byte) {
+    0x21 => .hid,
+    0x22 => .report,
+    0x23 => .physical,
+    _ => throw Exception('Unknown HIDDescriptorType'),
+  };
 
   /// Raw descriptor type value.
   final int value;
-
-  /// Creates a descriptor type from its raw value.
-  static HIDDescriptorType fromValue(
-    int value, {
-    HIDDescriptorType orElse = HIDDescriptorType.hid,
-  }) {
-    try {
-      return HIDDescriptorType.values.firstWhere((t) => t.value == value);
-    } catch (_) {
-      return orElse;
-    }
-  }
 }
 
 /// HID report types.
@@ -209,15 +208,16 @@ enum HIDReportType {
   /// Feature report (3).
   feature(3);
 
+  /// Creates a HID report type.
   const HIDReportType(this.value);
 
-  final int value;
+  /// Creates a report type from its raw value.
+  factory HIDReportType.fromByte(int byte) => switch (byte) {
+    1 => .input,
+    2 => .output,
+    3 => .feature,
+    _ => throw Exception('Unknown HIDReportType $byte'),
+  };
 
-  static HIDReportType? fromValue(int value) {
-    try {
-      return HIDReportType.values.firstWhere((t) => t.value == value);
-    } catch (_) {
-      return null;
-    }
-  }
+  final int value;
 }

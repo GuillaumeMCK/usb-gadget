@@ -59,12 +59,12 @@ class EndpointAddress {
   /// Creates an IN (device-to-host) endpoint address.
   ///
   /// IN endpoints send data from the device to the host.
-  const EndpointAddress.in_(this.number) : direction = USBDirection.in_;
+  const EndpointAddress.in_(this.number) : direction = .in_;
 
   /// Creates an OUT (host-to-device) endpoint address.
   ///
   /// OUT endpoints receive data from the host to the device.
-  const EndpointAddress.out(this.number) : direction = USBDirection.out;
+  const EndpointAddress.out(this.number) : direction = .out;
 
   /// Parses an endpoint address from a bEndpointAddress byte.
   ///
@@ -1093,7 +1093,7 @@ enum USBDirection {
   static const int mask = 0x80;
 
   /// Extracts direction from bEndpointAddress or bmRequestType.
-  static USBDirection fromByte(int byte) =>
+  factory USBDirection.fromByte(int byte) =>
       (byte & mask) == in_.value ? in_ : out;
 
   /// True if this is an IN direction.
@@ -1353,12 +1353,15 @@ enum USBRequestType {
   static const int mask = 0x60;
 
   /// Extracts request type from bmRequestType byte.
-  static USBRequestType fromByte(int byte) {
+  factory USBRequestType.fromByte(int byte) {
     final masked = byte & mask;
-    return USBRequestType.values.firstWhere(
-      (t) => t.value == masked,
-      orElse: () => reserved,
-    );
+    return switch (masked) {
+      0x00 => standard,
+      0x20 => class_,
+      0x40 => vendor,
+      0x60 => reserved,
+      _ => throw ArgumentError('Invalid USB request type: $masked'),
+    };
   }
 }
 
@@ -1385,12 +1388,15 @@ enum USBRecipient {
   static const int mask = 0x1F;
 
   /// Extracts recipient from bmRequestType byte.
-  static USBRecipient fromByte(int byte) {
+  factory USBRecipient.fromByte(int byte) {
     final masked = byte & mask;
-    return USBRecipient.values.firstWhere(
-      (r) => r.value == masked,
-      orElse: () => other,
-    );
+    return switch (masked) {
+      0x00 => device,
+      0x01 => interface,
+      0x02 => endpoint,
+      0x03 => other,
+      _ => throw ArgumentError('Invalid USB recipient: $masked'),
+    };
   }
 }
 
@@ -1431,17 +1437,24 @@ enum USBRequest {
 
   const USBRequest(this.value);
 
+  /// Creates a request from its raw value.
+  factory USBRequest.fromByte(int byte) => switch (byte) {
+    0x00 => .getStatus,
+    0x01 => .clearFeature,
+    0x03 => .setFeature,
+    0x05 => .setAddress,
+    0x06 => .getDescriptor,
+    0x07 => .setDescriptor,
+    0x08 => .getConfiguration,
+    0x09 => .setConfiguration,
+    0x0A => .getInterface,
+    0x0B => .setInterface,
+    0x0C => .synchFrame,
+    _ => throw ArgumentError('Invalid USB request: $byte'),
+  };
+
   /// Raw request value.
   final int value;
-
-  /// Creates a request from its raw value.
-  static USBRequest? fromValue(int value) {
-    try {
-      return USBRequest.values.firstWhere((r) => r.value == value);
-    } catch (_) {
-      return null;
-    }
-  }
 }
 
 /// Standard USB feature selectors.
@@ -1456,9 +1469,27 @@ enum USBFeature {
   testMode(0x02),
 
   /// Interface function suspend feature (0x00).
-  intfFuncSuspend(0x00);
+  functionSuspend(0x00);
 
   const USBFeature(this.value);
+
+  /// Creates a feature selector from its raw value and recipient.
+  /// Throws ArgumentError if the combination is invalid.
+  factory USBFeature.fromByte(int byte, USBRecipient recipient) =>
+      switch (recipient) {
+        .endpoint when byte == 0x00 => .endpointHalt,
+        .interface when byte == 0x00 => .functionSuspend,
+        .device => switch (byte) {
+          0x01 => .deviceRemoteWakeup,
+          0x02 => .testMode,
+          _ => throw ArgumentError(
+            'Invalid feature selector for device recipient: $byte',
+          ),
+        },
+        _ => throw ArgumentError(
+          'Invalid recipient for feature selector: $recipient',
+        ),
+      };
 
   /// Raw feature value.
   final int value;
