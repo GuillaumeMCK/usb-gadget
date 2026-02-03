@@ -183,7 +183,7 @@ abstract final class Unistd {
   /// Returns empty list on EOF.
   ///
   /// Throws [OSError] on error (except EAGAIN).
-  /// Throws [ArgumentError] if fd is negative or count is not positive.
+  /// Throws [ArgumentError] if fd is negative or count is negative.
   static Uint8List read(int fd, int count) {
     if (fd < 0) {
       throw ArgumentError.value(fd, 'fd', 'Must be non-negative');
@@ -258,13 +258,15 @@ abstract final class Unistd {
   /// Returns the number of bytes actually written (may be less than data.length).
   ///
   /// Throws [OSError] on error.
-  /// Throws [ArgumentError] if fd is negative or data is empty.
+  /// Throws [ArgumentError] if fd is negative.
   static int write(int fd, Uint8List data) {
     if (fd < 0) {
       throw ArgumentError.value(fd, 'fd', 'Must be non-negative');
     }
+
+    // Handle zero-length writes
     if (data.isEmpty) {
-      throw ArgumentError.value(data, 'data', 'Cannot be empty');
+      return UnistdLibrary.instance.lib.write(fd, ffi.nullptr, 0);
     }
 
     final bufferPtr = malloc<ffi.Uint8>(data.length);
@@ -294,6 +296,12 @@ abstract final class Unistd {
   ///
   /// Throws [OSError] on error.
   static void writeAll(int fd, Uint8List data) {
+    // Handle zero-length writes
+    if (data.isEmpty) {
+      write(fd, data);
+      return;
+    }
+
     var offset = 0;
 
     while (offset < data.length) {
@@ -358,7 +366,7 @@ abstract final class Unistd {
 
     final newFlags = nonBlocking
         ? currentFlags | OpenFlag.nonBlock.value
-        : currentFlags & OpenFlag.nonBlock.value;
+        : currentFlags & ~OpenFlag.nonBlock.value;
 
     fcntl(fd, FcntlCommand.setFl, newFlags);
   }
