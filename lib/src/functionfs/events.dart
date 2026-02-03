@@ -31,13 +31,16 @@ enum FunctionFsEventType {
   /// Creates an event type from its numeric value.
   ///
   /// Returns null if the value doesn't match any known event type.
-  static FunctionFsEventType? fromValue(int value) {
-    try {
-      return FunctionFsEventType.values.firstWhere((e) => e.index == value);
-    } catch (_) {
-      return null;
-    }
-  }
+  factory FunctionFsEventType.fromByte(int value) => switch (value) {
+    0 => .bind,
+    1 => .unbind,
+    2 => .enable,
+    3 => .disable,
+    4 => .setup,
+    5 => .suspend,
+    6 => .resume,
+    _ => throw ArgumentError('Invalid FunctionFs event type value: $value'),
+  };
 }
 
 /// Base class for FunctionFs events.
@@ -57,18 +60,14 @@ sealed class FunctionFsEvent {
     if (data.length < 12) {
       throw ArgumentError('Event data must be at least 12 bytes');
     }
-    final eventType = FunctionFsEventType.fromValue(data[8]);
-    if (eventType == null) {
-      return null;
-    }
-    return switch (eventType) {
-      FunctionFsEventType.bind => const BindEvent(),
-      FunctionFsEventType.unbind => const UnbindEvent(),
-      FunctionFsEventType.enable => const EnableEvent(),
-      FunctionFsEventType.disable => const DisableEvent(),
-      FunctionFsEventType.setup => SetupEvent._fromBytes(data),
-      FunctionFsEventType.suspend => const SuspendEvent(),
-      FunctionFsEventType.resume => const ResumeEvent(),
+    return switch (FunctionFsEventType.fromByte(data[8])) {
+      .bind => const BindEvent(),
+      .unbind => const UnbindEvent(),
+      .enable => const EnableEvent(),
+      .disable => const DisableEvent(),
+      .setup => SetupEvent._fromBytes(data),
+      .suspend => const SuspendEvent(),
+      .resume => const ResumeEvent(),
     };
   }
 
@@ -96,10 +95,7 @@ class BindEvent implements FunctionFsEvent {
   const BindEvent();
 
   @override
-  final FunctionFsEventType type = FunctionFsEventType.bind;
-
-  @override
-  String toString() => 'BindEvent()';
+  final FunctionFsEventType type = .bind;
 }
 
 /// Function has been unbound from the UDC.
@@ -108,10 +104,7 @@ class UnbindEvent implements FunctionFsEvent {
   const UnbindEvent();
 
   @override
-  final FunctionFsEventType type = FunctionFsEventType.unbind;
-
-  @override
-  String toString() => 'UnbindEvent()';
+  final FunctionFsEventType type = .unbind;
 }
 
 /// Function has been enabled.
@@ -120,10 +113,7 @@ class EnableEvent implements FunctionFsEvent {
   const EnableEvent();
 
   @override
-  final FunctionFsEventType type = FunctionFsEventType.enable;
-
-  @override
-  String toString() => 'EnableEvent()';
+  final FunctionFsEventType type = .enable;
 }
 
 /// Function has been disabled.
@@ -132,10 +122,7 @@ class DisableEvent implements FunctionFsEvent {
   const DisableEvent();
 
   @override
-  final FunctionFsEventType type = FunctionFsEventType.disable;
-
-  @override
-  String toString() => 'DisableEvent()';
+  final FunctionFsEventType type = .disable;
 }
 
 /// Setup packet received.
@@ -165,7 +152,7 @@ class SetupEvent implements FunctionFsEvent {
   }
 
   @override
-  final FunctionFsEventType type = FunctionFsEventType.setup;
+  final FunctionFsEventType type = .setup;
 
   /// Request type and direction.
   final int bRequestType;
@@ -208,7 +195,7 @@ class SetupEvent implements FunctionFsEvent {
 
   @override
   String toString() =>
-      'SetupEvent(type: ${bRequestType.toHex()}, '
+      'SetupEvent(type: ${bmRequestType.toHex()}, '
       'request: ${bRequest.toHex()}, '
       'value: ${wValue.toHex()}, '
       'index: ${wIndex.toHex()}, '
@@ -221,10 +208,7 @@ class SuspendEvent implements FunctionFsEvent {
   const SuspendEvent();
 
   @override
-  final FunctionFsEventType type = FunctionFsEventType.suspend;
-
-  @override
-  String toString() => 'SuspendEvent()';
+  final FunctionFsEventType type = .suspend;
 }
 
 /// USB resume signaled.
@@ -233,8 +217,5 @@ class ResumeEvent implements FunctionFsEvent {
   const ResumeEvent();
 
   @override
-  final FunctionFsEventType type = FunctionFsEventType.resume;
-
-  @override
-  String toString() => 'ResumeEvent()';
+  final FunctionFsEventType type = .resume;
 }
