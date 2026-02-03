@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-import '/src/utils/utils.dart';
 import '/usb_gadget.dart';
 
 /// Event type constants.
@@ -132,7 +131,7 @@ class DisableEvent implements FunctionFsEvent {
 class SetupEvent implements FunctionFsEvent {
   /// Creates a setup event.
   const SetupEvent({
-    required this.bRequestType,
+    required this.bmRequestType,
     required this.bRequest,
     required this.wValue,
     required this.wIndex,
@@ -143,7 +142,7 @@ class SetupEvent implements FunctionFsEvent {
   factory SetupEvent._fromBytes(List<int> data) {
     final buffer = ByteData.sublistView(Uint8List.fromList(data));
     return SetupEvent(
-      bRequestType: buffer.getUint8(0),
+      bmRequestType: buffer.getUint8(0),
       bRequest: buffer.getUint8(1),
       wValue: buffer.getUint16(2, .little),
       wIndex: buffer.getUint16(4, .little),
@@ -154,8 +153,8 @@ class SetupEvent implements FunctionFsEvent {
   @override
   final FunctionFsEventType type = .setup;
 
-  /// Request type and direction.
-  final int bRequestType;
+  /// Request type and direction
+  final int bmRequestType;
 
   /// Specific request.
   final int bRequest;
@@ -170,28 +169,16 @@ class SetupEvent implements FunctionFsEvent {
   final int wLength;
 
   /// Gets the request type (standard, class, vendor).
-  USBRequestType get requestType => USBRequestType.fromByte(bRequestType);
+  USBRequestType get requestType => .fromByte(bmRequestType);
 
   /// Gets the recipient (device, interface, endpoint, other).
-  USBRecipient get recipient => USBRecipient.fromByte(bRequestType);
+  USBRecipient get recipient => .fromByte(bmRequestType);
 
   /// Gets the direction (IN or OUT).
-  USBDirection get direction => USBDirection.fromByte(bRequestType);
-
-  /// Checks if this is a standard USB request.
-  bool get isStandardRequest => requestType == USBRequestType.standard;
-
-  /// Checks if this is a class-specific request.
-  bool get isClassRequest => requestType == USBRequestType.class_;
-
-  /// Checks if this is a vendor-specific request.
-  bool get isVendorRequest => requestType == USBRequestType.vendor;
+  USBDirection get direction => .fromByte(bmRequestType);
 
   /// Gets the standard request type if this is a standard request.
-  ///
-  /// Returns null if this is not a standard request.
-  USBRequest? get standardRequest =>
-      isStandardRequest ? USBRequest.fromValue(bRequest) : null;
+  USBRequest get standardRequest => .fromByte(bRequest);
 
   @override
   String toString() =>
