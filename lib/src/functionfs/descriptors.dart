@@ -14,35 +14,34 @@ enum FunctionFsMagic {
   /// Original FunctionFs format (v1).
   ///
   /// Basic descriptor support without flags or extended features.
-  /// Magic: 0x00000001
-  v1(0x00000001),
+  /// Magic: 0x01
+  v1(0x01),
 
   /// Strings only format.
   ///
-  /// Magic: 0x00000002
-  strings(0x00000002),
+  /// Magic: 0x02
+  strings(0x02),
 
   /// FunctionFs v2 format with flags.
   ///
   /// Adds support for feature flags and SuperSpeed descriptors.
-  /// Magic: 0x00000003
-  v2(0x00000003);
+  /// Magic: 0x03
+  v2(0x03);
 
   const FunctionFsMagic(this.value);
-
-  /// The raw magic number value.
-  final int value;
 
   /// Creates a magic number from its raw value.
   ///
   /// Returns null if the value doesn't match any known magic number.
-  static FunctionFsMagic? fromValue(int value) {
-    try {
-      return FunctionFsMagic.values.firstWhere((m) => m.value == value);
-    } catch (_) {
-      return null;
-    }
-  }
+  factory FunctionFsMagic.fromByte(int byte) => switch (byte) {
+    0x01 => .v1,
+    0x02 => .strings,
+    0x03 => .v2,
+    _ => throw ArgumentError('Invalid FunctionFs magic value: $byte'),
+  };
+
+  /// The raw magic number value.
+  final int value;
 }
 
 /// Builder for FunctionFs string data.
@@ -80,7 +79,7 @@ class FunctionFsStringsBuilder {
 ///
 /// This represents the complete string blob in the format expected by
 /// FunctionFs. The data includes:
-/// - Magic number (0x00000002, same as v2 magic)
+/// - Magic number (0x02, same as v2 magic)
 /// - Length (4 bytes)
 /// - For each language:
 ///   - Language ID (2 bytes)
@@ -99,7 +98,7 @@ class FunctionFsStrings {
   /// Serializes to the FunctionFs string format.
   ///
   /// Format (matches Python StringsHead):
-  /// - magic (4 bytes): FUNCTIONFS_STRINGS_MAGIC (0x00000002)
+  /// - magic (4 bytes): FUNCTIONFS_STRINGS_MAGIC (0x02)
   /// - length (4 bytes): total length of structure
   /// - str_count (4 bytes): number of strings per language
   /// - lang_count (4 bytes): number of languages
@@ -236,8 +235,7 @@ class FunctionFsDescriptors {
       buffer.add(count.buffer.asUint8List());
     }
     if (flags.hasSuperSpeedPlus && superSpeedPlus != null) {
-      final count = ByteData(4)
-        ..setUint32(0, superSpeedPlus!.count, .little);
+      final count = ByteData(4)..setUint32(0, superSpeedPlus!.count, .little);
       buffer.add(count.buffer.asUint8List());
     }
 
@@ -321,13 +319,13 @@ class FunctionFsFlags {
   );
 
   // Flag bit masks
-  static const int _fullSpeedFlag = 0x00000001;
-  static const int _highSpeedFlag = 0x00000002;
-  static const int _superSpeedFlag = 0x00000004;
-  static const int _superSpeedPlusFlag = 0x00000008;
-  static const int _virtualAddressFlag = 0x00000010;
-  static const int _allCtrlReqFlag = 0x00000020;
-  static const int _config0Flag = 0x00000040;
+  static const int _fullSpeedFlag = 0x01;
+  static const int _highSpeedFlag = 0x02;
+  static const int _superSpeedFlag = 0x04;
+  static const int _superSpeedPlusFlag = 0x08;
+  static const int _virtualAddressFlag = 0x10;
+  static const int _allCtrlReqFlag = 0x20;
+  static const int _config0Flag = 0x40;
 
   /// Full-Speed (12 Mbps) descriptors are present.
   final bool hasFullSpeed;
