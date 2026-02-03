@@ -9,10 +9,10 @@ import '../ffi_utils.dart';
 import 'unistd.ffi.dart' as unistd_ffi;
 
 /// Singleton library loader for unistd
-class UnistdLibrary {
-  UnistdLibrary._();
+class UnistdBindings {
+  UnistdBindings._();
 
-  static final instance = UnistdLibrary._();
+  static final instance = UnistdBindings._();
 
   final unistd_ffi.Unistd lib = unistd_ffi.Unistd(ffi.DynamicLibrary.process());
 }
@@ -133,7 +133,7 @@ abstract final class Unistd {
 
     final pathPtr = path.toNativeUtf8();
     try {
-      final fd = UnistdLibrary.instance.lib.open(
+      final fd = UnistdBindings.instance.lib.open(
         pathPtr.cast(),
         flags.toBitmask(),
       );
@@ -155,7 +155,7 @@ abstract final class Unistd {
   /// This method does not throw on error, as double-closes are common
   /// and usually harmless. Use [closeStrict] if you need error checking.
   static void close(int fd) {
-    UnistdLibrary.instance.lib.close(fd);
+    UnistdBindings.instance.lib.close(fd);
   }
 
   /// Closes a file descriptor with error checking
@@ -167,7 +167,7 @@ abstract final class Unistd {
       throw ArgumentError.value(fd, 'fd', 'Must be non-negative');
     }
 
-    final result = UnistdLibrary.instance.lib.close(fd);
+    final result = UnistdBindings.instance.lib.close(fd);
     if (result == -1) {
       throw Errno.currentOSError;
     }
@@ -194,7 +194,7 @@ abstract final class Unistd {
 
     final bufferPtr = malloc<ffi.Uint8>(count);
     try {
-      final bytesRead = UnistdLibrary.instance.lib.read(
+      final bytesRead = UnistdBindings.instance.lib.read(
         fd,
         bufferPtr.cast(),
         count,
@@ -266,14 +266,14 @@ abstract final class Unistd {
 
     // Handle zero-length writes
     if (data.isEmpty) {
-      return UnistdLibrary.instance.lib.write(fd, ffi.nullptr, 0);
+      return UnistdBindings.instance.lib.write(fd, ffi.nullptr, 0);
     }
 
     final bufferPtr = malloc<ffi.Uint8>(data.length);
     try {
       bufferPtr.asTypedList(data.length).setAll(0, data);
 
-      final bytesWritten = UnistdLibrary.instance.lib.write(
+      final bytesWritten = UnistdBindings.instance.lib.write(
         fd,
         bufferPtr.cast(),
         data.length,
@@ -337,7 +337,7 @@ abstract final class Unistd {
       throw ArgumentError.value(fd, 'fd', 'Must be non-negative');
     }
 
-    final result = UnistdLibrary.instance.lib.fcntl(fd, cmd.value);
+    final result = UnistdBindings.instance.lib.fcntl(fd, cmd.value);
 
     if (result == -1) {
       throw Errno.currentOSError;
