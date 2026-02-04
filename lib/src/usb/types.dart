@@ -1086,15 +1086,15 @@ enum USBDirection {
 
   const USBDirection(this.value);
 
+  /// Extracts direction from bEndpointAddress or bmRequestType.
+  factory USBDirection.fromByte(int byte) =>
+      (byte & mask) == in_.value ? in_ : out;
+
   /// Raw value for bit 7.
   final int value;
 
   /// Direction bit mask (bit 7).
   static const int mask = 0x80;
-
-  /// Extracts direction from bEndpointAddress or bmRequestType.
-  factory USBDirection.fromByte(int byte) =>
-      (byte & mask) == in_.value ? in_ : out;
 
   /// True if this is an IN direction.
   bool get isIn => this == in_;
@@ -1346,12 +1346,6 @@ enum USBRequestType {
 
   const USBRequestType(this.value);
 
-  /// Raw value for bits 5-6 of bmRequestType.
-  final int value;
-
-  /// Request type mask (bits 5-6).
-  static const int mask = 0x60;
-
   /// Extracts request type from bmRequestType byte.
   factory USBRequestType.fromByte(int byte) {
     final masked = byte & mask;
@@ -1363,6 +1357,12 @@ enum USBRequestType {
       _ => throw ArgumentError('Invalid USB request type: $masked'),
     };
   }
+
+  /// Raw value for bits 5-6 of bmRequestType.
+  final int value;
+
+  /// Request type mask (bits 5-6).
+  static const int mask = 0x60;
 }
 
 /// USB recipients (bits 0-4 of bmRequestType).
@@ -1381,12 +1381,6 @@ enum USBRecipient {
 
   const USBRecipient(this.value);
 
-  /// Raw value for bits 0-4 of bmRequestType.
-  final int value;
-
-  /// Recipient mask (bits 0-4).
-  static const int mask = 0x1F;
-
   /// Extracts recipient from bmRequestType byte.
   factory USBRecipient.fromByte(int byte) {
     final masked = byte & mask;
@@ -1398,6 +1392,12 @@ enum USBRecipient {
       _ => throw ArgumentError('Invalid USB recipient: $masked'),
     };
   }
+
+  /// Raw value for bits 0-4 of bmRequestType.
+  final int value;
+
+  /// Recipient mask (bits 0-4).
+  static const int mask = 0x1F;
 }
 
 /// Standard USB requests.
