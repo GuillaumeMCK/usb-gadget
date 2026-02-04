@@ -51,7 +51,7 @@ import 'aio_context.dart';
 final class AioWriter with Releasable {
   /// Creates an [AioWriter] for the given file descriptor.
   ///
-  /// The [fd] must be a valid, open file descriptor. The [config] parameter
+  /// The [_fd] must be a valid, open file descriptor. The [config] parameter
   /// controls buffer sizes, concurrency, and polling behavior.
   ///
   /// Example:
