@@ -1,3 +1,3 @@
 export 'bitwise.dart';
-export 'hex.dart';
-export 'xxd.dart';
+export 'format.dart';
+export 'utils.dart';
