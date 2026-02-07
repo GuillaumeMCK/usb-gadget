@@ -1,9 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
 
-import '/src/logger/logger.dart';
 import '/usb_gadget.dart';
 
 /// FunctionFs lifecycle states
@@ -72,30 +72,26 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
   final Map<EndpointAddress, EndpointFile> _endpoints = {};
 
   /// Per-endpoint status buffers, keyed by [EndpointAddress].
-  /// Each value is the raw 2-byte payload returned by GET_STATUS (endpoint).
-  /// Bit 0 of byte 0: endpoint halted (STALL).
-  /// Entries are created on first SET_FEATURE and persist for the lifetime
-  /// of the function so that GET_STATUS can return them without allocation.
-  final Map<EndpointAddress, Uint8List> _endpointStatus = {};
+  final Map<EndpointAddress, int> _endpointStatus = {};
 
-  /// Raw 2-byte device-status buffer, returned verbatim by GET_STATUS (device).
+  /// Raw byte device-status buffer, returned verbatim by GET_STATUS (device).
   /// Bit 0: self-powered (0 = bus-powered, 1 = self-powered).
   /// Bit 1: remote-wakeup enabled.
   /// Set bit 0 after construction when the powered state of your hardware
   /// is known; bit 1 is managed by SET/CLEAR_FEATURE (DEVICE_REMOTE_WAKEUP).
-  final Uint8List _deviceStatus = Uint8List(2);
+  int _deviceStatus = 0;
 
   /// State stream
   final StreamController<FunctionFsState> _stateController = .broadcast();
 
   /// Stream controller for FunctionFs events
-  final StreamController<FunctionFsEvent> _eventController = .broadcast();
+  // final StreamController<FunctionFsEvent> _eventController = .broadcast();
 
   /// Subscription for EP0 event reading
   StreamSubscription<FunctionFsEvent>? _eventSubscription;
 
   /// Stream of FunctionFs events (bind, unbind, enable, disable, setup, etc.)
-  Stream<FunctionFsEvent> get events => _eventController.stream;
+  // Stream<FunctionFsEvent> get events => _eventController.stream;
 
   /// Control endpoint accessor
   EndpointControlFile get ep0 => _ep0;
@@ -174,24 +170,22 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
         rethrow;
       }
 
-      if (strings.isNotEmpty) {
-        final builder = FunctionFsStringsBuilder();
-        for (final entry in strings.entries) {
-          builder.addLanguage(
-            LanguageStrings(language: entry.key, strings: entry.value),
-          );
-        }
-        final stringBytes = builder.build().toBytes();
-        log?.debug('Writing strings to EP0:${stringBytes.xxd()}');
+      final builder = FunctionFsStringsBuilder();
+      for (final entry in strings.entries) {
+        builder.addLanguage(
+          LanguageStrings(language: entry.key, strings: entry.value),
+        );
+      }
+      final stringBytes = builder.build().toBytes();
+      log?.debug('Writing strings to EP0:${stringBytes.xxd()}');
 
-        try {
-          _ep0.write(stringBytes);
-        } catch (e) {
-          log?.error('Failed to write strings: $e');
-          await _ep0.close();
-          _setState(.uninitialized);
-          rethrow;
-        }
+      try {
+        _ep0.write(stringBytes);
+      } catch (e) {
+        log?.error('Failed to write strings: $e');
+        await _ep0.close();
+        _setState(.uninitialized);
+        rethrow;
       }
 
       // Open endpoint files with error recovery
@@ -204,8 +198,8 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
         rethrow;
       }
 
-      _startEventListener();
       _setState(.ready);
+      _startEventListener();
       log?.debug('Ready for UDC binding');
     } catch (err, st) {
       _setState(.uninitialized);
@@ -217,34 +211,34 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
   @override
   @mustCallSuper
   void release() {
-    if (!isReleased) {
-      log?.info('Releasing function (current state: $_state)');
-      _eventSubscription?.cancel();
-      _eventSubscription = null;
+    log?.info('Releasing function (current state: $_state)');
+    _eventSubscription?.cancel();
+    _eventSubscription = null;
 
-      if (_endpoints.isNotEmpty) {
-        for (final ep in _endpoints.values) {
-          try {
-            log?.info('Closing endpoint: ${ep.fd}');
-            ep.close();
-          } catch (err) {
-            log?.warn('Failed to close endpoint: $err');
-          }
+    if (_endpoints.isNotEmpty) {
+      for (final ep in _endpoints.values) {
+        try {
+          log?.info('Closing endpoint: ${ep.fd}');
+          ep.close();
+        } catch (err) {
+          log?.warn('Failed to close endpoint: $err');
         }
-        _endpoints.clear();
       }
-
-      try {
-        log?.info('Closing EP0 and unmounting FunctionFs...');
-        _ep0.close();
-      } catch (err) {
-        log?.warn('Failed to close EP0: $err');
-      }
-
-      _eventController.close();
-      _setState(.disposed);
-      super.release();
+      _endpoints.clear();
     }
+
+    try {
+      log?.info('Closing EP0 and unmounting FunctionFs...');
+      _ep0.close();
+    } catch (err) {
+      log?.warn('Failed to close EP0: $err');
+    }
+
+    // Clear maps to release strong references
+    _endpointStatus.clear();
+    _stateController.close();
+    _setState(.disposed);
+    super.release();
   }
 
   /// Generates descriptors for a specific speed if enabled.
@@ -322,11 +316,8 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
   /// Starts listening for events from EP0.
   void _startEventListener() {
     log?.info('Starting event listener on EP0');
-    _eventSubscription = _ep0.stream().listen(
-      (event) {
-        _eventController.add(event);
-        _handleEvent(event);
-      },
+    _eventSubscription ??= _ep0.stream().listen(
+      _handleEvent,
       onError: (Object err, StackTrace st) {
         log?.error('Error in EP0 event stream: $err', err, st);
       },
@@ -399,6 +390,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
   /// Called when the host de-configures the device.
   @mustCallSuper
   void onDisable() {
+    _endpointStatus.clear();
     _setState(.bound);
   }
 
@@ -436,71 +428,97 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
     final type = USBRequestType.fromByte(bmRequestType);
     final direction = USBDirection.fromByte(bmRequestType);
     final request = USBRequest.fromByte(bRequest);
-    final feature = USBFeature.fromByte(wValue.lowByte, recipient);
-    final address = EndpointAddress.fromByte(wIndex.lowByte);
 
+    // Only handle standard requests here
     if (type != .standard) {
-      log?.warn('Non-standard request, halting');
       return _ep0.halt();
     }
 
-    switch ((request, direction, feature, recipient)) {
-      // Clear endpoint halt
-      case (.clearFeature, .out, .endpointHalt, _):
-        getEndpoint<EndpointInFile>(address.number).clearHalt();
-        // clear bit 0 (halted)
-        _endpointStatus[address]?[0] &= 0x01;
-        log?.debug('Cleared halt on $address');
-        _ep0.halt();
+    // Feature/endpoint helpers (only needed for a subset of requests)
+    USBFeature? feature;
+    EndpointAddress? address;
 
-      // Set endpoint halt
-      case (.setFeature, .out, .endpointHalt, _):
-        _endpoints[address]?.halt();
-        // set bit 0 (halted) if not already present
-        (_endpointStatus[address] ??= Uint8List(2))[0] |= 0x01;
-        _ep0.halt();
+    if (request == .setFeature || request == .clearFeature) {
+      feature = USBFeature.fromByte(wValue.byte(0), recipient);
+    }
 
-      // Get endpoint status - IN transfer
-      case (.getStatus, .in_, _, .endpoint):
+    if (recipient == .endpoint) {
+      address = EndpointAddress.fromByte(wIndex.byte(0));
+      _endpointStatus[address] ??= 0;
+    }
+
+    switch ((request, direction, recipient)) {
+      // Device-level requests
+      case (.getStatus, .in_, .device):
+        log?.debug(
+          'GET_STATUS (device) '
+          'selfPowered=${_deviceStatus.bit(0)}, '
+          'remoteWakeup=${_deviceStatus.bit(1)}',
+        );
+        return _ep0.write(_deviceStatus.bytes);
+
+      case (.setFeature, .out, .device) when feature == .deviceRemoteWakeup:
+        _deviceStatus = _deviceStatus.bit(1, 1);
+        log?.debug('Enabled remote wakeup');
+        return ep0.ack();
+
+      case (.clearFeature, .out, .device) when feature == .deviceRemoteWakeup:
+        _deviceStatus = _deviceStatus.bit(1, 0);
+        log?.debug('Disabled remote wakeup');
+        return ep0.ack();
+
+      // Endpoint-level requests
+      case (.getStatus, .in_, .endpoint):
+        if (address == null) return _ep0.halt();
+
         final endpoint = _endpoints[address];
-        if (endpoint != null) {
-          final status = _endpointStatus[address] ??= Uint8List(2);
-          _ep0.write(status);
-          log?.debug(
-            'Returned status for $address (halted: ${status[0].bitAt(0)})',
-          );
-        } else {
-          log?.warn('Cannot get status for $address: Endpoint not found');
-          _ep0.halt();
+        if (endpoint == null) {
+          log?.warn('GET_STATUS: Endpoint $address not found');
+          return _ep0.halt();
         }
 
-      // Get device status - IN transfer
-      case (.getStatus, .in_, _, .device):
-        _ep0.write(_deviceStatus);
-        log?.debug(
-          'Returned device status '
-          '(self-powered: ${_deviceStatus[0].bitAt(0)}, '
-          'remote-wakeup: ${_deviceStatus[0].bitAt(1)})',
-        );
+        final status = _endpointStatus[address]!;
+        log?.debug('GET_STATUS (endpoint $address) halted=${status.bit(0)}');
 
-      // Set device remote wakeup - OUT transfer
-      case (.setFeature, .out, .deviceRemoteWakeup, _):
-        _deviceStatus[0] |= 0x02; // set bit 1 (remote wakeup)
-        _ep0.halt(); // ACK the OUT transfer
-        log?.debug('Enabled remote wakeup');
+        return _ep0.write(status.bytes);
 
-      // Clear device remote wakeup - OUT transfer
-      case (.clearFeature, .out, .deviceRemoteWakeup, _):
-        _deviceStatus[0] &= 0x02; // clear bit 1 (remote wakeup)
-        _ep0.halt(); // ACK the OUT transfer
-        log?.debug('Disabled remote wakeup');
+      case (.clearFeature, .out, .endpoint) when feature == .endpointHalt:
+        if (address == null) return _ep0.halt();
+
+        final ep = _endpoints[address] as EndpointInFile?;
+        if (ep == null) return _ep0.halt();
+
+        ep.clearHalt();
+        _endpointStatus[address] = _endpointStatus[address]!.bit(0, 0);
+
+        log?.debug('CLEAR_FEATURE HALT on $address');
+        return ep0.ack();
+
+      case (.setFeature, .out, .endpoint) when feature == .endpointHalt:
+        if (address == null) return _ep0.halt();
+
+        final ep = _endpoints[address];
+        if (ep == null) return _ep0.halt();
+
+        ep.halt();
+        _endpointStatus[address] = _endpointStatus[address]!.bit(0, 1);
+
+        log?.debug('SET_FEATURE HALT on $address');
+        return ep0.ack();
+
+      // In FunctionFS these are normally handled by the kernel.
+      // Only subclasses that explicitly need them should override.
+      case (.getInterface, _, _):
+      case (.setInterface, _, _):
+        log?.debug('Interface request passed to subclass or kernel');
+        return _ep0.halt();
 
       default:
         log?.warn(
-          'Unhandled: request=$request, direction=$direction, '
-          'feature=$feature, recipient=$recipient',
+          'Unhandled standard request: '
+          'request=$request, direction=$direction, recipient=$recipient',
         );
-        _ep0.halt();
+        return _ep0.halt();
     }
   }
 }
