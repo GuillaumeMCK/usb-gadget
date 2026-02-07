@@ -44,9 +44,6 @@ enum FunctionFsEventType {
 
 /// Base class for FunctionFs events.
 sealed class FunctionFsEvent {
-  /// The type of this event.
-  FunctionFsEventType get type;
-
   /// Parses a single FunctionFs event from raw bytes.
   ///
   /// The event structure is 12 bytes:
@@ -55,7 +52,7 @@ sealed class FunctionFsEvent {
   /// - 3 bytes padding
   ///
   /// Returns null if the event type is invalid or unknown.
-  static FunctionFsEvent? fromBytes(List<int> data) {
+  factory FunctionFsEvent.fromBytes(List<int> data) {
     if (data.length < 12) {
       throw ArgumentError('Event data must be at least 12 bytes');
     }
@@ -70,22 +67,10 @@ sealed class FunctionFsEvent {
     };
   }
 
-  static const size = 12;
+  /// The type of this event.
+  FunctionFsEventType get type;
 
-  /// Parses multiple events from a buffer.
-  ///
-  /// FunctionFs can queue up to 4 events (48 bytes).
-  /// Invalid or unknown events are skipped.
-  static List<FunctionFsEvent> fromBytesMultiple(List<int> data) {
-    final events = <FunctionFsEvent>[];
-    for (var offset = 0; offset + size <= data.length; offset += size) {
-      final event = fromBytes(data.sublist(offset, offset + size));
-      if (event != null) {
-        events.add(event);
-      }
-    }
-    return events;
-  }
+  static const size = 12;
 }
 
 /// Function has been bound to a UDC.
