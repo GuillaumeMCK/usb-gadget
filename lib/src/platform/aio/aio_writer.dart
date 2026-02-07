@@ -133,31 +133,45 @@ final class AioWriter with Releasable {
       throw StateError('No buffers available');
     }
 
-    // Copy data to buffer
-    buffer.asTypedList(data.length).setAll(0, data);
+    ffi.Pointer<iocb>? iocbPtr;
+    TrackedOperation? op;
 
-    final iocbPtr = calloc<iocb>()
-      ..ref.aio_fildes = _fd
-      // IOCB_CMD_PWRITE
-      ..ref.aio_lio_opcode = 1
-      ..ref.aio_reqprio = 0
-      ..ref.aio_rw_flags = 0
-      ..ref.data = ffi.Pointer<ffi.Void>.fromAddress(opId)
-      ..ref.u.c.buf = buffer.cast<ffi.Void>()
-      ..ref.u.c.nbytes = data.length
-      ..ref.u.c.offset = 0;
+    try {
+      // Copy data to buffer
+      buffer.asTypedList(data.length).setAll(0, data);
 
-    final op = TrackedOperation(
-      id: OperationId(opId),
-      type: OperationType.write,
-      buffer: buffer,
-      size: data.length,
-      offset: 0,
-      block: iocbPtr,
-      userData: opId,
-    );
+      iocbPtr = calloc<iocb>()
+        ..ref.aio_fildes = _fd
+        // IOCB_CMD_PWRITE
+        ..ref.aio_lio_opcode = 1
+        ..ref.aio_reqprio = 0
+        ..ref.aio_rw_flags = 0
+        ..ref.data = ffi.Pointer<ffi.Void>.fromAddress(opId)
+        ..ref.u.c.buf = buffer.cast<ffi.Void>()
+        ..ref.u.c.nbytes = data.length
+        ..ref.u.c.offset = 0;
 
-    _context!.submit([op]);
+      op = TrackedOperation(
+        id: OperationId(opId),
+        type: OperationType.write,
+        buffer: buffer,
+        size: data.length,
+        offset: 0,
+        block: iocbPtr,
+        userData: opId,
+      );
+
+      _context!.submit([op]);
+    } catch (e) {
+      // Clean up resources on submit failure
+      if (op != null) {
+        op.free();
+      } else if (iocbPtr != null) {
+        calloc.free(iocbPtr);
+      }
+      _bufferPool!.releaseBuffer(buffer);
+      rethrow;
+    }
   }
 
   // Harvests completed operations from the kernel.
@@ -219,28 +233,22 @@ final class AioWriter with Releasable {
 
   @override
   void release() {
-    if (!isReleased) {
-      _pollTimer?.cancel();
-      _pollTimer = null;
+    super.release();
 
-      // Complete any pending requests with error
-      for (final request in _pending.values) {
-        if (!request.completer.isCompleted) {
-          request.completer.completeError(
-            StateError('AioWriter released before completion'),
-          );
-        }
-      }
-      _pending.clear();
+    _pollTimer?.cancel();
+    _pollTimer = null;
 
-      _bufferPool?.release();
-      _bufferPool = null;
-
-      _context?.release();
-      _context = null;
-
-      super.release();
+    final releaseError = StateError('AioWriter has been released');
+    for (final request in _pending.values) {
+      request.completer.completeError(releaseError);
     }
+
+    _pending.clear();
+    _bufferPool?.release();
+    _bufferPool = null;
+
+    _context?.release();
+    _context = null;
   }
 }
 

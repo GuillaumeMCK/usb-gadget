@@ -125,35 +125,42 @@ final class AioReader with Releasable {
     if (buffer == null) return; // No buffers available
 
     final opId = _nextOpId++;
-
-    final iocbPtr = calloc<iocb>()
-      ..ref.aio_fildes = _fd
-      // IOCB_CMD_PREAD
-      ..ref.aio_lio_opcode = 0
-      ..ref.aio_reqprio = 0
-      ..ref.aio_rw_flags = 0
-      ..ref.data = ffi.Pointer<ffi.Void>.fromAddress(opId)
-      ..ref.u.c.buf = buffer.cast<ffi.Void>()
-      ..ref.u.c.nbytes = config.bufferSize
-      ..ref.u.c.offset = _fileOffset;
-
+    final offset = _fileOffset;
     _fileOffset += config.bufferSize;
 
-    final op = TrackedOperation(
-      id: OperationId(opId),
-      type: OperationType.read,
-      buffer: buffer,
-      size: config.bufferSize,
-      offset: _fileOffset - config.bufferSize,
-      block: iocbPtr,
-      userData: opId,
-    );
+    ffi.Pointer<iocb>? iocbPtr;
+    TrackedOperation? op;
 
     try {
+      iocbPtr = calloc<iocb>()
+        ..ref.aio_fildes = _fd
+        // IOCB_CMD_PREAD
+        ..ref.aio_lio_opcode = 0
+        ..ref.aio_reqprio = 0
+        ..ref.aio_rw_flags = 0
+        ..ref.data = ffi.Pointer<ffi.Void>.fromAddress(opId)
+        ..ref.u.c.buf = buffer.cast<ffi.Void>()
+        ..ref.u.c.nbytes = config.bufferSize
+        ..ref.u.c.offset = offset;
+
+      op = TrackedOperation(
+        id: OperationId(opId),
+        type: .read,
+        buffer: buffer,
+        size: config.bufferSize,
+        offset: offset,
+        block: iocbPtr,
+        userData: opId,
+      );
+
       _context!.submit([op]);
     } catch (e) {
+      if (op != null) {
+        op.free();
+      } else if (iocbPtr != null) {
+        calloc.free(iocbPtr);
+      }
       _bufferPool!.releaseBuffer(buffer);
-      op.free();
       rethrow;
     }
   }
@@ -203,27 +210,24 @@ final class AioReader with Releasable {
         _submitRead();
       }
     } finally {
-      _bufferPool!.releaseBuffer(op.buffer);
+      _bufferPool?.releaseBuffer(op.buffer);
       op.free();
     }
   }
 
   @override
   void release() {
-    if (!isReleased) {
-      _pollTimer?.cancel();
-      _pollTimer = null;
+    super.release();
+    _pollTimer?.cancel();
+    _pollTimer = null;
 
-      _controller?.close();
-      _controller = null;
+    _controller?.close();
+    _controller = null;
 
-      _bufferPool?.release();
-      _bufferPool = null;
+    _bufferPool?.release();
+    _bufferPool = null;
 
-      _context?.release();
-      _context = null;
-
-      super.release();
-    }
+    _context?.release();
+    _context = null;
   }
 }

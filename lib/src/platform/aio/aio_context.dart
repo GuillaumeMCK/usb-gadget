@@ -123,13 +123,15 @@ final class BufferPool with Releasable {
 
   @override
   void release() {
-    if (!isReleased) {
-      _pool
-        ..forEach(calloc.free)
-        ..clear();
-      _inUse.clear();
-      super.release();
-    }
+    super.release();
+    assert(
+      _inUse.isEmpty,
+      'BufferPool released while ${_inUse.length} buffers are still in use',
+    );
+    _pool
+      ..forEach(calloc.free)
+      ..clear();
+    _inUse.clear();
   }
 
   /// The number of available buffers in the pool.
@@ -178,12 +180,13 @@ enum OperationType {
 /// Contains all the metadata and native resources associated with a pending
 /// I/O operation. The [iocb] pointer must be freed when the operation completes
 /// or is cancelled.
+@immutable
 final class TrackedOperation {
   /// Creates a new [TrackedOperation].
   ///
   /// All parameters are required except [userData], which can be used to attach
   /// arbitrary application data to the operation.
-  TrackedOperation({
+  const TrackedOperation({
     required this.id,
     required this.type,
     required this.buffer,
@@ -299,7 +302,9 @@ final class AioContext with PlatformLogger, Releasable {
   /// exceed [maxConcurrent].
   /// Throws [OSError] if the kernel rejects the submission.
   int submit(List<TrackedOperation> operations) {
-    _checkNotDisposed();
+    if (isReleased) {
+      throw StateError('Cannot submit operations to a released AioContext');
+    }
 
     if (operations.isEmpty) return 0;
     if (_inFlight.length + operations.length > _maxConcurrent) {
@@ -323,9 +328,9 @@ final class AioContext with PlatformLogger, Releasable {
       );
 
       if (result < 0) {
-        // Remove from tracking on submit failure
         for (final op in operations) {
           _inFlight.remove(op.id);
+          op.free();
         }
         throw Errno.toOSError(-result, 'Failed to submit operations');
       }
@@ -333,7 +338,9 @@ final class AioContext with PlatformLogger, Releasable {
       // Handle partial submission
       if (result < operations.length) {
         for (var i = result; i < operations.length; i++) {
-          _inFlight.remove(operations[i].id);
+          final op = operations[i];
+          _inFlight.remove(op.id);
+          op.free();
         }
       }
 
@@ -358,7 +365,9 @@ final class AioContext with PlatformLogger, Releasable {
     int? maxEvents,
     Duration? timeout,
   }) {
-    _checkNotDisposed();
+    if (isReleased) {
+      throw StateError('Cannot get completions from a released AioContext');
+    }
 
     final max = maxEvents ?? _maxConcurrent;
     if (minEvents < 0 || minEvents > max) {
@@ -424,8 +433,6 @@ final class AioContext with PlatformLogger, Releasable {
   /// Note: This does not inform the kernel of the cancellation, but removes
   /// them from local tracking and frees their native control blocks.
   void cancelAll() {
-    _checkNotDisposed();
-
     for (final op in _inFlight.values) {
       op.free();
     }
@@ -435,28 +442,20 @@ final class AioContext with PlatformLogger, Releasable {
   /// Releases this [AioContext] and frees all associated native resources.
   @override
   void release() {
-    if (!isReleased) {
-      // Clean up any remaining operations
-      for (final op in _inFlight.values) {
-        op.free();
-      }
-      _inFlight.clear();
-
-      final result = AioBindings.instance.io_destroy(_handle);
-      if (result != 0) {
-        log?.warn(
-          'io_destroy returned error code $result (${Errno.describe(result)})',
-        );
-      }
-
-      super.release();
+    // Clean up any remaining operations
+    for (final op in _inFlight.values) {
+      op.free();
     }
-  }
+    _inFlight.clear();
 
-  void _checkNotDisposed() {
-    if (isReleased) {
-      throw StateError('AioContext has been released');
+    final result = AioBindings.instance.io_destroy(_handle);
+    if (result != 0) {
+      log?.warn(
+        'io_destroy returned error code $result (${Errno.describe(result)})',
+      );
     }
+
+    super.release();
   }
 }
 
