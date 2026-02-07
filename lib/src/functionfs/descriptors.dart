@@ -59,7 +59,7 @@ class FunctionFsStringsBuilder {
 
   FunctionFsStrings build() {
     if (_languages.isEmpty) {
-      throw StateError('At least one language must be provided');
+      return const FunctionFsStrings._([]);
     }
 
     // Validate all languages have same string count
