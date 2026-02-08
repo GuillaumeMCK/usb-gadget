@@ -27,8 +27,8 @@ extension IntBitOps on int {
     assert(position >= 0, 'Bit position must be non-negative');
     assert(position < 64, 'Bit position $position exceeds 64-bit range');
     assert(
-    bit == null || bit == 0 || bit == 1,
-    'Bit value must be 0, 1, or null',
+      bit == null || bit == 0 || bit == 1,
+      'Bit value must be 0, 1, or null',
     );
 
     return switch (bit) {
@@ -73,13 +73,10 @@ extension IntByteOps on int {
   /// with that value and the modified integer is returned.
   int byte(int position, [int? value]) {
     assert(position >= 0, 'Byte position must be non-negative');
+    assert(position < 8, 'Byte position must be between 0 and 7 inclusive');
     assert(
-    position < 8,
-    'Byte position must be between 0 and 7 inclusive',
-    );
-    assert(
-    value == null || (value >= 0 && value <= 255),
-    'Byte value must be between 0 and 255',
+      value == null || (value >= 0 && value <= 255),
+      'Byte value must be between 0 and 255',
     );
 
     final shift = position * 8;
@@ -114,8 +111,10 @@ extension IntByteOps on int {
   /// will be truncated.
   Uint8List toBytes(int length, [Endian endian = Endian.big]) {
     assert(length > 0, 'Length must be greater than 0');
-    assert(length <=
-        8, 'Cannot convert more than 8 bytes from a 64-bit integer');
+    assert(
+      length <= 8,
+      'Cannot convert more than 8 bytes from a 64-bit integer',
+    );
 
     final byteList = Uint8List(length);
 

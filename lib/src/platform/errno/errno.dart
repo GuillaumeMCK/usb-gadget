@@ -334,7 +334,7 @@ abstract final class Errno {
     bool Function(T result)? isError,
   }) {
     final result = operation();
-    final checkError = isError ?? (r) => (r is int && r < 0);
+    final checkError = isError ?? (r) => r is int && r < 0;
 
     if (checkError(result)) {
       throw currentOSError;
