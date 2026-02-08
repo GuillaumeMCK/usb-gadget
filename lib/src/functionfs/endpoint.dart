@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import '/src/logger/logger.dart';
 import '/src/platform/platform.dart';
 import '/usb_gadget.dart';
 
@@ -10,7 +9,7 @@ import '/usb_gadget.dart';
 ///
 /// Manages the lifecycle (open, close, halt) for USB endpoints
 /// exposed via the Linux FunctionFs interface.
-abstract class EndpointFile {
+abstract class EndpointFile with USBGadgetLogger {
   /// Creates an endpoint file manager for [path].
   EndpointFile(this.path) {
     if (path.isEmpty) {
@@ -23,9 +22,6 @@ abstract class EndpointFile {
 
   /// The underlying file descriptor.
   int? _fd;
-
-  /// Whether this endpoint is currently open.
-  bool get isOpen => _fd != null;
 
   /// Opens the endpoint file with appropriate flags.
   ///
@@ -80,10 +76,13 @@ abstract class EndpointFile {
   ///
   /// Returns `null` if the file is not currently open.
   int? get fd => _fd;
+
+  @override
+  String toString() => 'EndpointFile(path: $path)';
 }
 
 /// Manages the USB control endpoint (EP0) for FunctionFs.
-class EndpointControlFile extends EndpointFile with USBGadgetLogger {
+class EndpointControlFile extends EndpointFile {
   EndpointControlFile(
     super.path, {
     required String mountPoint,
@@ -217,11 +216,6 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
   /// Throws [OSError] on unrecoverable write errors.
   void write(Uint8List data) {
     assert(_fd != null, 'write: Endpoint is not open');
-
-    if (data.isEmpty) {
-      return log?.warn('Attempting to write empty data to EP0');
-    }
-
     var offset = 0;
     while (offset < data.length) {
       try {
@@ -231,7 +225,7 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
           // Retry on EAGAIN (would block)
           continue;
         }
-        log?.error('Failed to write to EP0: ${e.message}');
+        log?.error('Failed to write to EP0: ${Errno.describe(e.errorCode)}');
         rethrow;
       }
     }
@@ -254,6 +248,25 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
       return Unistd.read(_fd!, length);
     } on OSError catch (e) {
       log?.error('Failed to read from EP0: ${e.message}');
+      rethrow;
+    }
+  }
+
+  /// ACK response to the host (zero-length packet).
+  ///
+  /// Used to acknowledge successful processing of a endpoint request without
+  /// sending additional data.
+  ///
+  /// Throws [StateError] if endpoint is not open.
+  /// Throws [OSError] on write failure.
+  void ack() {
+    if (_fd == null) {
+      throw StateError('Cannot ACK: Endpoint is not open');
+    }
+    try {
+      Unistd.write(_fd!, Uint8List(0));
+    } on OSError catch (e) {
+      log?.error('Failed to send ACK on EP0: ${e.message}');
       rethrow;
     }
   }
@@ -297,14 +310,11 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
       return controller.stream;
     }
 
-    // Create new broadcast controller
-    final newController = StreamController<FunctionFsEvent>.broadcast(
+    _streamController ??= .broadcast(
       onListen: _startEventReading,
       onCancel: _stopEventReading,
     );
-
-    _streamController = newController;
-    return newController.stream;
+    return _streamController!.stream;
   }
 
   /// Starts event reading from EP0 using synchronous polling with a Timer.
@@ -313,49 +323,44 @@ class EndpointControlFile extends EndpointFile with USBGadgetLogger {
   /// with a polling timer. The file descriptor is opened with O_NONBLOCK
   /// to prevent blocking on reads when no events are available.
   void _startEventReading() {
-    if (_eventReadingActive || _fd == null) return;
+    assert(_fd != null, '_startEventReading: Endpoint is not open');
+    assert(
+      _streamController != null,
+      '_startEventReading: Stream controller is null',
+    );
+    if (_eventReadingActive) {
+      return; // Already active
+    }
     _eventReadingActive = true;
 
     // Use a timer to poll for events (10ms interval for low latency)
-    _pollingTimer = Timer.periodic(const .new(milliseconds: 10), (_) {
-      if (!_eventReadingActive || _fd == null) {
-        return _pollingTimer?.cancel();
-      }
-
+    _pollingTimer ??= Timer.periodic(const .new(milliseconds: 10), (_) {
       try {
         // Try to read events (non-blocking)
-        final bytesRead = Unistd.read(_fd!, eventBufferSize);
-
-        if (bytesRead.isNotEmpty) {
-          // Parse and emit events
-          try {
-            final events = FunctionFsEvent.fromBytesMultiple(bytesRead);
-            final controller = _streamController;
-            if (controller != null && !controller.isClosed) {
-              events.forEach(controller.add);
-            }
-          } catch (e, st) {
-            log?.error('Failed to parse FunctionFs event', e, st);
-            _streamController?.addError(e, st);
+        final data = Unistd.read(_fd!, eventBufferSize);
+        const offset = FunctionFsEvent.size;
+        // Parse and emit events
+        try {
+          for (var i = 0; i + offset <= data.length; i += offset) {
+            _streamController?.add(.fromBytes(data.sublist(i, i + offset)));
           }
+        } catch (e, st) {
+          log?.error('Failed to parse FunctionFs event', e, st);
+          _streamController?.addError(e, st);
         }
-      } on OSError catch (e) {
-        if (e.errorCode == Errno.eagain || e.errorCode == Errno.ewouldblock) {
-          // No data available, this is normal for non-blocking I/O
-          return;
-        } else if (e.errorCode == Errno.ebadf || e.errorCode == Errno.einval) {
-          // File descriptor closed or invalid, stop polling
-          log?.warn('EP0 file descriptor invalid, stopping event reading');
-          _eventReadingActive = false;
-          _pollingTimer?.cancel();
-          return;
-        } else {
-          log?.error(
-            'Error reading EP0 events: ${e.message} (errno: ${e.errorCode})',
-          );
-          if (_streamController != null && !_streamController!.isClosed) {
-            _streamController!.addError(e);
-          }
+      } on OSError catch (err, st) {
+        switch (err.errorCode) {
+          case Errno.eagain:
+            // No data available, this is normal for non-blocking I/O
+            return;
+          default:
+            log?.error(
+              'Error reading EP0 ${Errno.describe(err.errorCode)}',
+              err,
+              st,
+            );
+            _stopEventReading();
+            _streamController?.addError(err, st);
         }
       }
     });
@@ -452,19 +457,22 @@ class EndpointInFile extends EndpointFile {
       // Writing 0 bytes to IN endpoint sends STALL to host
       Unistd.write(_fd!, Uint8List(0));
     } on OSError catch (e) {
-      if (e.errorCode == Errno.epipe) {
-        throw StateError('Cannot halt IN endpoint: Host disconnected (EPIPE)');
-      } else if (e.errorCode == Errno.eshutdown) {
-        throw StateError(
-          'Cannot halt IN endpoint: Endpoint is shut down (ESHUTDOWN)',
-        );
-      } else if (e.errorCode == Errno.enotconn) {
-        throw StateError('Cannot halt IN endpoint: Not connected (ENOTCONN)');
+      switch (e.errorCode) {
+        case Errno.epipe:
+          throw StateError(
+            'Cannot halt IN endpoint: Host disconnected (EPIPE)',
+          );
+        case Errno.eshutdown:
+          throw StateError(
+            'Cannot halt IN endpoint: Endpoint is shut down (ESHUTDOWN)',
+          );
+        case Errno.enotconn:
+          throw StateError('Cannot halt IN endpoint: Not connected (ENOTCONN)');
+        default:
+          throw StateError(
+            'Failed to halt IN endpoint: ${e.message} (errno: ${e.errorCode})',
+          );
       }
-      // Provide meaningful error message for other errors
-      throw StateError(
-        'Failed to halt IN endpoint: ${e.message} (errno: ${e.errorCode})',
-      );
     }
   }
 
@@ -501,7 +509,7 @@ class EndpointInFile extends EndpointFile {
   Future<int> writeAsync(
     Uint8List data, {
     int bufferSize = 16384,
-    int concurrency = 4,
+    int concurrency = 1,
     Duration? interval,
   }) {
     assert(_fd != null, 'writeAsync: Endpoint is not open');
@@ -543,6 +551,9 @@ class EndpointOutFile extends EndpointFile {
   /// Cached broadcast stream.
   StreamController<Uint8List>? _streamController;
 
+  /// Subscription to the reader stream.
+  StreamSubscription<Uint8List>? _readerSubscription;
+
   @override
   Future<void> open() async {
     if (_fd != null) {
@@ -561,6 +572,9 @@ class EndpointOutFile extends EndpointFile {
   @override
   Future<void> close() async {
     if (_fd == null) return;
+
+    await _readerSubscription?.cancel();
+    _readerSubscription = null;
 
     await _streamController?.close();
     _streamController = null;
@@ -604,8 +618,16 @@ class EndpointOutFile extends EndpointFile {
     assert(_fd != null, 'read: Endpoint is not open');
     try {
       return Unistd.read(_fd!, length);
-    } on OSError {
-      rethrow;
+    } on OSError catch (e) {
+      switch (e.errorCode) {
+        case Errno.eagain:
+          // No data available, return empty list
+          return Uint8List(0);
+        default:
+          throw StateError(
+            'Failed to read from OUT endpoint: ${e.message} (errno: ${e.errorCode})',
+          );
+      }
     }
   }
 
@@ -635,7 +657,7 @@ class EndpointOutFile extends EndpointFile {
   ///
   /// Throws [StateError] if endpoint is not open.
   /// Throws [ArgumentError] if concurrency is invalid.
-  Stream<Uint8List> stream({int concurrency = 4, Duration? interval}) {
+  Stream<Uint8List> stream([Duration? interval, int concurrency = 1]) {
     assert(_fd != null, 'stream: Endpoint is not open');
     assert(concurrency > 0, 'Concurrency must be positive');
 
@@ -657,14 +679,14 @@ class EndpointOutFile extends EndpointFile {
       AioConfig(
         bufferSize: bufferSize,
         maxConcurrent: concurrency,
-        interval: interval ?? const .new(milliseconds: 1),
+        interval: interval ?? const .new(milliseconds: 10),
       ),
     );
 
-    _streamController = StreamController<Uint8List>.broadcast();
+    _streamController ??= .broadcast();
 
-    // Store subscription so we can cancel it later if needed
-    _reader?.stream.listen(
+    // Store subscription so we can cancel it later
+    _readerSubscription ??= _reader?.stream.listen(
       (data) {
         if (_streamController != null && !_streamController!.isClosed) {
           _streamController!.add(data);
