@@ -9,5 +9,5 @@ mixin USBGadgetLogger implements ILogger {
 
 mixin PlatformLogger implements ILogger {
   @override
-  late final Logger? log = Logger('$runtimeType');
+  late final Logger? log = _isDebugMode ? .new('$runtimeType') : null;
 }
