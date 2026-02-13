@@ -64,7 +64,7 @@ class FunctionFsMount with USBGadgetLogger {
   /// - Mount point directory cannot be created
   /// - Mount operation fails
   /// - EP0 file doesn't exist after mount
-  Future<void> ensureMounted() async {
+  void ensureMounted() {
     // Create mount point directory if needed
     final dir = Directory(mountPoint);
     if (!dir.existsSync()) {
@@ -81,13 +81,13 @@ class FunctionFsMount with USBGadgetLogger {
     if (isMounted) {
       log?.warn('Already mounted at $mountPoint, remounting');
       remount();
-      await Future<void>.delayed(config.mountDelay);
+      sleep(config.mountDelay);
     }
 
     // Mount if not mounted
     if (!isMounted) {
       mount(); // Throws on failure
-      await Future<void>.delayed(config.mountDelay);
+      sleep(config.mountDelay);
     }
   }
 
