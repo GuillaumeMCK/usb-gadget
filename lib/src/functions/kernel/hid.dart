@@ -108,7 +108,7 @@ class HIDFunction extends KernelFunction {
   }
 
   @override
-  void release() {
+  Future<void> release() async {
     if (!isReleased) {
       log?.info('Closing HID device');
       try {
@@ -117,7 +117,7 @@ class HIDFunction extends KernelFunction {
         log?.warn('Failed to close HID device file: $e');
       }
       _file = null;
-      super.release();
+      await super.release();
     }
   }
 }
