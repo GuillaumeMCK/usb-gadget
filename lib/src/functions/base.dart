@@ -127,5 +127,5 @@ abstract class GadgetFunction with Releasable {
   /// After this method completes, the function should be in a clean state
   /// and ready for garbage collection.
   @override
-  void release();
+  Future<void> release();
 }
