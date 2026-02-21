@@ -3,10 +3,6 @@
 > [!IMPORTANT]
 > This library is experimental and not suitable for production use. Breaking changes may occur without warning.
 
-> [!CAUTION]
-> Misconfigured USB gadgets can destabilize your system or prevent booting. Always test on non-essential devices with
-> physical recovery access available.
-
 A comprehensive Dart library for creating USB gadgets on Linux using ConfigFS and FunctionFS. Transform your Linux
 device into a USB peripheral—implement keyboards, mice, storage devices, network interfaces, or create entirely custom
 USB protocols in pure Dart.
@@ -249,7 +245,7 @@ Future<void> main() async {
 
   try {
     await gadget.bind();
-    await gadget.waitForState(.configured);
+    await gadget.awaitState(.configured);
     // An additional delay here prevents the first few keypresses from
     // being missed on some hosts.
     await Future<void>.delayed(const .new(milliseconds: 100));
@@ -292,7 +288,9 @@ The [examples](example/) directory contains ready-to-run implementations:
 
 ## Resources
 
-- **[API Documentation](https://pub.dev/documentation/usb_gadget/latest/)** - Complete API reference
-- **[Linux USB Gadget API](https://www.kernel.org/doc/html/latest/usb/gadget.html)** - Kernel documentation
-- **[HID Usage Tables](https://usb.org/sites/default/files/hut1_3_0.pdf)** - HID keyboard/mouse codes
-- **[usb-gadget (Rust)](https://github.com/surban/usb-gadget)** - Inspiration and reference implementation
+- **[API Documentation](https://pub.dev/documentation/usb_gadget/latest/)**
+- **[Linux USB Gadget API](https://www.kernel.org/doc/html/latest/usb/gadget.html)**
+- **[USB in a Nutshell](https://www.beyondlogic.org/usbnutshell/usb1.shtml)**
+- **[HID Usage Tables](https://usb.org/sites/default/files/hut1_3_0.pdf)**
+- **[usb-gadget (Rust)](https://github.com/surban/usb-gadget)**
+- **[functionfs (Python)](https://github.com/vpelletier/python-functionfs)**
