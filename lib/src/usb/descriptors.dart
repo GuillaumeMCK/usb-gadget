@@ -351,34 +351,33 @@ class USBInterfaceDescriptor implements USBDescriptor {
   }
 }
 
-/// USB Endpoint Descriptor (standard 7-byte version).
+/// USB Endpoint Descriptor.
 ///
 /// Describes a USB endpoint within an interface. Endpoints are the ultimate
 /// source or sink of data in USB transfers. Each endpoint has a unique address
 /// within a device and specific transfer characteristics.
-class USBEndpointDescriptorNoAudio implements USBDescriptor {
-  /// Creates a USB endpoint descriptor without audio fields.
-  ///
-  /// This is the standard 7-byte endpoint descriptor used by most devices.
-  /// Audio devices may use the extended 9-byte version with additional fields.
+///
+/// By default this produces a standard 7-byte descriptor (`bLength = 7`).
+/// When [bRefresh] or [bSynchAddress] are non-zero (USB Audio Class usage),
+/// `bLength` becomes 9 to include those extra fields.
+class USBEndpointDescriptor implements USBDescriptor {
+  /// Creates a USB endpoint descriptor.
   ///
   /// Parameters:
   /// - [address]: Endpoint address with direction (required)
   /// - [attributes]: Transfer type and attributes (required)
   /// - [maxPacketSize]: Maximum packet size (required)
   /// - [interval]: Polling interval (default: none)
-  const USBEndpointDescriptorNoAudio({
+  /// - [bRefresh]: Audio refresh rate (default: 0, non-audio endpoints)
+  /// - [bSynchAddress]: Audio sync endpoint address (default: 0, non-audio endpoints)
+  const USBEndpointDescriptor({
     required this.address,
     required this.attributes,
     required this.maxPacketSize,
     this.interval = const PollingInterval.none(),
+    this.bRefresh = 0,
+    this.bSynchAddress = 0,
   });
-
-  @override
-  int get bLength => 7;
-
-  @override
-  int get bDescriptorType => USBDescriptorType.endpoint.value;
 
   /// Endpoint address (includes direction and number).
   final EndpointAddress address;
@@ -392,73 +391,44 @@ class USBEndpointDescriptorNoAudio implements USBDescriptor {
   /// Interval for polling endpoint for data transfers.
   final PollingInterval interval;
 
-  /// Legacy getter for compatibility.
-  int get bEndpointAddress => address.value;
+  /// Refresh rate for audio endpoints (USB Audio Class).
+  ///
+  /// Indicates how often the host should read/update the synchronization
+  /// endpoint. Value is 2^(bRefresh-1) frames (full-speed) or
+  /// 2^(bRefresh-1) × 125μs (high-speed). Set to 0 for non-audio endpoints.
+  final int bRefresh;
 
-  /// Legacy getter for compatibility.
-  int get bmAttributes => attributes.value;
+  /// Synchronization endpoint address for audio endpoints (USB Audio Class).
+  ///
+  /// Address of the associated synchronization endpoint for isochronous data
+  /// endpoints that require explicit synchronization. Set to 0 if not used.
+  final int bSynchAddress;
 
   /// Legacy getter for compatibility.
   int get wMaxPacketSize => maxPacketSize.value;
+  /// Returns 9 for audio endpoints (non-zero [bRefresh] or [bSynchAddress]),
+  /// 7 for all other endpoints.
+  @override
+  int get bLength => (bRefresh != 0 || bSynchAddress != 0) ? 9 : 7;
 
-  /// Legacy getter for compatibility.
-  int get bInterval => interval.value;
+  @override
+  int get bDescriptorType => USBDescriptorType.endpoint.value;
 
   @override
   Uint8List toBytes() {
-    final bytes = ByteData(7)
+    final bytes = ByteData(bLength)
       ..setUint8(0, bLength)
       ..setUint8(1, bDescriptorType)
       ..setUint8(2, address.value)
       ..setUint8(3, attributes.value)
       ..setUint16(4, maxPacketSize.value, .little)
       ..setUint8(6, interval.value);
+    if (bLength == 9) {
+      bytes
+        ..setUint8(7, bRefresh)
+        ..setUint8(8, bSynchAddress);
+    }
     return bytes.buffer.asUint8List();
-  }
-}
-
-/// USB Endpoint Descriptor (extended 9-byte version with audio fields).
-///
-/// Extended version of endpoint descriptor with fields used by audio endpoints.
-/// Most non-audio devices should use [USBEndpointDescriptorNoAudio] instead.
-class USBEndpointDescriptor extends USBEndpointDescriptorNoAudio {
-  /// Creates a USB endpoint descriptor with audio fields.
-  ///
-  /// Parameters:
-  /// - [address]: Endpoint address with direction (required)
-  /// - [attributes]: Transfer type and attributes (required)
-  /// - [maxPacketSize]: Maximum packet size (required)
-  /// - [interval]: Polling interval (default: none)
-  /// - [bRefresh]: Audio refresh rate (default: 0)
-  /// - [bSynchAddress]: Audio sync endpoint address (default: 0)
-  const USBEndpointDescriptor({
-    required super.address,
-    required super.attributes,
-    required super.maxPacketSize,
-    super.interval,
-    this.bRefresh = 0,
-    this.bSynchAddress = 0,
-  });
-
-  @override
-  int get bLength => 9;
-
-  /// Refresh rate for audio endpoints.
-  ///
-  /// Used by audio isochronous endpoints to indicate how often the host
-  /// should read/update the synchronization endpoint. Value is 2^(bRefresh-1)
-  /// frames for full-speed and 2^(bRefresh-1) * 125μs for high-speed.
-  final int bRefresh;
-
-  /// Synchronization endpoint address for audio endpoints.
-  ///
-  /// For audio isochronous data endpoints that require explicit synchronization,
-  /// this indicates the address of the synchronization endpoint. 0 if not used.
-  final int bSynchAddress;
-
-  @override
-  Uint8List toBytes() {
-    return Uint8List.fromList([...super.toBytes(), bRefresh, bSynchAddress]);
   }
 }
 
