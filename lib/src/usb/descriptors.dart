@@ -289,27 +289,6 @@ class USBInterfaceDescriptor implements USBDescriptor {
     this.stringIndex = StringIndex.none,
   });
 
-  /// Parses an interface descriptor from bytes.
-  ///
-  /// Throws [FormatException] if the descriptor is too short.
-  factory USBInterfaceDescriptor.parse(List<int> bytes) {
-    if (bytes.length < 9) {
-      throw FormatException('Interface descriptor too short: ${bytes.length}');
-    }
-    return USBInterfaceDescriptor(
-      interfaceNumber: InterfaceNumber(bytes[2]),
-      alternateSetting: AlternateSetting(bytes[3]),
-      numEndpoints: EndpointCount(bytes[4]),
-      interfaceClass: USBClass.values.firstWhere(
-        (c) => c.value == bytes[5],
-        orElse: () => USBClass.interface,
-      ),
-      interfaceSubClass: bytes[6],
-      interfaceProtocol: bytes[7],
-      stringIndex: StringIndex(bytes[8]),
-    );
-  }
-
   @override
   int get bLength => 9;
 
@@ -497,19 +476,6 @@ class USBSSEPCompDescriptor implements USBDescriptor {
     this.bytesPerInterval = BytesPerInterval.none,
   });
 
-  /// Parses a SuperSpeed endpoint companion descriptor from bytes.
-  ///
-  /// Throws [FormatException] if the descriptor is too short.
-  factory USBSSEPCompDescriptor.parse(List<int> bytes) {
-    if (bytes.length < 6) {
-      throw FormatException('SS endpoint companion too short: ${bytes.length}');
-    }
-    return USBSSEPCompDescriptor(
-      maxBurst: BurstSize(bytes[2]),
-      bytesPerInterval: BytesPerInterval(bytes[4] | (bytes[5] << 8)),
-    );
-  }
-
   @override
   int get bLength => 6;
 
@@ -566,24 +532,6 @@ class USBSSPIsocEndpointDescriptor implements USBDescriptor {
     required this.bytesPerInterval,
   });
 
-  /// Parses a SuperSpeedPlus isochronous endpoint companion descriptor from bytes.
-  ///
-  /// Throws [FormatException] if the descriptor is too short.
-  factory USBSSPIsocEndpointDescriptor.parse(List<int> bytes) {
-    if (bytes.length < 8) {
-      throw FormatException(
-        'SSP isoc endpoint companion too short: ${bytes.length}',
-      );
-    }
-    final dwBytesPerInterval =
-        bytes[4] | (bytes[5] << 8) | (bytes[6] << 16) | (bytes[7] << 24);
-
-    return USBSSPIsocEndpointDescriptor(
-      wReserved: bytes[2] | (bytes[3] << 8),
-      bytesPerInterval: ExtendedBytesPerInterval(dwBytesPerInterval),
-    );
-  }
-
   @override
   int get bLength => 8;
 
@@ -638,23 +586,6 @@ class USBInterfaceAssocDescriptor implements USBDescriptor {
     this.functionProtocol = 0,
     this.functionString = StringIndex.none,
   });
-
-  /// Parses an interface association descriptor from bytes.
-  ///
-  /// Throws [FormatException] if the descriptor is too short.
-  factory USBInterfaceAssocDescriptor.parse(List<int> bytes) {
-    if (bytes.length < 8) {
-      throw FormatException('Interface association too short: ${bytes.length}');
-    }
-    return USBInterfaceAssocDescriptor(
-      firstInterface: InterfaceNumber(bytes[2]),
-      interfaceCount: bytes[3],
-      functionClass: bytes[4],
-      functionSubClass: bytes[5],
-      functionProtocol: bytes[6],
-      functionString: StringIndex(bytes[7]),
-    );
-  }
 
   @override
   int get bLength => 8;
