@@ -4,8 +4,8 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
+import '/src/utils/bitwise.dart';
 import '../errno/errno.dart';
-import '../ffi_utils.dart';
 import 'unistd.ffi.dart' as unistd_ffi;
 
 /// Singleton library loader for unistd
@@ -18,7 +18,7 @@ class UnistdBindings {
 }
 
 /// POSIX open() flags
-enum OpenFlag implements Flag {
+enum OpenFlag implements BitFlag {
   /// Open for reading only
   rdOnly(unistd_ffi.O_RDONLY),
 
@@ -133,16 +133,12 @@ abstract final class Unistd {
 
     final pathPtr = path.toNativeUtf8();
     try {
-      final fd = UnistdBindings.instance.lib.open(
-        pathPtr.cast(),
-        flags.toBitmask(),
+      return Errno.call(
+        () =>
+            UnistdBindings.instance.lib.open(pathPtr.cast(), flags.toBitmask()),
+        isError: (r) => r == -1,
+        message: 'open($path)',
       );
-
-      if (fd == -1) {
-        throw Errno.currentOSError;
-      }
-
-      return fd;
     } finally {
       malloc.free(pathPtr);
     }
@@ -167,10 +163,11 @@ abstract final class Unistd {
       throw ArgumentError.value(fd, 'fd', 'Must be non-negative');
     }
 
-    final result = UnistdBindings.instance.lib.close(fd);
-    if (result == -1) {
-      throw Errno.currentOSError;
-    }
+    Errno.call(
+      () => UnistdBindings.instance.lib.close(fd),
+      isError: (r) => r == -1,
+      message: 'close',
+    );
   }
 
   /// Reads up to [count] bytes from a file descriptor
@@ -194,26 +191,22 @@ abstract final class Unistd {
 
     final bufferPtr = malloc<ffi.Uint8>(count);
     try {
-      final bytesRead = UnistdBindings.instance.lib.read(
-        fd,
-        bufferPtr.cast(),
-        count,
+      final (bytesRead, errnoCode) = Errno.capture(
+        () => UnistdBindings.instance.lib.read(fd, bufferPtr.cast(), count),
       );
 
       if (bytesRead < 0) {
-        final errorCode = Errno.current;
-
         // Non-blocking read would block
-        if (errorCode == Errno.eagain) {
+        if (errnoCode == Errno.eagain) {
           return Uint8List(0);
         }
 
         // Interrupted by signal - retry handled by caller
-        if (errorCode == Errno.eintr) {
+        if (errnoCode == Errno.eintr) {
           return Uint8List(0);
         }
 
-        throw Errno.currentOSError;
+        throw Errno.toOSError(errnoCode);
       }
 
       // EOF or successful read
@@ -273,17 +266,15 @@ abstract final class Unistd {
     try {
       bufferPtr.asTypedList(data.length).setAll(0, data);
 
-      final bytesWritten = UnistdBindings.instance.lib.write(
-        fd,
-        bufferPtr.cast(),
-        data.length,
+      return Errno.call(
+        () => UnistdBindings.instance.lib.write(
+          fd,
+          bufferPtr.cast(),
+          data.length,
+        ),
+        isError: (r) => r == -1,
+        message: 'write',
       );
-
-      if (bytesWritten == -1) {
-        throw Errno.currentOSError;
-      }
-
-      return bytesWritten;
     } finally {
       malloc.free(bufferPtr);
     }
@@ -337,13 +328,11 @@ abstract final class Unistd {
       throw ArgumentError.value(fd, 'fd', 'Must be non-negative');
     }
 
-    final result = UnistdBindings.instance.lib.fcntl(fd, cmd.value);
-
-    if (result == -1) {
-      throw Errno.currentOSError;
-    }
-
-    return result;
+    return Errno.call(
+      () => UnistdBindings.instance.lib.fcntl(fd, cmd.value),
+      isError: (r) => r == -1,
+      message: 'fcntl',
+    );
   }
 
   /// Get file status flags
@@ -354,8 +343,6 @@ abstract final class Unistd {
   }
 
   /// Set file status flags
-  ///
-  /// Only certain flags can be modified (O_APPEND, O_ASYNC, O_DIRECT, etc.)
   static void setFlags(int fd, List<OpenFlag> flags) {
     fcntl(fd, FcntlCommand.setFl, flags.toBitmask());
   }
