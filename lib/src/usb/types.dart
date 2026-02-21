@@ -277,17 +277,22 @@ class EndpointAttributes {
     : transferType = .interrupt,
       _extraBits = 0;
 
-  /// Parses attributes from a bmAttributes byte.
-  factory EndpointAttributes.fromByte(int byte) =>
-      switch (TransferType.fromAttributes(byte)) {
-        .control => const .control(),
-        .isochronous => .isochronous(
-          syncType: .fromByte(byte),
-          usageType: .fromByte(byte),
-        ),
-        .bulk => const .bulk(),
-        .interrupt => const .interrupt(),
-      };
+  /// Creates attributes from a transfer type and optional isochronous parameters.
+  factory EndpointAttributes.from(
+    TransferType type, {
+    IsoSyncType? syncType,
+    IsoUsageType? usageType,
+  }) {
+    return switch (type) {
+      .control => const .control(),
+      .isochronous => .isochronous(
+        syncType: syncType ?? .noSync,
+        usageType: usageType ?? .data,
+      ),
+      .bulk => const .bulk(),
+      .interrupt => const .interrupt(),
+    };
+  }
 
   /// The transfer type of this endpoint.
   final TransferType transferType;
@@ -300,13 +305,13 @@ class EndpointAttributes {
   ///
   /// Returns null for non-isochronous endpoints.
   IsoSyncType? get syncType =>
-      transferType == .isochronous ? IsoSyncType.fromByte(value) : null;
+      transferType == .isochronous ? .fromByte(value) : null;
 
   /// Usage type for isochronous endpoints.
   ///
   /// Returns null for non-isochronous endpoints.
   IsoUsageType? get usageType =>
-      transferType == .isochronous ? IsoUsageType.fromByte(value) : null;
+      transferType == .isochronous ? .fromByte(value) : null;
 
   @override
   bool operator ==(Object other) =>
@@ -422,7 +427,7 @@ enum IsoUsageType {
 ///
 /// SuperSpeed limits (USB 3.0+, 5+ Gbps):
 /// - All: 512 or 1024 bytes
-class MaxPacketSize {
+final class MaxPacketSize {
   /// Full-speed control endpoint (8, 16, 32, or 64 bytes).
   const MaxPacketSize.fullSpeedControl(this.size)
     : assert(
@@ -502,6 +507,31 @@ class MaxPacketSize {
   const MaxPacketSize.raw(this.size)
     : assert(size >= 0 && size <= 0xFFFF, 'Size must fit in 16 bits'),
       _extraBits = 0;
+
+  /// From USB Speed and Transfer Type, determine the default max packet size.
+  factory MaxPacketSize.from(USBSpeed speed, TransferType type) {
+    return switch ((speed, type)) {
+      (.fullSpeed, .control) => const .fullSpeedControl(64),
+      (.fullSpeed, .bulk) => const .fullSpeedBulk(64),
+      (.fullSpeed, .interrupt) => const .fullSpeedInterrupt(64),
+      (.fullSpeed, .isochronous) => const .fullSpeedIsochronous(1023),
+      (.highSpeed, .control) => const .highSpeedControl(),
+      (.highSpeed, .bulk) => const .highSpeedBulk(),
+      (.highSpeed, .interrupt) => const .highSpeedInterrupt(1024),
+      (.highSpeed, .isochronous) => const .highSpeedIsochronous(
+        size: 1024,
+        // Default to 1 transaction/microframe; high-bandwidth modes (2–3)
+        // must be requested explicitly.
+        transactionsPerMicroframe: 1,
+      ),
+      // SuperSpeed (USB 3.x): control and bulk are fixed at 512 per spec;
+      // interrupt and isochronous may use 1024.
+      (.superSpeed || .superSpeedPlus, .control) => const .superSpeed(512),
+      (.superSpeed || .superSpeedPlus, .bulk) => const .superSpeed(512),
+      (.superSpeed || .superSpeedPlus, _) => const .superSpeed(1024),
+      _ => throw ArgumentError('Unsupported speed/transfer type combination'),
+    };
+  }
 
   /// The packet size in bytes.
   final int size;
@@ -591,6 +621,24 @@ final class PollingInterval {
   const PollingInterval.raw(this.value)
     : assert(value >= 0 && value <= 255, 'Interval must be 0-255');
 
+  /// From USB Speed and Transfer Type, determine the default polling interval.
+  factory PollingInterval.from(USBSpeed speed, TransferType type) =>
+      switch ((speed, type)) {
+        (.fullSpeed, .control) => const .none(),
+        (.fullSpeed, .bulk) => const .none(),
+        (.fullSpeed, .interrupt) => const .fullSpeed(10),
+        (.fullSpeed, .isochronous) => const .fullSpeed(1),
+        (.highSpeed, .control) => const .none(),
+        (.highSpeed, .bulk) => const .none(),
+        (.highSpeed, .interrupt) => const .highSpeedInterrupt(4),
+        (.highSpeed, .isochronous) => const .highSpeedIsochronous(),
+        // superSpeedPlus uses the same bInterval encoding as superSpeed.
+        (.superSpeed || .superSpeedPlus, .control) => const .none(),
+        (.superSpeed || .superSpeedPlus, .bulk) => const .none(),
+        (.superSpeed || .superSpeedPlus, _) => const .superSpeed(4),
+        _ => throw ArgumentError('Unsupported speed/transfer type combination'),
+      };
+
   /// Final bInterval field value.
   final int value;
 
@@ -678,15 +726,6 @@ class SSEndpointAttributes {
   ///
   /// No additional attributes for interrupt endpoints.
   const SSEndpointAttributes.interrupt() : value = 0;
-
-  /// Parses attributes from bmAttributes byte given the transfer type.
-  factory SSEndpointAttributes.fromByte(int byte, TransferType transferType) {
-    return switch (transferType) {
-      TransferType.bulk => .bulk(streams: byte & 0x1F),
-      TransferType.isochronous => .isochronous(mult: byte & 0x03),
-      _ => const .interrupt(),
-    };
-  }
 
   /// The final bmAttributes field value.
   final int value;
@@ -816,7 +855,7 @@ class DeviceClass {
 ///
 /// Further refines the device class when used at the device descriptor level
 /// (bDeviceSubClass field). Interpretation depends on the device class.
-class DeviceSubClass {
+final class DeviceSubClass {
   const DeviceSubClass(this.value)
     : assert(value >= 0 && value <= 255, 'Device subclass must be 0-255');
 
@@ -849,7 +888,7 @@ class DeviceSubClass {
 /// Specifies the protocol when used at the device descriptor level
 /// (bDeviceProtocol field). Interpretation depends on the device class
 /// and subclass.
-class DeviceProtocol {
+final class DeviceProtocol {
   const DeviceProtocol(this.value)
     : assert(value >= 0 && value <= 255, 'Device protocol must be 0-255');
 
@@ -926,12 +965,6 @@ enum TransferType {
 
   /// Raw value for bits 0-1 of bmAttributes.
   final int value;
-
-  /// Extracts transfer type from bmAttributes byte.
-  static TransferType fromAttributes(int bmAttributes) {
-    final masked = bmAttributes & 0x03;
-    return TransferType.values.firstWhere((t) => t.value == masked);
-  }
 }
 
 /// USB device class codes.
