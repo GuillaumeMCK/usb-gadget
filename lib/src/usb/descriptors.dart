@@ -629,6 +629,184 @@ class USBInterfaceAssocDescriptor implements USBDescriptor {
   }
 }
 
+/// Endpoint configuration: transfer type, packet size, and polling interval.
+///
+/// Use one of the subtypes to describe your endpoint:
+/// - [BulkEndpointConfig] — reliable large transfers, no timing guarantee
+/// - [ControlEndpointConfig] — structured bidirectional control transfers
+/// - [InterruptEndpointConfig] — bounded-latency periodic transfers
+/// - [IsochronousEndpointConfig] — guaranteed-bandwidth streaming transfers
+///
+/// Each subtype carries only the fields relevant to its transfer type and
+/// overrides [getMaxPacketSize] and [getPollingInterval] directly — no
+/// runtime dispatch on a `transferType` field is needed.
+sealed class EndpointConfig {
+  const EndpointConfig({this.maxPacketSize});
+
+  /// Optional custom maximum packet size override (bytes).
+  ///
+  /// When `null`, the spec-mandated default for the transfer type and speed
+  /// is used automatically. Set this only when you need a non-default size.
+  final int? maxPacketSize;
+
+  /// Transfer type of this endpoint.
+  TransferType get transferType;
+
+  /// Returns the [MaxPacketSize] for [speed].
+  ///
+  /// Applies [maxPacketSize] override when set; otherwise uses the
+  /// USB-spec default for this transfer type and speed.
+  MaxPacketSize getMaxPacketSize(USBSpeed speed);
+
+  /// Returns the [PollingInterval] for [speed].
+  PollingInterval getPollingInterval(USBSpeed speed);
+}
+
+/// Bulk transfer endpoint configuration.
+///
+/// Automatically selects packet size by speed:
+/// - Full-Speed: 64 bytes
+/// - High-Speed: 512 bytes
+/// - SuperSpeed / SuperSpeedPlus: 512 bytes (USB 3.x spec §9.6.6)
+///
+/// Polling interval is irrelevant for bulk endpoints (always zero).
+final class BulkEndpointConfig extends EndpointConfig {
+  const BulkEndpointConfig({super.maxPacketSize});
+
+  @override
+  TransferType get transferType => TransferType.bulk;
+
+  @override
+  MaxPacketSize getMaxPacketSize(USBSpeed speed) => switch (speed) {
+    .fullSpeed => .fullSpeedBulk(maxPacketSize ?? 64),
+    .highSpeed => const .highSpeedBulk(),
+    _ => .superSpeed(maxPacketSize ?? 512),
+  };
+
+  @override
+  PollingInterval getPollingInterval(USBSpeed speed) =>
+      const PollingInterval.none();
+}
+
+/// Control transfer endpoint configuration.
+///
+/// Automatically selects packet size by speed:
+/// - Full-Speed: 64 bytes
+/// - High-Speed: 64 bytes (fixed by spec)
+/// - SuperSpeed / SuperSpeedPlus: 512 bytes (fixed by spec)
+///
+/// Polling interval is irrelevant for control endpoints (always zero).
+final class ControlEndpointConfig extends EndpointConfig {
+  const ControlEndpointConfig({super.maxPacketSize});
+
+  @override
+  TransferType get transferType => TransferType.control;
+
+  @override
+  MaxPacketSize getMaxPacketSize(USBSpeed speed) => switch (speed) {
+    .fullSpeed => .fullSpeedControl(maxPacketSize ?? 64),
+    .highSpeed => const .highSpeedControl(),
+    _ => .superSpeed(maxPacketSize ?? 512),
+  };
+
+  @override
+  PollingInterval getPollingInterval(USBSpeed speed) =>
+      const PollingInterval.none();
+}
+
+/// Interrupt transfer endpoint configuration.
+///
+/// [interval] is the polling interval for Full-Speed (1–255 ms).
+/// High-Speed and SuperSpeed exponents are derived automatically from it.
+///
+/// Automatically selects packet size by speed:
+/// - Full-Speed: up to 64 bytes
+/// - High-Speed: up to 1024 bytes
+/// - SuperSpeed: up to 1024 bytes
+final class InterruptEndpointConfig extends EndpointConfig {
+  const InterruptEndpointConfig({required this.interval, super.maxPacketSize});
+
+  /// Polling interval (used directly for Full-Speed; converted for HS/SS).
+  final Duration interval;
+
+  @override
+  TransferType get transferType => TransferType.interrupt;
+
+  @override
+  MaxPacketSize getMaxPacketSize(USBSpeed speed) => switch (speed) {
+    .fullSpeed => .fullSpeedInterrupt(maxPacketSize ?? 64),
+    .highSpeed => .highSpeedInterrupt(maxPacketSize ?? 1024),
+    _ => .superSpeed(maxPacketSize ?? 1024),
+  };
+
+  @override
+  PollingInterval getPollingInterval(USBSpeed speed) {
+    final ms = interval.inMilliseconds.clamp(1, 255);
+    return switch (speed) {
+      .fullSpeed => .fullSpeed(ms),
+      .highSpeed => .highSpeedInterrupt(_msToExponent(ms)),
+      _ => .superSpeed(_msToExponent(ms)),
+    };
+  }
+
+  /// Maps a millisecond interval to a high-speed/SuperSpeed bInterval exponent.
+  ///
+  /// The actual interval is 2^(exp-1) × 125 µs; this method finds the
+  /// smallest exponent whose interval is ≥ [ms].
+  static int _msToExponent(int ms) {
+    if (ms <= 0) return 1;
+    final microframes = (ms / 0.125).round().clamp(1, 32768);
+    var exp = 1;
+    while ((1 << (exp - 1)) < microframes && exp < 16) {
+      exp++;
+    }
+    return exp;
+  }
+}
+
+/// Isochronous transfer endpoint configuration.
+///
+/// [syncType] and [usageType] define the isochronous synchronization model.
+/// Polling interval is fixed by the spec (1 frame for FS, 1 microframe for HS).
+///
+/// Automatically selects packet size by speed:
+/// - Full-Speed: up to 1023 bytes
+/// - High-Speed: up to 1024 bytes (1 transaction/microframe)
+/// - SuperSpeed: up to 1024 bytes
+final class IsochronousEndpointConfig extends EndpointConfig {
+  const IsochronousEndpointConfig({
+    required this.syncType,
+    required this.usageType,
+    super.maxPacketSize,
+  });
+
+  /// Isochronous synchronization type (bits 2–3 of bmAttributes).
+  final IsoSyncType syncType;
+
+  /// Isochronous usage type (bits 4–5 of bmAttributes).
+  final IsoUsageType usageType;
+
+  @override
+  TransferType get transferType => TransferType.isochronous;
+
+  @override
+  MaxPacketSize getMaxPacketSize(USBSpeed speed) => switch (speed) {
+    .fullSpeed => .fullSpeedIsochronous(maxPacketSize ?? 1023),
+    .highSpeed => .highSpeedIsochronous(
+      size: maxPacketSize ?? 1024,
+      transactionsPerMicroframe: 1,
+    ),
+    _ => .superSpeed(maxPacketSize ?? 1024),
+  };
+
+  @override
+  PollingInterval getPollingInterval(USBSpeed speed) => switch (speed) {
+    .fullSpeed => const PollingInterval.fullSpeed(1),
+    .highSpeed => const PollingInterval.highSpeedIsochronous(),
+    _ => const PollingInterval.superSpeed(1),
+  };
+}
+
 /// Endpoint template for speed-independent endpoint definitions.
 ///
 /// Provides a high-level endpoint specification that can be converted
