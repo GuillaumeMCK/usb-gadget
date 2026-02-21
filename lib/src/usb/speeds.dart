@@ -13,10 +13,10 @@ enum Speed implements Comparable<Speed> {
   /// USB 2.0: 480 Mbit/s.
   highSpeed('high-speed', 4),
 
-  /// USB 1.0: 12 Mbit/s.
+  /// USB 1.1: 12 Mbit/s.
   fullSpeed('full-speed', 3),
 
-  /// USB 1.0: 1.5 Mbit/s.
+  /// USB 1.0/1.1: 1.5 Mbit/s.
   lowSpeed('low-speed', 2),
 
   /// Unknown speed.
