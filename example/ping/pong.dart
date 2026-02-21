@@ -47,12 +47,10 @@ class PongFunction extends FunctionFs {
   }
 
   @override
-  void release() {
-    if (!isReleased) {
-      _dataSubscription?.cancel();
-      _dataSubscription = null;
-      super.release();
-    }
+  Future<void> release() async {
+    await _dataSubscription?.cancel();
+    _dataSubscription = null;
+    await super.release();
   }
 }
 
