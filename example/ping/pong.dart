@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:usb_gadget/src/utils/utils.dart';
 import 'package:usb_gadget/usb_gadget.dart';
 
 class PongFunction extends FunctionFs {
@@ -16,12 +15,12 @@ class PongFunction extends FunctionFs {
             interfaceClass: .vendorSpecific,
           ),
           const EndpointTemplate(
-            address: EndpointAddress.in_(.ep1),
-            config: EndpointConfig.bulk(),
+            address: .in_(.ep1),
+            config: BulkEndpointConfig(),
           ),
           const EndpointTemplate(
-            address: EndpointAddress.out(.ep2),
-            config: EndpointConfig.bulk(),
+            address: .out(.ep2),
+            config: BulkEndpointConfig(),
           ),
         ],
         strings: {
@@ -39,8 +38,7 @@ class PongFunction extends FunctionFs {
   @override
   Future<void> onEnable() async {
     super.onEnable();
-    await waitUSBDeviceState(.configured);
-    _dataSubscription = epOut.stream().listen((data) {
+    _dataSubscription = epOut.stream.listen((data) {
       log?.debug('Received data:\n${data.xxd()}');
       epIn.write(data);
     }, cancelOnError: false);
@@ -75,6 +73,7 @@ Future<void> main() async {
 
   try {
     await gadget.bind();
+    await gadget.awaitState(.configured);
     stdout.writeln('Pong Device ready. Press Ctrl+C to exit.');
     await ProcessSignal.sigint.watch().first;
   } finally {
