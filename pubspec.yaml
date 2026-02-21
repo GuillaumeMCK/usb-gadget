@@ -4,7 +4,7 @@ version: 0.2.3
 homepage: https://github.com/GuillaumeMCK/usb-gadget
 
 environment:
-  sdk: ^3.10.0
+  sdk: ^3.11.0
 
 dependencies:
   ffi: ^2.1.5
@@ -12,7 +12,6 @@ dependencies:
   using: ^1.0.5
 
 dev_dependencies:
-  custom_lint: ^0.8.1
   ffigen: ^20.1.1
-  leancode_lint: ^19.0.1
+  leancode_lint: ^21.0.0
   lints: ^6.0.0
