@@ -171,7 +171,7 @@ abstract class DescriptorGenerator {
   ///
   /// Takes a list of base descriptors and produces speed-specific variants:
   /// - Interface descriptors are copied as-is
-  /// - EndpointTemplate descriptors are converted to USBEndpointDescriptorNoAudio
+  /// - EndpointTemplate descriptors are converted to [USBEndpointDescriptor]
   ///   with speed-appropriate packet sizes and intervals
   /// - SuperSpeed endpoints include companion descriptors
   ///
@@ -186,12 +186,18 @@ abstract class DescriptorGenerator {
       if (desc is EndpointTemplate) {
         // Generate endpoint descriptor with speed-specific values
         result.add(
-          USBEndpointDescriptorNoAudio(
+          USBEndpointDescriptor(
             address: desc.address,
             attributes: EndpointAttributes.from(
               desc.config.transferType,
-              syncType: desc.config.syncType,
-              usageType: desc.config.usageType,
+              syncType: switch (desc.config) {
+                IsochronousEndpointConfig(:final syncType) => syncType,
+                _ => null,
+              },
+              usageType: switch (desc.config) {
+                IsochronousEndpointConfig(:final usageType) => usageType,
+                _ => null,
+              },
             ),
             maxPacketSize: desc.config.getMaxPacketSize(speed),
             interval: desc.config.getPollingInterval(speed),
@@ -404,8 +410,6 @@ class USBEndpointDescriptor implements USBDescriptor {
   /// endpoints that require explicit synchronization. Set to 0 if not used.
   final int bSynchAddress;
 
-  /// Legacy getter for compatibility.
-  int get wMaxPacketSize => maxPacketSize.value;
   /// Returns 9 for audio endpoints (non-zero [bRefresh] or [bSynchAddress]),
   /// 7 for all other endpoints.
   @override
