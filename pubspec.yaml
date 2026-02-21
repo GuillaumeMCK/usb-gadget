@@ -3,6 +3,10 @@ description: Expose standard or fully custom USB peripherals (gadgets) through a
 version: 0.3.0
 homepage: https://github.com/GuillaumeMCK/usb-gadget
 
+platforms:
+  linux:
+  android:
+
 environment:
   sdk: ^3.11.0
 
