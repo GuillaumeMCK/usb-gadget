@@ -188,7 +188,11 @@ abstract class DescriptorGenerator {
         result.add(
           USBEndpointDescriptorNoAudio(
             address: desc.address,
-            attributes: desc.config.getAttributes(),
+            attributes: EndpointAttributes.from(
+              desc.config.transferType,
+              syncType: desc.config.syncType,
+              usageType: desc.config.usageType,
+            ),
             maxPacketSize: desc.config.getMaxPacketSize(speed),
             interval: desc.config.getPollingInterval(speed),
           ),
