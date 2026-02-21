@@ -323,7 +323,7 @@ class Gadget with USBGadgetLogger {
   /// before starting data transfers.
   ///
   /// Parameters:
-  /// - [targetState]: The USB state to wait for (typically [USBDeviceState.configured])
+  /// - [target]: The USB state to wait for (typically [USBDeviceState.configured])
   /// - [pollInterval]: How often to check the state (default: 100ms)
   /// - [timeout]: Maximum time to wait (default: 5 seconds)
   ///
@@ -336,11 +336,11 @@ class Gadget with USBGadgetLogger {
   /// Example:
   /// ```dart
   /// await gadget.bind();
-  /// await gadget.waitForState(USBDeviceState.configured);
+  /// await gadget.awaitState(USBDeviceState.configured);
   /// // Device is now ready to send/receive data
   /// ```
-  Future<void> waitForState(
-    USBDeviceState targetState, {
+  Future<void> awaitState(
+    USBDeviceState target, {
     Duration pollInterval = const Duration(milliseconds: 100),
     Duration timeout = const Duration(seconds: 5),
   }) async {
@@ -359,7 +359,7 @@ class Gadget with USBGadgetLogger {
       if (DateTime.now().difference(startTime) > timeout) {
         final currentState = getCurrentUsbState();
         throw TimeoutException(
-          'Timeout waiting for USB state "${targetState.value}". '
+          'Timeout waiting for USB state "${target.value}". '
           'Current state: ${currentState.value}',
           timeout,
         );
@@ -369,7 +369,7 @@ class Gadget with USBGadgetLogger {
       final stateStr = stateFile.readAsStringSync().trim();
       final state = USBDeviceState.fromString(stateStr);
 
-      if (state == targetState) {
+      if (state == target) {
         return;
       }
 
@@ -436,7 +436,7 @@ class Gadget with USBGadgetLogger {
     for (final function in config.functions) {
       function.usbDeviceStateStream = stream;
       if (function.type == .ffs) {
-        await function.waitState(.ready);
+        await function.awaitState(.ready);
       }
     }
   }
