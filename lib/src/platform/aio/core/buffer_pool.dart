@@ -108,12 +108,9 @@ final class BufferPool with Releasable {
 
   @override
   void release() {
-    if (isReleased) return;
     super.release();
     // Unblock any callers suspended in acquireAsync so they do not hang.
     _semaphore.cancelAll(StateError('BufferPool has been released'));
-    for (final buf in _buffers) {
-      calloc.free(buf);
-    }
+    _buffers.forEach(calloc.free);
   }
 }
