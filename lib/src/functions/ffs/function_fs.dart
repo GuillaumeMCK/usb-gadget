@@ -35,12 +35,13 @@ enum FunctionFsState {
 class FunctionFs extends GadgetFunction with USBGadgetLogger {
   FunctionFs({
     required super.name,
-    this.descriptors = const [],
+    List<USBDescriptor>? descriptors,
     this.speeds = const {.fullSpeed, .highSpeed},
     this.strings = const {},
     this.flags = const FunctionFsFlags(),
     String? mountPoint,
-  }) : _mountPoint = mountPoint ?? '/dev/ffs/$name';
+  }) : _mountPoint = mountPoint ?? '/dev/ffs/$name',
+       descriptors = [...?descriptors];
 
   @override
   GadgetFunctionType get type => .ffs;
@@ -82,14 +83,8 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
   /// State stream
   final StreamController<FunctionFsState> _stateController = .broadcast();
 
-  /// Stream controller for FunctionFs events
-  // final StreamController<FunctionFsEvent> _eventController = .broadcast();
-
   /// Subscription for EP0 event reading
   StreamSubscription<FunctionFsEvent>? _eventSubscription;
-
-  /// Stream of FunctionFs events (bind, unbind, enable, disable, setup, etc.)
-  // Stream<FunctionFsEvent> get events => _eventController.stream;
 
   /// Control endpoint accessor
   EndpointControlFile get ep0 => _ep0;
@@ -208,16 +203,16 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
 
   @override
   @mustCallSuper
-  void release() {
+  Future<void> release() async {
     log?.info('Releasing function (current state: $_state)');
-    _eventSubscription?.cancel();
+    await _eventSubscription?.cancel();
     _eventSubscription = null;
 
     if (_endpoints.isNotEmpty) {
       for (final ep in _endpoints.values) {
         try {
           log?.info('Closing endpoint: ${ep.fd}');
-          ep.close();
+          await ep.close();
         } catch (err) {
           log?.warn('Failed to close endpoint: $err');
         }
@@ -227,14 +222,14 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
 
     try {
       log?.info('Closing EP0 and unmounting FunctionFs...');
-      _ep0.close();
+      await _ep0.close();
     } catch (err) {
       log?.warn('Failed to close EP0: $err');
     }
 
     // Clear maps to release strong references
     _endpointStatus.clear();
-    _stateController.close();
+    await _stateController.close();
     _setState(.disposed);
     super.release();
   }
@@ -270,7 +265,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
 
         final epPath = '$_mountPoint/ep$index';
         final endpoint = switch (desc.address.direction) {
-          .in_ => EndpointInFile(epPath),
+          .in_ => EndpointInFile(epPath, config: desc.config),
           .out => EndpointOutFile(epPath, config: desc.config),
         };
 
@@ -314,13 +309,10 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
   /// Starts listening for events from EP0.
   void _startEventListener() {
     log?.info('Starting event listener on EP0');
-    _eventSubscription ??= _ep0.stream().listen(
+    _eventSubscription ??= _ep0.stream.listen(
       _handleEvent,
       onError: (Object err, StackTrace st) {
         log?.error('Error in EP0 event stream: $err', err, st);
-      },
-      onDone: () {
-        log?.warn('EP0 event stream closed');
       },
       cancelOnError: false,
     );
@@ -362,10 +354,6 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
     }
     return endpoint;
   }
-
-  // ============================================================================
-  // Lifecycle Hook Methods
-  // ============================================================================
 
   /// Called when the function is bound to the UDC.
   @mustCallSuper
@@ -445,9 +433,9 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
       _endpointStatus[address] ??= 0;
     }
 
-    switch ((request, direction, recipient)) {
+    switch ((request, direction, recipient, feature)) {
       // Device-level requests
-      case (.getStatus, .in_, .device):
+      case (.getStatus, .in_, .device, _):
         log?.debug(
           'GET_STATUS (device) '
           'selfPowered=${_deviceStatus.bit(0)}, '
@@ -455,18 +443,18 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
         );
         return _ep0.write(_deviceStatus.bytes);
 
-      case (.setFeature, .out, .device) when feature == .deviceRemoteWakeup:
+      case (.setFeature, .out, .device, .deviceRemoteWakeup):
         _deviceStatus = _deviceStatus.bit(1, 1);
         log?.debug('Enabled remote wakeup');
         return ep0.ack();
 
-      case (.clearFeature, .out, .device) when feature == .deviceRemoteWakeup:
+      case (.clearFeature, .out, .device, .deviceRemoteWakeup):
         _deviceStatus = _deviceStatus.bit(1, 0);
         log?.debug('Disabled remote wakeup');
         return ep0.ack();
 
       // Endpoint-level requests
-      case (.getStatus, .in_, .endpoint):
+      case (.getStatus, .in_, .endpoint, _):
         if (address == null) return _ep0.halt();
 
         final endpoint = _endpoints[address];
@@ -480,7 +468,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
 
         return _ep0.write(status.bytes);
 
-      case (.clearFeature, .out, .endpoint) when feature == .endpointHalt:
+      case (.clearFeature, .out, .endpoint, .endpointHalt):
         if (address == null) return _ep0.halt();
 
         final ep = _endpoints[address] as EndpointInFile?;
@@ -492,7 +480,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
         log?.debug('CLEAR_FEATURE HALT on $address');
         return ep0.ack();
 
-      case (.setFeature, .out, .endpoint) when feature == .endpointHalt:
+      case (.setFeature, .out, .endpoint, .endpointHalt):
         if (address == null) return _ep0.halt();
 
         final ep = _endpoints[address];
@@ -506,8 +494,8 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
 
       // In FunctionFS these are normally handled by the kernel.
       // Only subclasses that explicitly need them should override.
-      case (.getInterface, _, _):
-      case (.setInterface, _, _):
+      case (.getInterface, _, _, _):
+      case (.setInterface, _, _, _):
         log?.debug('Interface request passed to subclass or kernel');
         return _ep0.halt();
 
