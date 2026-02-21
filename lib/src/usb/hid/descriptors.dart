@@ -76,10 +76,10 @@ class USBHIDDescriptor implements USBDescriptor {
   int get numDescriptors => physicalDescriptorLength > 0 ? 2 : 1;
 
   /// BCD version major number.
-  int get majorVersion => (hidVersion >> 8) & 0xFF;
+  int get majorVersion => hidVersion.byte(1);
 
   /// BCD version minor number.
-  int get minorVersion => hidVersion & 0xFF;
+  int get minorVersion => hidVersion.byte(0);
 
   @override
   Uint8List toBytes() {
