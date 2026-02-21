@@ -17,7 +17,7 @@ import '/usb_gadget.dart';
 ///
 /// 1. **prepare()**: Initialize resources asynchronously (mount filesystems,
 ///    write configuration attributes, open files).
-/// 2. **waitState()**: Wait until the function is ready for UDC binding.
+/// 2. **awaitState()**: Wait until the function is ready for UDC binding.
 ///    This ensures all setup is complete before hardware activation.
 /// 3. **release()**: Clean up resources when the gadget is unbound (close
 ///    files, unmount filesystems, release handles).
@@ -47,16 +47,6 @@ abstract class GadgetFunction with Releasable {
   /// state changes. Use this to react to enumeration lifecycle events.
   Stream<USBDeviceState>? usbDeviceStateStream;
 
-  /// Future void that completes when the state of the USB device changes and
-  /// matches the desired state.
-  Future<void> Function(USBDeviceState state) get waitUSBDeviceState =>
-      (state) {
-        if (usbDeviceStateStream == null) {
-          throw StateError('USB device state stream is not available');
-        }
-        return usbDeviceStateStream!.firstWhere((s) => s == state);
-      };
-
   /// Returns the configfs instance name for this function.
   ///
   /// The format depends on the function type:
@@ -85,7 +75,7 @@ abstract class GadgetFunction with Releasable {
   /// write its attributes (e.g., `/sys/kernel/config/usb_gadget/g1/functions/ffs.adb`).
   ///
   /// **Important:** This method must be synchronous in execution but can
-  /// initiate asynchronous operations. Use [waitState] to wait for completion.
+  /// initiate asynchronous operations. Use [awaitState] to wait for completion.
   ///
   /// Throws:
   /// - [FileSystemException] if configuration files cannot be written
@@ -110,7 +100,7 @@ abstract class GadgetFunction with Releasable {
   /// Throws:
   /// - [StateError] if the function enters an error state
   /// - [TimeoutException] if the state is not reached within a reasonable time
-  Future<void> waitState(FunctionFsState state);
+  Future<void> awaitState(FunctionFsState state);
 
   /// Phase 3: Clean up function resources.
   ///

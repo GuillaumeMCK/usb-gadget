@@ -105,7 +105,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
 
   /// Waits until the function reaches the specified state.
   @override
-  Future<void> waitState(FunctionFsState state) => state != _state
+  Future<void> awaitState(FunctionFsState state) => state != _state
       ? _stateController.stream.where((s) => s == state).first
       : .value();
 

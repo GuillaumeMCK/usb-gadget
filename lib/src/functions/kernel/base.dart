@@ -123,7 +123,7 @@ abstract class KernelFunction extends GadgetFunction with USBGadgetLogger {
   /// Only for FunctionFs-based functions; not needed for kernel functions.
   /// Returns immediately.
   @override
-  Future<void> waitState(_) => .value();
+  Future<void> awaitState(_) => .value();
 
   @override
   @mustCallSuper
