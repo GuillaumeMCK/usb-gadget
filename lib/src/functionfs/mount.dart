@@ -3,22 +3,11 @@ import 'dart:io';
 import '/src/logger/logger.dart';
 import '/src/platform/platform.dart';
 
-/// Configuration for FunctionFs mount behavior.
-class FunctionFsMountConfig {
-  const FunctionFsMountConfig({
-    this.mountDelay = const Duration(milliseconds: 50),
-    this.cleanupOnClose = true,
-  });
-
-  /// Delay after mounting before opening endpoint files.
-  /// Gives kernel time to create endpoint files.
-  ///
-  /// Note: This uses async delay to avoid blocking the isolate.
-  final Duration mountDelay;
-
-  /// Automatically unmount when closing if we mounted it.
-  final bool cleanupOnClose;
-}
+/// Delay after mounting before opening endpoint files.
+///
+/// Gives the kernel time to create endpoint files in the FunctionFs mount
+/// point. Using a synchronous sleep here avoids a race with `ensure`.
+const Duration functionFsMountDelay = Duration(milliseconds: 50);
 
 /// Manages FunctionFs filesystem mounting and unmounting.
 ///
@@ -29,8 +18,7 @@ class FunctionFsMount with USBGadgetLogger {
     required this.mountPoint,
     required this.mountSource,
     required this.ep0Path,
-    FunctionFsMountConfig? config,
-  }) : config = config ?? const FunctionFsMountConfig();
+  });
 
   /// Mount point for FunctionFs filesystem.
   final String mountPoint;
@@ -40,9 +28,6 @@ class FunctionFsMount with USBGadgetLogger {
 
   /// Path to EP0 file (used for mount detection).
   final String ep0Path;
-
-  /// Mount configuration.
-  final FunctionFsMountConfig config;
 
   /// Whether the mount point exists and appears to be mounted.
   ///
@@ -57,14 +42,14 @@ class FunctionFsMount with USBGadgetLogger {
   /// 1. Creates the mount point directory if it doesn't exist
   /// 2. Remounts if already mounted (to ensure clean state)
   /// 3. Mounts if not mounted
-  /// 4. Waits for the mount delay
+  /// 4. Waits for [functionFsMountDelay]
   /// 5. Verifies the mount succeeded
   ///
   /// Throws [StateError] if:
   /// - Mount point directory cannot be created
   /// - Mount operation fails
   /// - EP0 file doesn't exist after mount
-  void ensureMounted() {
+  void ensure() {
     // Create mount point directory if needed
     final dir = Directory(mountPoint);
     if (!dir.existsSync()) {
@@ -81,13 +66,13 @@ class FunctionFsMount with USBGadgetLogger {
     if (isMounted) {
       log?.warn('Already mounted at $mountPoint, remounting');
       remount();
-      sleep(config.mountDelay);
+      sleep(functionFsMountDelay);
     }
 
     // Mount if not mounted
     if (!isMounted) {
       mount(); // Throws on failure
-      sleep(config.mountDelay);
+      sleep(functionFsMountDelay);
     }
   }
 
@@ -160,7 +145,7 @@ class FunctionFsMount with USBGadgetLogger {
     }
 
     try {
-      Errno.retry(() => Mount.umount(mountPoint), retryOn: [Errno.ebusy]);
+      Mount.umount(mountPoint);
       log?.info('Unmounted FunctionFs from $mountPoint');
     } catch (_) {
       log?.warn('Unmount failed, attempting force unmount (MNT_DETACH)');
@@ -172,15 +157,6 @@ class FunctionFsMount with USBGadgetLogger {
       } catch (e) {
         log?.error('Failed to unmount FunctionFs: $e');
       }
-    }
-  }
-
-  /// Unmounts if cleanup is enabled in config.
-  ///
-  /// This is a convenience method for use in close() methods.
-  void cleanupIfNeeded() {
-    if (config.cleanupOnClose) {
-      unmount();
     }
   }
 }
