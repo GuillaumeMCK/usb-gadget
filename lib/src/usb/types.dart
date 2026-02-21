@@ -321,13 +321,16 @@ class EndpointAttributes {
 
 /// Isochronous synchronization type (bits 2-3 of bmAttributes).
 ///
-/// Describes how isochronous data is synchronized:
-/// - No synchronization: Asynchronous
-/// - Asynchronous: Source has no locked timing
-/// - Adaptive: Sink can adjust timing
-/// - Synchronous: Source/sink have locked timing
+/// Describes how isochronous data is synchronized (USB 2.0 spec Table 9-13):
+/// - No synchronization: No sync source (bits 2–3 = 00)
+/// - Asynchronous: Source has no locked timing (bits 2–3 = 01)
+/// - Adaptive: Sink can adapt to rate feedback (bits 2–3 = 10)
+/// - Synchronous: Source/sink locked to USB SOF (bits 2–3 = 11)
 enum IsoSyncType {
-  /// No synchronization (asynchronous).
+  /// No synchronization.
+  ///
+  /// The endpoint has no synchronization source. Distinct from [async],
+  /// which has its own free-running clock. Encoded as bits 2–3 = 00.
   noSync(0x00),
 
   /// Asynchronous synchronization.
@@ -532,17 +535,18 @@ class MaxPacketSize {
 ///
 /// Full-Speed:
 /// - Control/Bulk: Ignored (set to 0)
-/// - Interrupt/Isochronous: 1-255 frames (1 frame = 1 ms)
+/// - Interrupt: 1–255 frames (1 frame = 1 ms)
+/// - Isochronous: Must equal 1 (= 1 ms per frame, per USB spec §9.6.6)
 ///
 /// High-Speed:
 /// - Control/Bulk: Ignored (set to 0)
-/// - Interrupt: 1-16 (actual interval = 2^(value-1) microframes)
-/// - Isochronous: Always 1
+/// - Interrupt: 1–16 (actual interval = 2^(value-1) microframes × 125μs)
+/// - Isochronous: Must equal 1 (= 2^0 = 1 microframe = 125μs)
 ///
 /// SuperSpeed:
 /// - Bulk/Control: Ignored (set to 0)
-/// - Interrupt/Isochronous: 1-16 (actual interval = 2^(value-1) × 125μs)
-class PollingInterval {
+/// - Interrupt/Isochronous: 1–16 (actual interval = 2^(value-1) × 125μs)
+final class PollingInterval {
   /// No polling (for control/bulk endpoints).
   const PollingInterval.none() : value = 0;
 
@@ -567,9 +571,10 @@ class PollingInterval {
       ),
       value = exponent;
 
-  /// High-speed isochronous interval (always 1).
+  /// High-speed isochronous interval (bInterval = 1).
   ///
-  /// High-speed isochronous endpoints are always polled every microframe (125μs).
+  /// USB 2.0 spec §9.6.6 requires bInterval = 1 for high-speed isochronous
+  /// endpoints. This encodes an interval of 2^(1-1) = 1 microframe = 125μs.
   const PollingInterval.highSpeedIsochronous() : value = 1;
 
   /// SuperSpeed interval (1-16).
@@ -1266,7 +1271,12 @@ enum USBFeature {
   /// Test mode feature (0x02).
   testMode(0x02),
 
-  /// Interface function suspend feature (0x00).
+  /// Function suspend feature (0x00).
+  ///
+  /// Applied to interface recipients; shares the selector value 0x00
+  /// with [endpointHalt], which is applied to endpoint recipients.
+  /// The [fromByte] factory disambiguates by [USBRecipient]. See USB
+  /// 2.0 spec §9.4.1.
   functionSuspend(0x00);
 
   const USBFeature(this.value);
