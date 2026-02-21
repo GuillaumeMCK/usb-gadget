@@ -289,7 +289,7 @@ class Gadget with USBGadgetLogger {
 
     for (final function in config.functions) {
       try {
-        function.release();
+        await function.release();
         log?.debug('Released function: ${function.name}');
       } catch (err) {
         log?.warn('Failed to release function ${function.name}: $err');
