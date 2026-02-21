@@ -191,7 +191,6 @@ final class AioSink with Releasable implements StreamSink<Uint8List> {
 
   @override
   void release() {
-    if (isReleased) return;
     super.release();
 
     // Wake blocked writers so they don't hang.
