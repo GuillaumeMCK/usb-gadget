@@ -26,26 +26,28 @@ final class Aio with Releasable {
   /// Uses the transfer-type defaults unless [EndpointConfig.maxPacketSize] is
   /// set, in which case that value overrides the default buffer size.
   factory Aio.fromEndpointConfig(EndpointConfig config) {
-    final (
-      maxEvents,
-      defaultBufferSize,
-      poolSize,
-    ) = switch (config.transferType) {
-      .bulk => (256, 65536, 64),
-      .control => (64, 512, 16),
-      .interrupt => (64, 1024, 16),
-      .isochronous => (128, 8192, 32),
+    final (maxEvents, bufferSize, poolSize, ctxPollInterval) = switch (config) {
+      BulkEndpointConfig() => (256, 65536, 64, _lowerCtxPollInterval),
+      ControlEndpointConfig() => (64, 512, 16, _lowerCtxPollInterval),
+      IsochronousEndpointConfig() => (128, 8192, 32, _lowerCtxPollInterval),
+      InterruptEndpointConfig(:final interval) => (
+        64,
+        1024,
+        16,
+        switch (interval ~/ 2) {
+          <= _lowerCtxPollInterval => _lowerCtxPollInterval,
+          final i => i,
+        },
+      ),
     };
 
     return Aio._(
-      pool: BufferPool(config.maxPacketSize ?? defaultBufferSize, poolSize),
+      pool: BufferPool(config.maxPacketSize ?? bufferSize, poolSize),
       maxEvents: maxEvents,
-      ctxPollInterval: switch (config.interval ~/ 2) {
-        <= _lowerCtxPollInterval => _lowerCtxPollInterval,
-        final interval => interval,
-      },
+      ctxPollInterval: ctxPollInterval,
     );
   }
+
   // Private constructor that accepts a pre-built pool, ensuring _pool and _ctx
   // share the same instance without needing a `late` field.
   Aio._({
@@ -92,7 +94,6 @@ final class Aio with Releasable {
 
   @override
   void release() {
-    if (isReleased) return;
     super.release();
     _ctx.release();
     _pool.release();
