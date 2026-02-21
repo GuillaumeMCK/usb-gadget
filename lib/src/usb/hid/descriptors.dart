@@ -19,15 +19,15 @@ class USBHIDDescriptor implements USBDescriptor {
   /// Parameters:
   /// - [hidVersion]: HID specification version in BCD (default: 0x0111 for HID 1.11)
   /// - [countryCode]: Hardware target country code (default: 0, not localized)
-  /// - [reportLenght]: Length of report descriptor in bytes (required)
+  /// - [reportLength]: Length of report descriptor in bytes (required)
   /// - [physicalDescriptorLength]: Length of physical descriptor (default: 0, not used)
   const USBHIDDescriptor({
     this.hidVersion = 0x0111,
     this.countryCode = 0x00,
-    required this.reportLenght,
+    required this.reportLength,
     this.physicalDescriptorLength = 0,
   }) : assert(
-         reportLenght > 0,
+         reportLength > 0,
          'Report descriptor length must be greater than 0',
        );
 
@@ -61,7 +61,7 @@ class USBHIDDescriptor implements USBDescriptor {
   /// The report descriptor defines all inputs, outputs, and features
   /// of the HID device. This field tells the host how many bytes to
   /// request when fetching the report descriptor.
-  final int reportLenght;
+  final int reportLength;
 
   /// Length of the physical descriptor in bytes.
   ///
@@ -91,7 +91,7 @@ class USBHIDDescriptor implements USBDescriptor {
       ..setUint8(5, numDescriptors)
       // First subordinate descriptor (report descriptor)
       ..setUint8(6, HIDDescriptorType.report.value)
-      ..setUint16(7, reportLenght, .little);
+      ..setUint16(7, reportLength, .little);
     if (physicalDescriptorLength > 0) {
       // Second subordinate descriptor (physical descriptor)
       bytes
@@ -104,5 +104,5 @@ class USBHIDDescriptor implements USBDescriptor {
   @override
   String toString() =>
       'USBHIDDescriptor(HID $majorVersion.$minorVersion, '
-      'reportLen=$reportLenght)';
+      'reportLen=$reportLength)';
 }
