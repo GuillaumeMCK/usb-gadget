@@ -1,8 +1,8 @@
-include: package:leancode_lint/analysis_options.yaml
+plugins:
+  leancode_lint: ^21.0.0
 
 analyzer:
   errors:
     always_put_control_body_on_new_line: ignore
-
-custom_lint:
-  rules: []
+  exclude:
+    - '**/*.g.dart'
