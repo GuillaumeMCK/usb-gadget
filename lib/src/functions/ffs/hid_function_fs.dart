@@ -8,49 +8,59 @@ import '/usb_gadget.dart';
 class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   HIDFunctionFs({
     required super.name,
-    required this.reportDescriptor,
     required this.subclass,
     required this.protocol,
     required this.config,
+    this.reportDescriptor,
+    int hidVersion = 0x0111,
+    int countryCode = 0x00,
+    int physicalDescriptorLength = 0,
     super.speeds,
     super.strings,
     super.flags,
-  }) : super(
-         descriptors: [
-           USBInterfaceDescriptor(
-             interfaceNumber: .interface0,
-             numEndpoints: EndpointCount(config.numEndpoints),
-             interfaceClass: .hid,
-             interfaceSubClass: subclass.value,
-             interfaceProtocol: protocol.value,
-           ),
-           USBHIDDescriptor(reportLenght: reportDescriptor.length),
-           ...config.descriptors,
-         ],
-       );
+  }) {
+    super.descriptors.addAll([
+      interface = USBInterfaceDescriptor(
+        interfaceNumber: .interface0,
+        numEndpoints: .new(config.numEndpoints),
+        interfaceClass: .hid,
+        interfaceSubClass: subclass.value,
+        interfaceProtocol: protocol.value,
+      ),
+      hidDescriptor = USBHIDDescriptor(
+        hidVersion: hidVersion,
+        countryCode: countryCode,
+        physicalDescriptorLength: physicalDescriptorLength,
+        reportLength: reportDescriptor?.length ?? 0,
+      ),
+      ...config.descriptors,
+    ]);
+  }
 
-  /// HID Report Descriptor defining the device's data format.
-  final Uint8List reportDescriptor;
+  /// Endpoint configuration (input-only, bidirectional, output-only).
+  final HIDEndpointConfig config;
+
+  /// Interface descriptor for this HID function.
+  late final USBInterfaceDescriptor interface;
+
+  /// HID class descriptor describing the HID interface version,
+  /// country code, and report descriptor length.
+  late final USBHIDDescriptor hidDescriptor;
+
+  /// HID report descriptor defining the format of reports sent to/from
+  /// the host.
+  final Uint8List? reportDescriptor;
 
   /// HID device subclass (boot device or none).
   final HIDSubclass subclass;
 
   /// HID protocol (keyboard, mouse, or none).
-  final HIDProtocol protocol;
-
-  /// Endpoint configuration (input-only, bidirectional, output-only).
-  final HIDFunctionFsConfig config;
+  HIDProtocol protocol;
 
   /// Idle rates per report ID (in 4ms units).
   /// Key: Report ID (0 = all reports)
   /// Value: Idle rate (0 = infinite, only report on change)
   final Map<int, int> _idleRates = {};
-
-  /// Current HID protocol mode (boot or report).
-  late HIDProtocol _currentProtocol;
-
-  /// Getter for current protocol.
-  HIDProtocol get currentProtocol => _currentProtocol;
 
   /// Interrupt IN endpoint for sending reports to the host.
   EndpointInFile? _interruptIn;
@@ -83,7 +93,6 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   @override
   @mustCallSuper
   void onEnable() {
-    _currentProtocol = protocol;
     if (config.hasInputEndpoint) {
       _interruptIn ??= getEndpoint<EndpointInFile>(config.inEndpointNumber!);
     }
@@ -97,7 +106,6 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
 
   @override
   void onDisable() {
-    // Null out endpoint references to help GC
     _interruptIn = null;
     _interruptOut = null;
     super.onDisable();
@@ -134,15 +142,16 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
           switch (HIDDescriptorType.fromByte(wValue.byte(1))) {
             case .hid:
               log?.debug('Providing HID descriptor');
-              final hidDesc = USBHIDDescriptor(
-                reportLenght: reportDescriptor.length,
-              );
-              final bytes = hidDesc.toBytes();
-              return ep0.write(bytes);
-
+              return ep0.write(hidDescriptor.toBytes());
             case .report:
-              log?.debug('Providing HID report descriptor');
-              return ep0.write(reportDescriptor);
+              if (reportDescriptor == null) {
+                log?.warn('No report descriptor available');
+                return ep0.halt();
+              }
+              log?.debug(
+                'Providing HID report descriptor (${reportDescriptor!.length} bytes)',
+              );
+              return ep0.write(reportDescriptor!.sublist(0, wLength));
             default:
           }
         default:
@@ -161,7 +170,7 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
           final data = onGetReport(reportType, reportId);
 
           if (data == null) {
-            log?.error('GET_REPORT: No data available – stalling');
+            log?.error('GET_REPORT: No data available');
             return ep0.halt();
           }
           return ep0.write(data.sublist(0, wLength));
@@ -200,11 +209,10 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
           if (wLength != 1) {
             return ep0.halt();
           }
-          return ep0.write(Uint8List(1)..[0] = _currentProtocol.value);
+          return ep0.write(Uint8List(1)..[0] = protocol.value);
 
         case (.setProtocol, .out):
-          _currentProtocol = HIDProtocol.fromByte(wValue.byte(0));
-          onSetProtocol(_currentProtocol);
+          onSetProtocol(.fromByte(wValue.byte(0)));
           return ep0.ack();
 
         default:
@@ -221,8 +229,9 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   /// Subclasses MUST override this method to provide report data.
   /// Return null to STALL the request.
   ///
-  /// The returned data should NOT include the Report ID byte - it will be
-  /// prepended automatically if reportId != 0.
+  /// The returned data is written directly to EP0 truncated to [wLength]
+  /// bytes. The Report ID byte is NOT prepended automatically — include it
+  /// in the returned data if your report descriptor uses multiple report IDs.
   @protected
   Uint8List? onGetReport(HIDReportType type, int reportId) {
     log?.warn('onGetReport not overridden - returning null (will STALL)');
@@ -240,15 +249,17 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   /// Called when the host changes the protocol via SET_PROTOCOL.
   @protected
   void onSetProtocol(HIDProtocol protocol) {
-    _currentProtocol = protocol;
+    this.protocol = protocol;
   }
 
   @override
   @mustCallSuper
-  void release() {
+  Future<void> release() async {
     _idleRates.clear();
+    _interruptIn?.release();
     _interruptIn = null;
+    _interruptOut?.release();
     _interruptOut = null;
-    super.release();
+    await super.release();
   }
 }
