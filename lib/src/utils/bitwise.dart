@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 /// Extension providing bit-level operations on integers.
 ///
-/// These utilities treat the integer as a 64-bit two’s-complement value
+/// These utilities treat the integer as a 64-bit two's-complement value
 /// and operate within that range.
 extension IntBitOps on int {
   /// Returns `true` if the bit at [position] is set (1), otherwise `false`.
@@ -125,4 +125,62 @@ extension IntByteOps on int {
 
     return byteList;
   }
+}
+
+/// Extension for converting lists of bit flags into integer bitmasks.
+///
+/// This extension allows combining multiple [BitFlag] values into a single
+/// integer where each flag's bit pattern is OR'd together.
+///
+/// Example:
+/// ```dart
+/// enum FilePermissions extends BitFlag {
+///   read(1 << 0),
+///   write(1 << 1),
+///   execute(1 << 2);
+///   const FilePermissions(super.value);
+/// }
+///
+/// final perms = [FilePermissions.read, FilePermissions.write];
+/// final mask = perms.toBitmask(); // Returns 3 (0b011)
+/// ```
+extension BitFlagList<T extends BitFlag> on List<T> {
+  /// Combines all flags in this list into a single integer bitmask.
+  ///
+  /// Each flag's value is OR'd together to produce the final result.
+  /// Returns `0` if the list is empty.
+  int toBitmask() => fold(0, (acc, flag) => acc | flag.value);
+}
+
+/// Base class for defining enum-based bit flags.
+///
+/// This abstract class provides a foundation for creating type-safe flag enums
+/// where each flag represents a specific bit or bit pattern in an integer.
+///
+/// Typically used with Dart enums to create sets of flags that can be combined
+/// using bitwise operations.
+///
+/// Example:
+/// ```dart
+/// enum Status extends BitFlag {
+///   active(1 << 0),    // 0b0001
+///   pending(1 << 1),   // 0b0010
+///   archived(1 << 2);  // 0b0100
+///   const Status(super.value);
+/// }
+///
+/// final combined = Status.active.value | Status.pending.value; // 0b0011
+/// final hasActive = (combined & Status.active.value) != 0;     // true
+/// ```
+abstract class BitFlag {
+  /// Creates a bit flag with the specified integer [value].
+  ///
+  /// The [value] typically represents a single bit (power of 2) or a
+  /// combination of bits that define this flag's meaning.
+  const BitFlag(this.value);
+
+  /// The integer value of this flag.
+  ///
+  /// This is used in bitwise operations to combine, check, or manipulate flags.
+  final int value;
 }
