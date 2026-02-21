@@ -1,229 +1,288 @@
 import 'dart:io';
 import 'errno.ffi.dart' as errno_ffi;
 
-/// A utility class for interacting with Linux `errno` values via FFI.
+/// A utility class for working with Linux `errno` values via FFI.
 ///
-/// This class is **Linux-only** and mirrors the error definitions found in
-/// the Linux kernel (`asm-generic/errno.h`).
+/// ## Usage pattern
+///
+/// The cardinal rule of errno: **read it immediately after the syscall.**
+/// Any intervening function call — even innocent-looking ones — can
+/// overwrite it. Use [call] or [capture] to guarantee safe reads:
+///
+/// ```dart
+/// // Safe: errno is captured atomically with the native call result.
+/// final fd = Errno.call(() => open(path, O_RDONLY));
+///
+/// // Safe: inspect both the result and errno yourself.
+/// final (result, code) = Errno.capture(() => read(fd, buf, len));
+/// if (result < 0) { ... }
+/// ```
+///
+/// Do **not** do this:
+/// ```dart
+/// final result = nativeCall();
+/// // ← anything here can clobber errno
+/// final code = Errno.current; // may be wrong
+/// ```
+///
+/// ## Platform
+///
+/// Linux only. Errno values mirror `asm-generic/errno-base.h` and
+/// `asm-generic/errno.h`.
 abstract final class Errno {
   // ---------------------------------------------------------------------------
-  // Standard POSIX / Generic Errors (1 - 40)
+  // Standard POSIX / Generic Errors (1–40)
   // ---------------------------------------------------------------------------
 
-  /// Operation not permitted (EPERM)
+  /// Operation not permitted (EPERM) — 1
   static const int eperm = 1;
 
-  /// No such file or directory (ENOENT)
+  /// No such file or directory (ENOENT) — 2
   static const int enoent = 2;
 
-  /// No such process (ESRCH)
+  /// No such process (ESRCH) — 3
   static const int esrch = 3;
 
-  /// Interrupted system call (EINTR)
+  /// Interrupted system call (EINTR) — 4
+  ///
+  /// Most blocking syscalls return EINTR when a signal is delivered.
+  /// Use [callUninterruptible] to automatically restart on EINTR.
   static const int eintr = 4;
 
-  /// I/O error (EIO)
+  /// I/O error (EIO) — 5
   static const int eio = 5;
 
-  /// No such device or address (ENXIO)
+  /// No such device or address (ENXIO) — 6
   static const int enxio = 6;
 
-  /// Argument list too long (E2BIG)
+  /// Argument list too long (E2BIG) — 7
   static const int e2big = 7;
 
-  /// Exec format error (ENOEXEC)
+  /// Exec format error (ENOEXEC) — 8
   static const int enoexec = 8;
 
-  /// Bad file descriptor (EBADF)
+  /// Bad file descriptor (EBADF) — 9
   static const int ebadf = 9;
 
-  /// No child processes (ECHILD)
+  /// No child processes (ECHILD) — 10
   static const int echild = 10;
 
-  /// Try again / Resource temporarily unavailable (EAGAIN)
+  /// Resource temporarily unavailable (EAGAIN / EWOULDBLOCK) — 11
+  ///
+  /// On Linux, EWOULDBLOCK is an alias for EAGAIN (both equal 11).
   static const int eagain = 11;
 
-  /// Out of memory (ENOMEM)
+  /// EWOULDBLOCK is an alias for [eagain] on Linux.
+  static const int ewouldblock = eagain;
+
+  /// Out of memory (ENOMEM) — 12
   static const int enomem = 12;
 
-  /// Permission denied (EACCES)
+  /// Permission denied (EACCES) — 13
   static const int eacces = 13;
 
-  /// Bad address (EFAULT)
+  /// Bad address (EFAULT) — 14
   static const int efault = 14;
 
-  /// Device or resource busy (EBUSY)
+  /// Block device required (ENOTBLK) — 15
+  static const int enotblk = 15;
+
+  /// Device or resource busy (EBUSY) — 16
   static const int ebusy = 16;
 
-  /// File exists (EEXIST)
+  /// File exists (EEXIST) — 17
   static const int eexist = 17;
 
-  /// Cross-device link (EXDEV)
+  /// Cross-device link (EXDEV) — 18
   static const int exdev = 18;
 
-  /// No such device (ENODEV)
+  /// No such device (ENODEV) — 19
   static const int enodev = 19;
 
-  /// Not a directory (ENOTDIR)
+  /// Not a directory (ENOTDIR) — 20
   static const int enotdir = 20;
 
-  /// Is a directory (EISDIR)
+  /// Is a directory (EISDIR) — 21
   static const int eisdir = 21;
 
-  /// Invalid argument (EINVAL)
+  /// Invalid argument (EINVAL) — 22
   static const int einval = 22;
 
-  /// File table overflow (ENFILE)
+  /// File table overflow (ENFILE) — 23
   static const int enfile = 23;
 
-  /// Too many open files (EMFILE)
+  /// Too many open files (EMFILE) — 24
   static const int emfile = 24;
 
-  /// Not a typewriter / Inappropriate ioctl for device (ENOTTY)
+  /// Inappropriate ioctl for device (ENOTTY) — 25
   static const int enotty = 25;
 
-  /// File too large (EFBIG)
+  /// Text file busy (ETXTBSY) — 26
+  static const int etxtbsy = 26;
+
+  /// File too large (EFBIG) — 27
   static const int efbig = 27;
 
-  /// No space left on device (ENOSP)
+  /// No space left on device (ENOSPC) — 28
   static const int enospc = 28;
 
-  /// Read-only file system (EROFS)
+  /// Illegal seek (ESPIPE) — 29
+  static const int espipe = 29;
+
+  /// Read-only file system (EROFS) — 30
   static const int erofs = 30;
 
-  /// Broken pipe (EPIPE)
+  /// Too many links (EMLINK) — 31
+  static const int emlink = 31;
+
+  /// Broken pipe (EPIPE) — 32
   static const int epipe = 32;
 
-  /// Math argument out of domain (EDOM)
+  /// Math argument out of domain (EDOM) — 33
   static const int edom = 33;
 
-  /// Math result not representable (ERANGE)
+  /// Math result not representable (ERANGE) — 34
   static const int erange = 34;
 
-  /// File name too long (ENAMETOOLONG)
+  /// Resource deadlock avoided (EDEADLK) — 35
+  static const int edeadlk = 35;
+
+  /// File name too long (ENAMETOOLONG) — 36
   static const int enametoolong = 36;
 
-  /// Function not implemented (ENOSYS)
+  /// No locks available (ENOLCK) — 37
+  static const int enolck = 37;
+
+  /// Function not implemented (ENOSYS) — 38
   static const int enosys = 38;
 
-  /// Directory not empty (ENOTEMPTY)
+  /// Directory not empty (ENOTEMPTY) — 39
   static const int enotempty = 39;
 
-  /// Too many symbolic links (ELOOP)
+  /// Too many symbolic links (ELOOP) — 40
   static const int eloop = 40;
 
   // ---------------------------------------------------------------------------
-  // Linux-specific / Legacy STREAMS Errors (45 - 87)
+  // Linux-specific / Legacy STREAMS Errors (45–57)
   // ---------------------------------------------------------------------------
 
-  /// Level 2 not synchronized (EL2NSYNC)
+  /// Level 2 not synchronized (EL2NSYNC) — 45
   static const int el2nsync = 45;
 
-  /// Level 3 halted (EL3HLT)
+  /// Level 3 halted (EL3HLT) — 46
   static const int el3hlt = 46;
 
-  /// Level 3 reset (EL3RST)
+  /// Level 3 reset (EL3RST) — 47
   static const int el3rst = 47;
 
-  /// Link number out of range (ELNRNG)
+  /// Link number out of range (ELNRNG) — 48
   static const int elnrng = 48;
 
-  /// Protocol driver not attached (EUNATCH)
+  /// Protocol driver not attached (EUNATCH) — 49
   static const int eunatch = 49;
 
-  /// No CSI structure available (ENOCSI)
+  /// No CSI structure available (ENOCSI) — 50
   static const int enocsi = 50;
 
-  /// Level 2 halted (EL2HLT)
+  /// Level 2 halted (EL2HLT) — 51
   static const int el2hlt = 51;
 
-  /// Invalid request code (EBADRQC)
+  /// Invalid request code (EBADRQC) — 56
   static const int ebadrqc = 56;
 
-  /// Invalid slot (EBADSLT)
+  /// Invalid slot (EBADSLT) — 57
   static const int ebadslt = 57;
 
   // ---------------------------------------------------------------------------
-  // Network / Socket Errors (88 - 115)
+  // Network / Socket Errors (88–116)
   // ---------------------------------------------------------------------------
 
-  /// Socket operation on non-socket (ENOTSOCK)
+  /// Socket operation on non-socket (ENOTSOCK) — 88
   static const int enotsock = 88;
 
-  /// Destination address required (EDESTADDRREQ)
+  /// Destination address required (EDESTADDRREQ) — 89
   static const int edestaddrreq = 89;
 
-  /// Message too long (EMSGSIZE)
+  /// Message too long (EMSGSIZE) — 90
   static const int emsgsize = 90;
 
-  /// Protocol wrong type for socket (EPROTOTYPE)
+  /// Protocol wrong type for socket (EPROTOTYPE) — 91
   static const int eprototype = 91;
 
-  /// Protocol not available (ENOPROTOOPT)
+  /// Protocol not available (ENOPROTOOPT) — 92
   static const int enoprotoopt = 92;
 
-  /// Protocol not supported (EPROTONOSUPPORT)
+  /// Protocol not supported (EPROTONOSUPPORT) — 93
   static const int eprotonosupport = 93;
 
-  /// Socket type not supported (ESOCKTNOSUPPORT)
+  /// Socket type not supported (ESOCKTNOSUPPORT) — 94
   static const int esocktnosupport = 94;
 
-  /// Operation not supported on transport endpoint (EOPNOTSUPP)
+  /// Operation not supported on transport endpoint (EOPNOTSUPP) — 95
   static const int eopnotsupp = 95;
 
-  /// Address family not supported by protocol (EAFNOSUPPORT)
+  /// Address family not supported by protocol (EAFNOSUPPORT) — 97
   static const int eafnosupport = 97;
 
-  /// Address already in use (EADDRINUSE)
+  /// Address already in use (EADDRINUSE) — 98
   static const int eaddrinuse = 98;
 
-  /// Cannot assign requested address (EADDRNOTAVAIL)
+  /// Cannot assign requested address (EADDRNOTAVAIL) — 99
   static const int eaddrnotavail = 99;
 
-  /// Network is down (ENETDOWN)
+  /// Network is down (ENETDOWN) — 100
   static const int enetdown = 100;
 
-  /// Network is unreachable (ENETUNREACH)
+  /// Network is unreachable (ENETUNREACH) — 101
   static const int enetunreach = 101;
 
-  /// Network dropped connection on reset (ENETRESET)
+  /// Network dropped connection on reset (ENETRESET) — 102
   static const int enetreset = 102;
 
-  /// Software caused connection abort (ECONNABORTED)
+  /// Software caused connection abort (ECONNABORTED) — 103
   static const int econnaborted = 103;
 
-  /// Connection reset by peer (ECONNRESET)
+  /// Connection reset by peer (ECONNRESET) — 104
   static const int econnreset = 104;
 
-  /// No buffer space available (ENOBUFS)
+  /// No buffer space available (ENOBUFS) — 105
   static const int enobufs = 105;
 
-  /// Transport endpoint is already connected (EISCONN)
+  /// Transport endpoint is already connected (EISCONN) — 106
   static const int eisconn = 106;
 
-  /// Transport endpoint is not connected (ENOTCONN)
+  /// Transport endpoint is not connected (ENOTCONN) — 107
   static const int enotconn = 107;
 
-  /// Cannot send after transport endpoint shutdown (ESHUTDOWN)
+  /// Cannot send after transport endpoint shutdown (ESHUTDOWN) — 108
   static const int eshutdown = 108;
 
-  /// Connection timed out (ETIMEDOUT)
+  /// Connection timed out (ETIMEDOUT) — 110
   static const int etimedout = 110;
 
-  /// Connection refused (ECONNREFUSED)
+  /// Connection refused (ECONNREFUSED) — 111
   static const int econnrefused = 111;
 
-  /// Host is down (EHOSTDOWN)
+  /// Host is down (EHOSTDOWN) — 112
   static const int ehostdown = 112;
 
-  /// No route to host (EHOSTUNREACH)
+  /// No route to host (EHOSTUNREACH) — 113
   static const int ehostunreach = 113;
 
-  /// Operation already in progress (EALREADY)
+  /// Operation already in progress (EALREADY) — 114
   static const int ealready = 114;
 
-  /// Operation now in progress (EINPROGRESS)
+  /// Operation now in progress (EINPROGRESS) — 115
   static const int einprogress = 115;
+
+  /// Stale file handle (ESTALE) — 116
+  ///
+  /// Common with NFS mounts; the file handle is no longer valid.
+  static const int estale = 116;
+
+  // ---------------------------------------------------------------------------
+  // Description map
+  // ---------------------------------------------------------------------------
 
   static const Map<int, String> _descriptions = {
     eperm: 'Operation not permitted',
@@ -240,6 +299,7 @@ abstract final class Errno {
     enomem: 'Out of memory',
     eacces: 'Permission denied',
     efault: 'Bad address',
+    enotblk: 'Block device required',
     ebusy: 'Device or resource busy',
     eexist: 'File exists',
     exdev: 'Cross-device link',
@@ -247,21 +307,24 @@ abstract final class Errno {
     enotdir: 'Not a directory',
     eisdir: 'Is a directory',
     einval: 'Invalid argument',
-    emfile: 'Too many open files',
     enfile: 'File table overflow',
-    enotty: 'Not a terminal',
+    emfile: 'Too many open files',
+    enotty: 'Inappropriate ioctl for device',
+    etxtbsy: 'Text file busy',
     efbig: 'File too large',
     enospc: 'No space left on device',
+    espipe: 'Illegal seek',
     erofs: 'Read-only file system',
+    emlink: 'Too many links',
     epipe: 'Broken pipe',
     edom: 'Math argument out of domain',
     erange: 'Math result not representable',
+    edeadlk: 'Resource deadlock avoided',
+    enametoolong: 'File name too long',
+    enolck: 'No locks available',
     enosys: 'Function not implemented',
     enotempty: 'Directory not empty',
     eloop: 'Too many symbolic links',
-    enametoolong: 'File name too long',
-
-    // Legacy / STREAMS
     el2nsync: 'Level 2 not synchronized',
     el3hlt: 'Level 3 halted',
     el3rst: 'Level 3 reset',
@@ -271,8 +334,6 @@ abstract final class Errno {
     el2hlt: 'Level 2 halted',
     ebadrqc: 'Invalid request code',
     ebadslt: 'Invalid slot',
-
-    // Network / Sockets
     enotsock: 'Socket operation on non-socket',
     edestaddrreq: 'Destination address required',
     emsgsize: 'Message too long',
@@ -299,68 +360,94 @@ abstract final class Errno {
     ehostunreach: 'No route to host',
     ealready: 'Operation already in progress',
     einprogress: 'Operation now in progress',
+    estale: 'Stale file handle',
   };
 
-  /// Returns the current thread-local `errno` value.
-  static int get current {
-    try {
-      return errno_ffi.getErrno();
-    } catch (_) {
-      return 0;
-    }
-  }
+  // ---------------------------------------------------------------------------
+  // Raw errno access
+  // ---------------------------------------------------------------------------
 
-  /// Sets the current thread-local `errno` value.
-  static set current(int value) {
-    try {
-      errno_ffi.setErrno(value);
-    } catch (_) {}
-  }
+  /// The current thread-local errno value.
+  ///
+  /// Prefer [capture] or [call] over reading this directly — by the time
+  /// Dart executes code after a native call, errno may already be stale.
+  static int get current => errno_ffi.getErrno();
 
-  /// Returns a descriptive string for a given errno [code].
-  static String describe(int code) =>
-      _descriptions[code] ?? 'Unknown error ($code)';
+  /// Overwrites the current thread-local errno value.
+  ///
+  /// Rarely needed in application code.
+  static set current(int value) => errno_ffi.setErrno(value);
 
-  /// Converts an errno [code] into a Dart [OSError].
-  static OSError toOSError(int code, [String? message]) =>
-      OSError(message ?? describe(code), code);
+  // ---------------------------------------------------------------------------
+  // Core safe-call API
+  // ---------------------------------------------------------------------------
 
-  /// Returns an [OSError] for the [current] errno value.
-  static OSError get currentOSError => toOSError(current);
+  /// Runs [operation] and returns its result alongside the errno value
+  /// captured **immediately** after the call — before any other code runs.
+  ///
+  /// This is the lowest-level safe building block. Prefer [call] for the
+  /// common case where you only need to throw on error.
+  ///
+  /// ```dart
+  /// final (fd, err) = Errno.capture(() => open(path, O_RDONLY));
+  /// if (fd < 0) {
+  ///   throw Errno.toOSError(err, 'open($path)');
+  /// }
+  /// ```
+  static (T result, int errno) capture<T>(T Function() operation) =>
+      errno_ffi.captureErrno(operation);
 
-  /// Wraps a native call and throws [currentOSError] if the return value satisfies [isError].
-  static T check<T>(
+  /// Runs [operation], captures errno atomically, and throws an [OSError]
+  /// if [isError] returns true for the result.
+  ///
+  /// The default [isError] predicate treats any negative [int] as an error,
+  /// which matches the POSIX convention. Supply a custom predicate for
+  /// functions that signal errors differently (e.g. returning `null` or `-1`
+  /// specifically).
+  ///
+  /// ```dart
+  /// // Standard POSIX: negative return → error.
+  /// final fd = Errno.call(() => open(path, O_RDONLY));
+  ///
+  /// // Custom predicate: only -1 is an error (not other negatives).
+  /// final n = Errno.call(
+  ///   () => read(fd, buf, len),
+  ///   isError: (r) => r == -1,
+  ///   message: 'read',
+  /// );
+  /// ```
+  ///
+  /// Throws [OSError] with the captured errno code on failure.
+  static T call<T>(
     T Function() operation, {
     bool Function(T result)? isError,
+    String? message,
   }) {
-    final result = operation();
-    final checkError = isError ?? (r) => r is int && r < 0;
+    final (result, errnoCode) = errno_ffi.captureErrno(operation);
+    final predicate = isError ?? (r) => r is int && (r as int) < 0;
 
-    if (checkError(result)) {
-      throw currentOSError;
+    if (predicate(result)) {
+      throw toOSError(errnoCode, message);
     }
 
     return result;
   }
 
-  /// Retries the [operation] if an [OSError] with a code in [retryOn] occurs.
-  static T retry<T>(
-    T Function() operation, {
-    required List<int> retryOn,
-    int maxRetries = 3,
-    Duration retryDelay = const Duration(milliseconds: 50),
-  }) {
-    var attempt = 0;
-    while (true) {
-      try {
-        return operation();
-      } on OSError catch (e) {
-        attempt++;
-        if (attempt > maxRetries || !retryOn.contains(e.errorCode)) {
-          rethrow;
-        }
-        sleep(retryDelay);
-      }
-    }
-  }
+  /// Returns a human-readable description for errno [code].
+  ///
+  /// Falls back to `'Unknown error (N)'` for unrecognised codes.
+  static String describe(int code) =>
+      _descriptions[code] ?? 'Unknown error ($code)';
+
+  /// Wraps errno [code] in a Dart [OSError].
+  ///
+  /// [message] defaults to [describe(code)] if omitted.
+  static OSError toOSError(int code, [String? message]) =>
+      OSError(message ?? describe(code), code);
+
+  /// An [OSError] for the [current] errno value.
+  ///
+  /// Only reliable immediately after a failed native call and before any
+  /// other code runs. Prefer [call] or [capture] in new code.
+  static OSError get currentOSError => toOSError(current);
 }
