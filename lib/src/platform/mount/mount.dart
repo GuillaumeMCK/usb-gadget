@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 
+import '/src/utils/bitwise.dart';
 import '../errno/errno.dart';
-import '../ffi_utils.dart';
 import 'mount.ffi.dart' as mount_lib;
 
 /// Singleton library loader for mount
@@ -116,7 +116,7 @@ enum FilesystemType {
 }
 
 /// Flags for filesystem mount operations
-enum MountFlag implements Flag {
+enum MountFlag implements BitFlag {
   /// Mount read-only
   rdOnly(mount_lib.MS_RDONLY),
 
@@ -187,7 +187,7 @@ enum MountFlag implements Flag {
 }
 
 /// Flags for unmount operations
-enum UnmountFlag implements Flag {
+enum UnmountFlag implements BitFlag {
   /// Force unmount (even if busy)
   force(mount_lib.MNT_FORCE),
 
@@ -283,17 +283,17 @@ abstract final class Mount {
     final flagValue = options.mountFlags.toBitmask();
 
     try {
-      final result = MountLibrary.instance.lib.mount(
-        sourcePtr.cast(),
-        targetPtr.cast(),
-        fsTypePtr.cast(),
-        flagValue,
-        dataPtr?.cast() ?? ffi.nullptr,
+      Errno.call(
+        () => MountLibrary.instance.lib.mount(
+          sourcePtr.cast(),
+          targetPtr.cast(),
+          fsTypePtr.cast(),
+          flagValue,
+          dataPtr?.cast() ?? ffi.nullptr,
+        ),
+        isError: (r) => r != 0,
+        message: 'mount(${options.target})',
       );
-
-      if (result != 0) {
-        throw Errno.currentOSError;
-      }
     } finally {
       malloc
         ..free(sourcePtr)
@@ -318,11 +318,11 @@ abstract final class Mount {
 
     final targetPtr = target.toNativeUtf8();
     try {
-      final result = MountLibrary.instance.lib.umount(targetPtr.cast());
-
-      if (result != 0) {
-        throw Errno.currentOSError;
-      }
+      Errno.call(
+        () => MountLibrary.instance.lib.umount(targetPtr.cast()),
+        isError: (r) => r != 0,
+        message: 'umount($target)',
+      );
     } finally {
       malloc.free(targetPtr);
     }
@@ -342,14 +342,14 @@ abstract final class Mount {
 
     final targetPtr = target.toNativeUtf8();
     try {
-      final result = MountLibrary.instance.lib.umount2(
-        targetPtr.cast(),
-        flags.toBitmask(),
+      Errno.call(
+        () => MountLibrary.instance.lib.umount2(
+          targetPtr.cast(),
+          flags.toBitmask(),
+        ),
+        isError: (r) => r != 0,
+        message: 'umount2($target)',
       );
-
-      if (result != 0) {
-        throw Errno.currentOSError;
-      }
     } finally {
       malloc.free(targetPtr);
     }
