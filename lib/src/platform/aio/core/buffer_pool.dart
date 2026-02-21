@@ -2,10 +2,6 @@ import 'dart:async';
 import 'dart:collection' show Queue;
 import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart';
-import 'package:usb_gadget/src/platform/aio/aio.dart'
-    show AioQueueFullException, AioStream;
-import 'package:usb_gadget/src/platform/platform.dart'
-    show AioQueueFullException, AioStream;
 import 'package:using/using.dart';
 
 /// A simple async semaphore that serialises access to a fixed number of
