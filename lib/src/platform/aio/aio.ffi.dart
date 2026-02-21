@@ -11,7 +11,8 @@ class Aio {
   _lookup;
 
   /// The symbols are looked up in [dynamicLibrary].
-  Aio(ffi.DynamicLibrary dynamicLibrary) : _lookup = dynamicLibrary.lookup;
+  Aio([ffi.DynamicLibrary? dynamicLibrary])
+    : _lookup = (dynamicLibrary ?? ffi.DynamicLibrary.open('libaio.so')).lookup;
 
   /// The symbols are looked up with [lookup].
   Aio.fromLookup(
