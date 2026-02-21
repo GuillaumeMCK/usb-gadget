@@ -2,132 +2,128 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:using/using.dart';
+
 import '/src/platform/platform.dart';
 import '/usb_gadget.dart';
 
 /// Base class for FunctionFs endpoint file descriptors.
 ///
-/// Manages the lifecycle (open, close, halt) for USB endpoints
-/// exposed via the Linux FunctionFs interface.
+/// Manages the low-level lifecycle (open, close, halt) for USB endpoints
+/// exposed via the Linux FunctionFs (FFS) interface.
 abstract class EndpointFile with USBGadgetLogger {
-  /// Creates an endpoint file manager for [path].
+  /// Creates an endpoint file manager for the specified [path].
   EndpointFile(this.path) {
     if (path.isEmpty) {
       throw ArgumentError.value(path, 'path', 'Path cannot be empty');
     }
   }
 
-  /// The path to the endpoint file (e.g., '/dev/usb-ffs/ep1').
+  /// The absolute path to the endpoint file (e.g., `/dev/ffs/<name>/ep1`).
   final String path;
 
-  /// The underlying file descriptor.
+  /// The raw Linux file descriptor assigned to this endpoint.
+  ///
+  /// This is `null` until the endpoint is successfully opened.
   int? _fd;
 
-  /// Opens the endpoint file with appropriate flags.
+  /// Returns the current file descriptor or `null` if the endpoint is closed.
+  int? get fd => _fd;
+
+  /// Opens the endpoint file with appropriate system flags.
   ///
-  /// Sets the internal file descriptor upon success.
-  /// Throws [OSError] if the underlying C `open` call fails.
+  /// Implementation varies by endpoint type (Read, Write, or RDWR).
+  /// Throws [OSError] if the system `open` call fails.
   /// Throws [StateError] if already open.
   Future<void> open();
 
-  /// Closes the underlying file descriptor.
+  /// Closes the underlying file descriptor and releases kernel resources.
   ///
-  /// Clears the internal file descriptor after closing.
-  /// Safe to call multiple times (idempotent).
+  /// Clears the internal file descriptor after closing. This is idempotent.
   Future<void> close();
 
-  /// Halts (STALLs) the endpoint.
+  /// Signals a protocol STALL (Halt) to the USB host.
   ///
-  /// The implementation differs based on endpoint type.
-  /// Throws [StateError] if endpoint is not open.
+  /// Throws [StateError] if the endpoint is not open.
+  /// Note: [EndpointOutFile] overrides this to throw [UnsupportedError]
+  /// unconditionally, as manual STALL is not supported for OUT endpoints.
   void halt();
 
-  /// Flushes the FIFO buffer.
+  /// Discards any pending data currently residing in the endpoint's FIFO buffer.
   ///
-  /// Discards any pending data in the endpoint's FIFO.
-  ///
-  /// Throws [StateError] if endpoint is not open.
-  /// Throws [OSError] if ioctl fails.
+  /// Throws [StateError] if the endpoint is not open.
+  /// Throws [OSError] if the `ioctl` call fails.
   void flushFIFO() {
-    if (_fd == null) {
+    if (fd == null) {
       throw StateError('Cannot flush FIFO: Endpoint is not open');
     }
-    Ioctl.call(_fd!, .fifoFlush);
+    Ioctl.call(fd!, .fifoFlush);
   }
 
-  /// Gets the FIFO status (number of bytes in buffer).
+  /// Queries the kernel for the number of bytes currently in the endpoint's FIFO.
   ///
-  /// Returns the number of bytes currently in the endpoint's FIFO.
-  ///
-  /// Throws [StateError] if endpoint is not open.
-  /// Throws [OSError] if ioctl fails.
+  /// Returns the byte count or throws [OSError] if the `ioctl` fails.
   int getFIFOStatus() {
-    if (_fd == null) {
+    if (fd == null) {
       throw StateError('Cannot get FIFO status: Endpoint is not open');
     }
-    final result = Ioctl.call(_fd!, .fifoStatus);
-    if (result < 0) {
-      throw Errno.toOSError(result);
-    }
-    return result;
+    // Ioctl.call() already throws OSError on any negative return value.
+    return Ioctl.call(fd!, .fifoStatus);
   }
 
-  /// The file descriptor for this endpoint.
-  ///
-  /// Returns `null` if the file is not currently open.
-  int? get fd => _fd;
-
   @override
-  String toString() => 'EndpointFile(path: $path)';
+  String toString() => 'EndpointFile(path: $path, open: ${_fd != null})';
 }
 
 /// Manages the USB control endpoint (EP0) for FunctionFs.
-class EndpointControlFile extends EndpointFile {
+///
+/// Handles the FunctionFs mount lifecycle and provides a broadcast stream
+/// for USB setup events (BIND, ENABLE, SETUP, etc.).
+final class EndpointControlFile extends EndpointFile with Releasable {
+  /// Creates a control endpoint manager with mounting capabilities.
   EndpointControlFile(
     super.path, {
     required String mountPoint,
     required String mountSource,
-    FunctionFsMountConfig? mountConfig,
   }) : _mount = FunctionFsMount(
          mountPoint: mountPoint,
          mountSource: mountSource,
          ep0Path: path,
-         config: mountConfig,
        );
 
-  /// Mount manager for the FunctionFs filesystem.
+  /// Event buffer size for polling (48 bytes = 4 events of 12 bytes each).
+  ///
+  /// Reading multiple events at once reduces syscall overhead during enumeration.
+  static const int eventBufferSize = 4 * FunctionFsEvent.size;
+
+  /// The mount manager responsible for the `functionfs` filesystem.
   final FunctionFsMount _mount;
 
-  /// Stream controller for event broadcasting.
+  /// Broadcast controller for emitting [FunctionFsEvent] objects.
   StreamController<FunctionFsEvent>? _streamController;
 
-  /// Timer for polling EP0 events.
+  /// Periodic timer that reads from the non-blocking EP0 file descriptor
+  /// at a fixed interval to deliver kernel USB events to the stream.
   Timer? _pollingTimer;
 
-  /// Whether event reading is active.
+  /// Internal flag to track if the polling loop is active.
   bool _eventReadingActive = false;
 
-  /// Whether the mount point exists and appears to be mounted.
+  /// Indicates if the FunctionFs backing store is currently mounted.
   bool get isMounted => _mount.isMounted;
 
-  /// Mount point for FunctionFs filesystem.
+  /// The directory where FunctionFs is mounted.
   String get mountPoint => _mount.mountPoint;
-
-  /// Mount configuration.
-  FunctionFsMountConfig get mountConfig => _mount.config;
 
   @override
   Future<void> open() async {
-    if (_fd != null) {
-      throw StateError('Endpoint is already open');
-    }
+    if (_fd != null) throw StateError('Endpoint is already open');
 
-    await _mount.ensureMounted();
-
+    _mount.ensure();
     try {
-      _fd = Unistd.open(path, const [OpenFlag.rdWr, OpenFlag.nonBlock]);
+      _fd = Unistd.open(path, const [.rdWr, .nonBlock]);
     } on OSError catch (e) {
-      _mount.cleanupIfNeeded();
+      _mount.unmount();
       throw StateError(
         'Failed to open EP0 at $path: ${e.message} (errno: ${e.errorCode})',
       );
@@ -136,289 +132,211 @@ class EndpointControlFile extends EndpointFile {
 
   @override
   Future<void> close() async {
-    final fd = _fd;
-    if (fd == null) return;
+    if (_fd == null) return;
+    super.release();
 
-    // Stop event reading
     _eventReadingActive = false;
     _pollingTimer?.cancel();
     _pollingTimer = null;
 
-    // Close stream controller
     await _streamController?.close();
     _streamController = null;
 
-    // Close file descriptor
     try {
-      Unistd.close(fd);
+      Unistd.close(_fd!);
     } on OSError catch (e) {
       log?.error('Failed to close EP0 file descriptor: ${e.message}');
     } finally {
       _fd = null;
     }
 
-    // Cleanup mount if configured
-    _mount.cleanupIfNeeded();
+    _mount.unmount();
   }
 
-  /// Sends a STALL response to the host.
-  ///
-  /// EP0 STALL behavior depends on the transfer direction:
-  /// - For IN transfers (device→host): Write 0 bytes
-  /// - For OUT transfers (host→device): Read 0 bytes
-  ///
-  /// However, since we typically don't know the direction when calling halt(),
-  /// and reading 0 bytes is more commonly used for STALL in examples,
-  /// we use read(0) as the default STALL mechanism.
-  ///
-  /// Used for:
-  /// - Invalid or unsupported control requests
-  /// - Malformed requests
-  /// - Requests the device cannot fulfill
-  ///
-  /// Throws [StateError] if endpoint is not open.
+  /// Sends a STALL response to the host via a 0-length read.
   @override
   void halt() {
-    if (_fd == null) {
-      throw StateError('Cannot halt: Endpoint is not open');
-    }
+    if (fd == null) throw StateError('Cannot halt: Endpoint is not open');
+
     try {
-      // Reading 0 bytes on EP0 sends STALL to host (works for most cases)
-      Unistd.read(_fd!, 0);
+      Unistd.read(fd!, 0);
     } on OSError catch (e) {
-      // Handle common errors gracefully
-      if (e.errorCode == Errno.epipe) {
-        log?.warn('Cannot halt: Broken pipe (host disconnected)');
-      } else if (e.errorCode == Errno.eshutdown) {
-        log?.warn('Cannot halt: Endpoint is shut down');
-      } else if (e.errorCode == Errno.enotconn) {
-        log?.warn('Cannot halt: Not connected');
-      } else if (e.errorCode == Errno.el2hlt) {
-        log?.warn('Cannot halt: Transfer already completed (EL2HLT)');
+      final code = e.errorCode;
+      if (const [Errno.epipe, Errno.eshutdown, Errno.enotconn].contains(code)) {
+        log?.warn('Halt ignored: Host disconnected (${e.errorCode})');
       } else {
-        log?.error('Failed to halt EP0: ${e.message}');
         rethrow;
       }
     }
   }
 
-  /// Writes data to EP0 (blocking, retries on EAGAIN).
-  ///
-  /// Used for:
-  /// - Writing descriptors during setup
-  /// - Sending responses to GET_DESCRIPTOR requests
-  /// - Returning data for IN control transfers
-  ///
-  /// This method will block until all data is written or an error occurs.
-  /// EAGAIN errors are retried automatically.
-  ///
-  /// Throws [StateError] if endpoint is not open.
-  /// Throws [OSError] on unrecoverable write errors.
+  /// Performs a synchronous write to EP0, retrying on `EAGAIN`.
   void write(Uint8List data) {
-    assert(_fd != null, 'write: Endpoint is not open');
+    final currentFd = _fd;
+    if (currentFd == null) throw StateError('write: Endpoint is not open');
+
     var offset = 0;
     while (offset < data.length) {
       try {
-        offset += Unistd.write(_fd!, data.sublist(offset));
+        offset += Unistd.write(currentFd, data.sublist(offset));
       } on OSError catch (e) {
-        if (e.errorCode == Errno.eagain) {
-          // Retry on EAGAIN (would block)
-          continue;
-        }
-        log?.error('Failed to write to EP0: ${Errno.describe(e.errorCode)}');
+        if (e.errorCode == Errno.eagain) continue;
         rethrow;
       }
     }
   }
 
-  /// Reads up to [length] bytes from EP0 (non-blocking).
-  ///
-  /// Used for:
-  /// - Reading data from SET_REPORT or other OUT transfers
-  ///
-  /// Returns empty list if no data available (EAGAIN).
-  /// Does NOT block waiting for data.
-  ///
-  /// Throws [StateError] if endpoint is not open.
-  /// Throws [OSError] on unrecoverable read errors.
-  /// Throws [ArgumentError] if length is negative.
+  /// Reads up to [length] bytes from EP0 in non-blocking mode.
   Uint8List read(int length) {
-    assert(_fd != null, 'read: Endpoint is not open');
-    try {
-      return Unistd.read(_fd!, length);
-    } on OSError catch (e) {
-      log?.error('Failed to read from EP0: ${e.message}');
-      rethrow;
-    }
+    if (_fd == null) throw StateError('read: Endpoint is not open');
+    return Unistd.read(_fd!, length);
   }
 
-  /// ACK response to the host (zero-length packet).
-  ///
-  /// Used to acknowledge successful processing of a endpoint request without
-  /// sending additional data.
-  ///
-  /// Throws [StateError] if endpoint is not open.
-  /// Throws [OSError] on write failure.
+  /// Acknowledges a host request with a Zero-Length Packet (ZLP).
   void ack() {
-    if (_fd == null) {
-      throw StateError('Cannot ACK: Endpoint is not open');
-    }
-    try {
-      Unistd.write(_fd!, Uint8List(0));
-    } on OSError catch (e) {
-      log?.error('Failed to send ACK on EP0: ${e.message}');
-      rethrow;
-    }
+    if (fd == null) throw StateError('Cannot ACK: Endpoint is not open');
+    Unistd.write(fd!, Uint8List(0));
   }
 
-  /// Event buffer size (48 bytes = 4 events of 12 bytes each).
-  ///
-  /// Reading multiple events at once reduces overhead.
-  static const int eventBufferSize = 4 * FunctionFsEvent.size;
+  /// A broadcast stream emitting control events from the kernel.
+  Stream<FunctionFsEvent> get stream {
+    if (_fd == null) throw StateError('Cannot create stream: EP0 not open');
 
-  /// Creates a broadcast stream of FunctionFs events.
-  ///
-  /// EP0 supports multiple stream listeners (broadcast semantics).
-  /// The stream is cached and reused for all listeners.
-  ///
-  /// Events include:
-  /// - BIND: Function bound to UDC
-  /// - UNBIND: Function unbound from UDC
-  /// - ENABLE: Host configured device
-  /// - DISABLE: Host de-configured device
-  /// - SETUP: Control transfer request from host
-  /// - SUSPEND: Bus suspended
-  /// - RESUME: Bus resumed
-  ///
-  /// The stream uses polling for event-driven I/O with minimal latency.
-  /// Errors are reported through the stream's error channel.
-  ///
-  /// The stream automatically closes when:
-  /// - The endpoint is closed via close()
-  /// - All listeners have canceled their subscriptions
-  /// - An unrecoverable error occurs
-  ///
-  /// Throws [StateError] if endpoint is not open.
-  Stream<FunctionFsEvent> stream() {
-    if (_fd == null) {
-      throw StateError('Cannot create stream: Endpoint is not open');
-    }
-
-    // Return existing stream if already created
     final controller = _streamController;
     if (controller != null && !controller.isClosed) {
       return controller.stream;
     }
 
-    _streamController ??= .broadcast(
-      onListen: _startEventReading,
-      onCancel: _stopEventReading,
+    _streamController ??= StreamController.broadcast(
+      onListen: _startReading,
+      onCancel: _stopReading,
     );
     return _streamController!.stream;
   }
 
-  /// Starts event reading from EP0 using synchronous polling with a Timer.
-  ///
-  /// EP0 does NOT support Linux AIO, so we use synchronous reads
-  /// with a polling timer. The file descriptor is opened with O_NONBLOCK
-  /// to prevent blocking on reads when no events are available.
-  void _startEventReading() {
-    assert(_fd != null, '_startEventReading: Endpoint is not open');
-    assert(
-      _streamController != null,
-      '_startEventReading: Stream controller is null',
-    );
-    if (_eventReadingActive) {
-      return; // Already active
-    }
+  void _startReading() {
+    if (_eventReadingActive) return;
     _eventReadingActive = true;
 
-    // Use a timer to poll for events (10ms interval for low latency)
-    _pollingTimer ??= Timer.periodic(const .new(milliseconds: 10), (_) {
+    _pollingTimer ??= .periodic(const Duration(milliseconds: 10), (_) {
       try {
-        // Try to read events (non-blocking)
         final data = Unistd.read(_fd!, eventBufferSize);
         const offset = FunctionFsEvent.size;
-        // Parse and emit events
-        try {
-          for (var i = 0; i + offset <= data.length; i += offset) {
-            _streamController?.add(.fromBytes(data.sublist(i, i + offset)));
-          }
-        } catch (e, st) {
-          log?.error('Failed to parse FunctionFs event', e, st);
-          _streamController?.addError(e, st);
+        for (var i = 0; i + offset <= data.length; i += offset) {
+          _streamController?.add(.fromBytes(data.sublist(i, i + offset)));
         }
-      } on OSError catch (err, st) {
-        switch (err.errorCode) {
-          case Errno.eagain:
-            // No data available, this is normal for non-blocking I/O
-            return;
-          default:
-            log?.error(
-              'Error reading EP0 ${Errno.describe(err.errorCode)}',
-              err,
-              st,
-            );
-            _stopEventReading();
-            _streamController?.addError(err, st);
+      } on OSError catch (err) {
+        if (err.errorCode != Errno.eagain) {
+          _streamController?.addError(err);
         }
       }
     });
   }
 
-  /// Stops event reading.
-  Future<void> _stopEventReading() async {
+  void _stopReading() {
     _eventReadingActive = false;
     _pollingTimer?.cancel();
     _pollingTimer = null;
   }
 }
 
-/// Manages a USB IN endpoint (device-to-host).
+/// Manages a USB IN endpoint (device-to-host) using Linux AIO.
 ///
-/// IN endpoints send data from the device to the host.
-/// Common uses:
-/// - HID input reports (keyboard, mouse, gamepad)
-/// - Bulk data transfers (file uploads)
-/// - Interrupt notifications
-class EndpointInFile extends EndpointFile {
-  EndpointInFile(super.path);
+/// Provides high-performance asynchronous writes with automatic buffer
+/// management and backpressure handling.
+final class EndpointInFile extends EndpointFile with Releasable {
+  /// Creates an IN endpoint with optional custom AIO instance.
+  EndpointInFile(super.path, {required this.config})
+    : _aio = .fromEndpointConfig(config);
 
-  /// AIO writer for high-throughput async writes.
-  AioWriter? _writer;
+  /// Endpoint configuration defining transfer characteristics.
+  final EndpointConfig config;
+
+  /// AIO context for asynchronous operations.
+  Aio? _aio;
+
+  /// Writer sink for asynchronous writes.
+  AioSink? _sink;
 
   @override
   Future<void> open() async {
-    if (_fd != null) {
-      throw StateError('Endpoint is already open');
-    }
+    if (_fd != null) return;
 
-    try {
-      _fd = Unistd.open(path, const [OpenFlag.wrOnly]);
-    } on OSError catch (e) {
-      throw StateError(
-        'Failed to open IN endpoint at $path: ${e.message} (errno: ${e.errorCode})',
-      );
-    }
+    _fd = Unistd.open(path, const [.wrOnly]);
+
+    // Create AIO context if not provided
+    _aio ??= Aio.fromEndpointConfig(config);
+
+    // Create writer sink for this endpoint
+    _sink ??= _aio!.createWriter(
+      _fd!,
+      config: switch (config) {
+        BulkEndpointConfig() => const .new(
+          maxQueueSize: 64,
+          backpressure: .block,
+        ),
+        ControlEndpointConfig() => const .new(
+          maxQueueSize: 16,
+          backpressure: .block,
+        ),
+        IsochronousEndpointConfig() => const .new(
+          maxQueueSize: 32,
+          backpressure: .dropOldest,
+        ),
+        InterruptEndpointConfig() => const .new(
+          maxQueueSize: 16,
+          backpressure: .dropOldest,
+        ),
+      },
+    );
   }
 
   @override
   Future<void> close() async {
     if (_fd == null) return;
+    super.release();
 
-    // Flush any pending writes before releasing
-    await _writer?.flush();
-    _writer?.release();
-    _writer = null;
+    // Close and wait for pending writes
+    await _sink?.close();
+    _sink = null;
 
-    // Close file descriptor
-    try {
-      Unistd.close(_fd!);
-    } on OSError {
-      // Silently ignore errors during cleanup
-    } finally {
-      _fd = null;
-    }
+    // Release AIO
+    _aio?.release();
+    _aio = null;
+
+    Unistd.close(_fd!);
+    _fd = null;
+  }
+
+  @override
+  void halt() {
+    if (_fd != null) Unistd.write(_fd!, Uint8List(0));
+  }
+
+  /// Enqueues [data] for asynchronous transmission to the host.
+  ///
+  /// The data is handed off to the [AioSink] and transmitted via Linux AIO.
+  /// Backpressure behaviour is determined by the AIO configuration.
+  ///
+  /// Throws [StateError] if endpoint is not open.
+  void write(Uint8List data) {
+    if (_sink == null) throw StateError('Endpoint not open');
+    _sink!.add(data);
+  }
+
+  /// Flushes all pending writes and waits for completion.
+  ///
+  /// Closes the current [AioSink] (draining all queued operations) and then
+  /// reopens a fresh sink so the endpoint can continue to be used.
+  /// Returns a future that completes when all queued data has been
+  /// transmitted to the host.
+  Future<void> flush() async {
+    if (_sink == null) return;
+    final config = _sink!.config;
+    await _sink!.close();
+    _sink = null;
+    // Reopen sink for continued use
+    _sink ??= _aio!.createWriter(_fd!, config: config);
   }
 
   /// Clears the halt (STALL) condition on the endpoint.
@@ -447,262 +365,82 @@ class EndpointInFile extends EndpointFile {
       );
     }
   }
-
-  @override
-  void halt() {
-    if (_fd == null) {
-      throw StateError('Cannot halt: Endpoint is not open');
-    }
-    try {
-      // Writing 0 bytes to IN endpoint sends STALL to host
-      Unistd.write(_fd!, Uint8List(0));
-    } on OSError catch (e) {
-      switch (e.errorCode) {
-        case Errno.epipe:
-          throw StateError(
-            'Cannot halt IN endpoint: Host disconnected (EPIPE)',
-          );
-        case Errno.eshutdown:
-          throw StateError(
-            'Cannot halt IN endpoint: Endpoint is shut down (ESHUTDOWN)',
-          );
-        case Errno.enotconn:
-          throw StateError('Cannot halt IN endpoint: Not connected (ENOTCONN)');
-        default:
-          throw StateError(
-            'Failed to halt IN endpoint: ${e.message} (errno: ${e.errorCode})',
-          );
-      }
-    }
-  }
-
-  /// Synchronous write (blocking).
-  ///
-  /// Writes data to the endpoint. Blocks until all data is written or an
-  /// error occurs. For high-throughput scenarios, use [writeAsync] instead.
-  ///
-  /// Throws [StateError] if endpoint is not open.
-  /// Throws [OSError] on write failure.
-  void write(Uint8List data) {
-    assert(_fd != null, 'write: Endpoint is not open');
-    Unistd.write(_fd!, data);
-  }
-
-  /// Asynchronous write using Linux AIO for high throughput.
-  ///
-  /// Automatically creates and manages an internal [AioWriter] instance.
-  /// Much more efficient than [write] for large data transfers or
-  /// high-frequency updates.
-  ///
-  /// Parameters:
-  /// - [data]: Data to write
-  /// - [bufferSize]: Size of each AIO buffer (default: 16KB)
-  /// - [concurrency]: Number of concurrent operations (default: 4)
-  ///
-  /// Note: [bufferSize] and [concurrency] are locked after the first call.
-  /// Subsequent calls with different values will use the original configuration.
-  ///
-  /// Returns a Future that completes with the number of bytes written.
-  ///
-  /// Throws [StateError] if endpoint is not open.
-  /// Throws [ArgumentError] if buffer parameters are invalid.
-  Future<int> writeAsync(
-    Uint8List data, {
-    int bufferSize = 16384,
-    int concurrency = 1,
-    Duration? interval,
-  }) {
-    assert(_fd != null, 'writeAsync: Endpoint is not open');
-    assert(bufferSize > 0, 'Buffer size must be positive');
-    assert(concurrency > 0, 'Concurrency must be positive');
-
-    _writer ??= AioWriter(
-      _fd!,
-      AioConfig(
-        bufferSize: bufferSize,
-        maxConcurrent: concurrency,
-        interval: interval ?? const .new(milliseconds: 1),
-      ),
-    );
-
-    return _writer!.write(data);
-  }
-
-  /// Flushes all pending asynchronous writes.
-  ///
-  /// Waits for all queued AIO operations to complete.
-  /// Safe to call even if no async writes are pending.
-  Future<void> flush() => _writer?.flush() ?? Future.value();
 }
 
-/// Manages a USB OUT endpoint (host-to-device).
-class EndpointOutFile extends EndpointFile {
-  EndpointOutFile(super.path, {required this.config});
+/// Manages a USB OUT endpoint (host-to-device) using Linux AIO.
+///
+/// Provides high-performance asynchronous reads with automatic buffer
+/// management and demand-driven backpressure.
+final class EndpointOutFile extends EndpointFile with Releasable {
+  /// Creates an OUT endpoint with optional custom AIO instance.
+  EndpointOutFile(super.path, {required this.config})
+    : _aio = .fromEndpointConfig(config);
 
-  /// Endpoint configuration (transfer type, packet size, etc.)
+  /// Endpoint configuration defining transfer characteristics.
   final EndpointConfig config;
 
-  /// Transfer type for this endpoint.
-  TransferType get transferType => config.transferType;
+  /// AIO context for asynchronous operations.
+  Aio? _aio;
 
-  /// AIO reader for high-throughput async reads.
-  AioReader? _reader;
-
-  /// Cached broadcast stream.
-  StreamController<Uint8List>? _streamController;
-
-  /// Subscription to the reader stream.
-  StreamSubscription<Uint8List>? _readerSubscription;
+  /// Reader stream for asynchronous reads.
+  AioStream? _reader;
 
   @override
   Future<void> open() async {
-    if (_fd != null) {
-      throw StateError('Endpoint is already open');
-    }
+    if (_fd != null) return;
 
-    try {
-      _fd = Unistd.open(path, const [OpenFlag.rdOnly]);
-    } on OSError catch (e) {
-      throw StateError(
-        'Failed to open OUT endpoint at $path: ${e.message} (errno: ${e.errorCode})',
-      );
-    }
+    _fd = Unistd.open(path, const [.rdOnly]);
+
+    // Create AIO context if not provided
+    _aio ??= Aio.fromEndpointConfig(config);
+
+    // Create reader stream for this endpoint
+    _reader ??= _aio!.createReader(
+      _fd!,
+      maxInflight: switch (config) {
+        BulkEndpointConfig() => 16,
+        IsochronousEndpointConfig() => 8,
+        InterruptEndpointConfig() => 4,
+        ControlEndpointConfig() => 2,
+      },
+    );
   }
 
   @override
   Future<void> close() async {
     if (_fd == null) return;
+    super.release();
 
-    await _readerSubscription?.cancel();
-    _readerSubscription = null;
-
-    await _streamController?.close();
-    _streamController = null;
-
+    // Release reader stream
     _reader?.release();
     _reader = null;
 
-    try {
-      Unistd.close(_fd!);
-    } on OSError {
-      // Silently ignore errors during cleanup
-    } finally {
-      _fd = null;
-    }
+    // Release AIO
+    _aio?.release();
+    _aio = null;
+
+    Unistd.close(_fd!);
+    _fd = null;
   }
 
-  /// Cannot halt OUT endpoints in FunctionFs.
-  ///
-  /// OUT endpoints use a 'no-stall' approach in USB Bulk-Only spec
-  /// to avoid race conditions. The host controls data flow on OUT
-  /// endpoints, not the device.
-  ///
-  /// Always throws [UnsupportedError].
   @override
-  void halt() => throw UnsupportedError(
-    'Cannot halt OUT endpoints in FunctionFs. '
-    'The host controls data flow on OUT endpoints.',
-  );
+  void halt() => throw UnsupportedError('Manual STALL not supported for OUT');
 
-  /// Synchronous read (non-blocking).
+  /// Stream of data from the host.
   ///
-  /// Attempts to read up to [length] bytes. Returns immediately with
-  /// available data or empty list if no data available (EAGAIN).
+  /// The stream automatically manages backpressure - pausing the stream
+  /// will stop submitting new read operations to the kernel, and resuming
+  /// will restart them. This provides natural flow control.
   ///
-  /// For continuous reading, use [stream] instead which is much more
-  /// efficient and handles backpressure automatically.
-  ///
-  /// Throws [StateError] if endpoint is not open.
-  /// Throws [ArgumentError] if length is negative.
-  Uint8List read(int length) {
-    assert(_fd != null, 'read: Endpoint is not open');
-    try {
-      return Unistd.read(_fd!, length);
-    } on OSError catch (e) {
-      switch (e.errorCode) {
-        case Errno.eagain:
-          // No data available, return empty list
-          return Uint8List(0);
-        default:
-          throw StateError(
-            'Failed to read from OUT endpoint: ${e.message} (errno: ${e.errorCode})',
-          );
-      }
-    }
-  }
-
-  /// Creates a broadcast stream using Linux AIO for high throughput.
-  ///
-  /// **IMPORTANT**: The stream can have multiple listeners (broadcast semantics),
-  /// but the underlying AIO reader is created once and shared. The buffer
-  /// configuration is locked after the first call to this method.
-  ///
-  /// The stream automatically handles:
-  /// - Transfer-type-specific error conditions
-  /// - Backpressure management
-  /// - Buffer allocation and reuse
-  /// - Isochronous timing errors (stops reading)
-  /// - Aborted bulk/interrupt transfers (ignores)
-  ///
-  /// Parameters:
-  /// - [concurrency]: Number of concurrent AIO operations (default: 4)
-  ///   More concurrency = better throughput but more memory
-  ///
-  /// Buffer size is determined automatically based on transfer type:
-  /// - Bulk: 16KB
-  /// - Interrupt: 64 bytes
-  /// - Isochronous: 1KB
-  /// - Control: 64 bytes
-  /// - Or uses maxPacketSize from config if specified
-  ///
-  /// Throws [StateError] if endpoint is not open.
-  /// Throws [ArgumentError] if concurrency is invalid.
-  Stream<Uint8List> stream([Duration? interval, int concurrency = 1]) {
-    assert(_fd != null, 'stream: Endpoint is not open');
-    assert(concurrency > 0, 'Concurrency must be positive');
-
-    // Return cached stream if already created
-    if (_streamController?.isClosed == false) {
-      return _streamController!.stream;
-    }
-
-    final bufferSize = switch (transferType) {
-      _ when config.maxPacketSize != null => config.maxPacketSize!,
-      .bulk => 16384,
-      .interrupt => 64,
-      .isochronous => 1024,
-      .control => 64,
-    };
-
-    _reader ??= AioReader(
-      _fd!,
-      AioConfig(
-        bufferSize: bufferSize,
-        maxConcurrent: concurrency,
-        interval: interval ?? const .new(milliseconds: 10),
-      ),
-    );
-
-    _streamController ??= .broadcast();
-
-    // Store subscription so we can cancel it later
-    _readerSubscription ??= _reader?.stream.listen(
-      (data) {
-        if (_streamController != null && !_streamController!.isClosed) {
-          _streamController!.add(data);
-        }
-      },
-      onError: (Object error, StackTrace stackTrace) {
-        if (_streamController != null && !_streamController!.isClosed) {
-          _streamController!.addError(error, stackTrace);
-        }
-      },
-      onDone: () {
-        _streamController?.close();
-      },
-      cancelOnError: false,
-    );
-
-    return _streamController!.stream;
+  /// Example:
+  /// ```dart
+  /// await for (final data in endpoint.stream) {
+  ///   // Process data...
+  ///   // Stream pauses automatically if processing is slow
+  /// }
+  /// ```
+  Stream<Uint8List> get stream {
+    if (_reader == null) throw StateError('Endpoint not open');
+    return _reader!.stream;
   }
 }
