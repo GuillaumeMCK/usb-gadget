@@ -1,8 +1,8 @@
 import 'dart:ffi' as ffi;
 import 'dart:io' show OSError;
 
+import '/src/utils/bitwise.dart';
 import '../errno/errno.dart';
-import '../ffi_utils.dart';
 import 'ioctl.ffi.dart' as ioctl_lib;
 
 /// Singleton library loader for ioctl
@@ -43,7 +43,7 @@ class _IoctlVariadic {
 /// FunctionFs ioctl request identifiers
 ///
 /// These ioctls are used with the FunctionFs (USB Gadget) subsystem.
-enum IoctlRequest implements Flag {
+enum IoctlRequest implements BitFlag {
   /// Get FIFO status
   fifoStatus(ioctl_lib.FUNCTIONFS_FIFO_STATUS, 'FIFO_STATUS'),
 
@@ -84,7 +84,7 @@ enum IoctlRequest implements Flag {
 
 /// Result of an ioctl operation
 class IoctlResult {
-  const IoctlResult(this.value);
+  const IoctlResult(this.value, [this.errorCode = 0]);
 
   final int value;
 
@@ -94,8 +94,8 @@ class IoctlResult {
   /// Whether the operation failed
   bool get isError => value < 0;
 
-  /// Error code if operation failed (0 if successful)
-  int get errorCode => isError ? Errno.current : 0;
+  /// Errno code captured atomically at call time (0 if successful).
+  final int errorCode;
 
   @override
   String toString() =>
@@ -119,13 +119,10 @@ abstract final class Ioctl {
       throw ArgumentError.value(fd, 'fd', 'Must be non-negative');
     }
 
-    final result = IoctlLibrary.instance.lib.ioctl(fd, request.value);
-
-    if (result < 0) {
-      throw Errno.currentOSError;
-    }
-
-    return result;
+    return Errno.call(
+      () => IoctlLibrary.instance.lib.ioctl(fd, request.value),
+      message: request.name,
+    );
   }
 
   /// Perform an ioctl call with no argument (returns result without throwing)
@@ -136,7 +133,10 @@ abstract final class Ioctl {
       throw ArgumentError.value(fd, 'fd', 'Must be non-negative');
     }
 
-    return IoctlResult(IoctlLibrary.instance.lib.ioctl(fd, request.value));
+    final (value, errno) = Errno.capture(
+      () => IoctlLibrary.instance.lib.ioctl(fd, request.value),
+    );
+    return IoctlResult(value, value < 0 ? errno : 0);
   }
 
   /// Perform an ioctl call with an integer argument
@@ -153,13 +153,10 @@ abstract final class Ioctl {
       throw ArgumentError.value(fd, 'fd', 'Must be non-negative');
     }
 
-    final result = _IoctlVariadic.callWithInt(fd, request.value, arg);
-
-    if (result < 0) {
-      throw Errno.currentOSError;
-    }
-
-    return result;
+    return Errno.call(
+      () => _IoctlVariadic.callWithInt(fd, request.value, arg),
+      message: request.name,
+    );
   }
 
   /// Perform an ioctl call with an integer argument (returns result without throwing)
@@ -168,7 +165,10 @@ abstract final class Ioctl {
       throw ArgumentError.value(fd, 'fd', 'Must be non-negative');
     }
 
-    return IoctlResult(_IoctlVariadic.callWithInt(fd, request.value, arg));
+    final (value, errno) = Errno.capture(
+      () => _IoctlVariadic.callWithInt(fd, request.value, arg),
+    );
+    return IoctlResult(value, value < 0 ? errno : 0);
   }
 
   /// Perform an ioctl call with a pointer argument
@@ -188,13 +188,10 @@ abstract final class Ioctl {
       throw ArgumentError.value(arg, 'arg', 'Cannot be nullptr');
     }
 
-    final result = _IoctlVariadic.callWithPtr(fd, request.value, arg);
-
-    if (result < 0) {
-      throw Errno.currentOSError;
-    }
-
-    return result;
+    return Errno.call(
+      () => _IoctlVariadic.callWithPtr(fd, request.value, arg),
+      message: request.name,
+    );
   }
 
   /// Perform an ioctl call with a pointer argument (returns result without throwing)
@@ -210,7 +207,10 @@ abstract final class Ioctl {
       throw ArgumentError.value(arg, 'arg', 'Cannot be nullptr');
     }
 
-    return IoctlResult(_IoctlVariadic.callWithPtr(fd, request.value, arg));
+    final (value, errno) = Errno.capture(
+      () => _IoctlVariadic.callWithPtr(fd, request.value, arg),
+    );
+    return IoctlResult(value, value < 0 ? errno : 0);
   }
 
   /// Perform an ioctl call with typed pointer
