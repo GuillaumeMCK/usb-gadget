@@ -5,85 +5,55 @@ import 'dart:typed_data';
 
 import 'package:usb_gadget/usb_gadget.dart';
 
-/// Simple standard HID Gamepad Report Descriptor
-final _descriptor = Uint8List.fromList([
-  0x05, 0x01, // Usage Page (Generic Desktop)
-  0x09, 0x05, // Usage (Gamepad)
-  0xA1, 0x01, // Collection (Application)
-  // Buttons (12 buttons)
-  0x05, 0x09, //   Usage Page (Button)
-  0x19, 0x01, //   Usage Minimum (Button 1)
-  0x29, 0x0C, //   Usage Maximum (Button 12)
-  0x15, 0x00, //   Logical Minimum (0)
-  0x25, 0x01, //   Logical Maximum (1)
-  0x75, 0x01, //   Report Size (1)
-  0x95, 0x0C, //   Report Count (12)
-  0x81, 0x02, //   Input (Data, Variable, Absolute)
-  // Padding (4 bits to complete the byte)
-  0x75, 0x01, //   Report Size (1)
-  0x95, 0x04, //   Report Count (4)
-  0x81, 0x01, //   Input (Constant)
-  // Left Stick X & Y (8-bit each for simplicity)
-  0x05, 0x01, //   Usage Page (Generic Desktop)
-  0x09, 0x30, //   Usage (X)
-  0x09, 0x31, //   Usage (Y)
-  0x15, 0x00, //   Logical Minimum (0)
-  0x26, 0xFF, 0x00, // Logical Maximum (255)
-  0x75, 0x08, //   Report Size (8)
-  0x95, 0x02, //   Report Count (2)
-  0x81, 0x02, //   Input (Data, Variable, Absolute)
-  // Right Stick X & Y (8-bit each)
-  0x09, 0x33, //   Usage (Rx)
-  0x09, 0x34, //   Usage (Ry)
-  0x15, 0x00, //   Logical Minimum (0)
-  0x26, 0xFF, 0x00, // Logical Maximum (255)
-  0x75, 0x08, //   Report Size (8)
-  0x95, 0x02, //   Report Count (2)
-  0x81, 0x02, //   Input (Data, Variable, Absolute)
-  // Triggers (8-bit each)
-  0x09, 0x32, //   Usage (Z) - Left Trigger
-  0x09, 0x35, //   Usage (Rz) - Right Trigger
-  0x15, 0x00, //   Logical Minimum (0)
-  0x26, 0xFF, 0x00, // Logical Maximum (255)
-  0x75, 0x08, //   Report Size (8)
-  0x95, 0x02, //   Report Count (2)
-  0x81, 0x02, //   Input (Data, Variable, Absolute)
-  // D-Pad (Hat Switch)
-  0x09, 0x39, //   Usage (Hat Switch)
-  0x15, 0x00, //   Logical Minimum (0)
-  0x25, 0x07, //   Logical Maximum (7)
-  0x35, 0x00, //   Physical Minimum (0)
-  0x46, 0x3B, 0x01, // Physical Maximum (315)
-  0x65, 0x14, //   Unit (Degrees)
-  0x75, 0x04, //   Report Size (4)
-  0x95, 0x01, //   Report Count (1)
-  0x81, 0x42, //   Input (Data, Variable, Absolute, Null State)
-  // Padding (4 bits)
-  0x75, 0x04, //   Report Size (4)
-  0x95, 0x01, //   Report Count (1)
-  0x81, 0x01, //   Input (Constant)
+// ---------------------------------------------------------------------------
+// Logitech F310 – DirectInput mode ("Logitech Dual Action", 046d:c216)
+//
+// Report layout (7 bytes, no report-ID prefix):
+//   Byte 0 : Left-stick X   0x00–0xFF  (centre = 0x80)
+//   Byte 1 : Left-stick Y   0x00–0xFF  (centre = 0x80, up = 0x00)
+//   Byte 2 : Right-stick X  0x00–0xFF  (centre = 0x80)
+//   Byte 3 : Right-stick Y  0x00–0xFF  (centre = 0x80, up = 0x00)
+//   Byte 4 : Buttons 1–8    (bit 0 = B1 … bit 7 = B8)
+//   Byte 5 : Buttons 9–12 in bits [3:0] + 4 padding bits [7:4]
+//   Byte 6 : Hat nibble [3:0] (0–7 = direction, 8 = centre) + 4 padding bits
+// ---------------------------------------------------------------------------
 
-  0xC0, // End Collection
-]);
+enum F310Button implements BitFlag {
+  x(1 << 0),
+  a(1 << 1),
+  b(1 << 2),
+  y(1 << 3),
+  lb(1 << 4),
+  rb(1 << 5),
+  lt(1 << 6),
+  rt(1 << 7),
+  back(1 << 8),
+  start(1 << 9),
+  ls(1 << 10),
+  rs(1 << 11);
 
-/// Gamepad button enumeration
-enum GamepadButton {
-  a,
-  b,
-  x,
-  y,
-  leftBumper,
-  rightBumper,
-  view,
-  menu,
-  leftStick,
-  rightStick,
-  guide,
-  extra,
+  const F310Button(this.value);
+
+  final value;
 }
 
-/// Analog stick report (8-bit unsigned, 0-255, center at 128)
-class AnalogStick {
+enum F310Hat {
+  north(0),
+  northEast(1),
+  east(2),
+  southEast(3),
+  south(4),
+  southWest(5),
+  west(6),
+  northWest(7),
+  center(8);
+
+  const F310Hat(this.value);
+
+  final int value;
+}
+
+class F310Stick {
   int _x = 128;
   int _y = 128;
 
@@ -91,196 +61,217 @@ class AnalogStick {
 
   int get y => _y;
 
-  set x(int value) => _x = value.clamp(0, 255);
+  set x(int v) => _x = v.clamp(0, 255);
 
-  set y(int value) => _y = value.clamp(0, 255);
+  set y(int v) => _y = v.clamp(0, 255);
 
   void setPosition(int x, int y) {
     this.x = x;
     this.y = y;
   }
 
-  void center() {
-    _x = 128;
-    _y = 128;
-  }
+  void center() => setPosition(128, 128);
 }
 
-/// Trigger report (8-bit, 0-255)
-class Trigger {
-  int _value = 0;
+class F310Report {
+  final F310Stick leftStick = F310Stick();
+  final F310Stick rightStick = F310Stick();
 
-  int get value => _value;
+  int _buttons = 0; // 12-bit bitmask
+  F310Hat hat = F310Hat.center;
 
-  set value(int v) => _value = v.clamp(0, 255);
+  void pressButton(F310Button btn) => _buttons |= btn.value;
 
-  void reset() => _value = 0;
-}
+  void releaseButton(F310Button btn) => _buttons &= ~btn.value;
 
-/// Gamepad report for HID reports
-class GamepadReport {
-  final AnalogStick leftStick = AnalogStick();
-  final AnalogStick rightStick = AnalogStick();
-  final Trigger leftTrigger = Trigger();
-  final Trigger rightTrigger = Trigger();
+  bool getButton(F310Button btn) => _buttons.bitFlag(btn.index);
 
-  int _buttons = 0;
-  int _dpad = 15;
+  void pressButtons(List<F310Button> btns) => _buttons |= btns.toBitmask();
 
-  int get buttons => _buttons;
-
-  int get dpad => _dpad;
-
-  set dpad(int value) => _dpad = value.clamp(0, 15);
-
-  // Report structure: 2 bytes buttons + 2 bytes left stick + 2 bytes right stick + 2 bytes triggers + 1 byte dpad = 9 bytes
-  final Uint8List _reportBytes = Uint8List(9);
-  late final ByteData _reportBuffer = ByteData.view(_reportBytes.buffer);
-
-  void setButton(GamepadButton button, bool pressed) {
-    if (pressed) {
-      _buttons |= 1 << button.index;
-    } else {
-      _buttons &= ~(1 << button.index);
-    }
-  }
-
-  bool getButton(GamepadButton button) {
-    return (_buttons & (1 << button.index)) != 0;
-  }
-
-  void pressButton(GamepadButton button) => setButton(button, true);
-
-  void releaseButton(GamepadButton button) => setButton(button, false);
+  void releaseButtons(List<F310Button> btns) => _buttons &= ~btns.toBitmask();
 
   void releaseAllButtons() => _buttons = 0;
 
   void reset() {
     _buttons = 0;
-    _dpad = 15;
+    hat = F310Hat.center;
     leftStick.center();
     rightStick.center();
-    leftTrigger.reset();
-    rightTrigger.reset();
   }
 
   Uint8List toBytes() {
-    _reportBuffer
-      ..setUint16(0, _buttons, .little) // Buttons (2 bytes)
-      ..setUint8(2, leftStick.x) // Left X
-      ..setUint8(3, leftStick.y) // Left Y
-      ..setUint8(4, rightStick.x) // Right X
-      ..setUint8(5, rightStick.y) // Right Y
-      ..setUint8(6, leftTrigger.value) // Left Trigger
-      ..setUint8(7, rightTrigger.value) // Right Trigger
-      ..setUint8(8, _dpad); // D-pad (lower 4 bits) + padding (upper 4 bits)
-    return _reportBytes;
+    final btnLow = _buttons.bitMask(0, 8);
+    final btnHigh = _buttons.bitMask(8, 4);
+
+    // Hat occupies the lower nibble; upper nibble is constant (padding = 0).
+    final hatByte = hat.value & 0x0F;
+
+    return .fromList([
+      leftStick.x, // byte 0 – Left X
+      leftStick.y, // byte 1 – Left Y
+      rightStick.x, // byte 2 – Right X  (Z axis)
+      rightStick.y, // byte 3 – Right Y  (Rz axis)
+      btnLow, // byte 4 – buttons 1-8
+      btnHigh, // byte 5 – buttons 9-12 + padding
+      hatByte, // byte 6 – hat + padding
+    ]);
   }
 }
 
-class SimpleGamepad extends HIDFunctionFs {
-  SimpleGamepad()
+class LogitechF310 extends HIDFunctionFs {
+  LogitechF310()
     : super(
-        name: 'gamepad',
-        reportDescriptor: _descriptor,
+        name: 'f310',
+        reportDescriptor: .fromList([
+          0x05, 0x01, // Usage Page (Generic Desktop)
+          0x09, 0x04, // Usage (Joystick)
+          0xA1, 0x01, // Collection (Application)
+          // Left Stick X & Y
+          0x09, 0x01, //   Usage (Pointer)
+          0xA1, 0x00, //   Collection (Physical)
+          0x09, 0x30, //     Usage (X)
+          0x09, 0x31, //     Usage (Y)
+          0x15, 0x00, //     Logical Minimum (0)
+          0x26, 0xFF, 0x00, //     Logical Maximum (255)
+          0x35, 0x00, //     Physical Minimum (0)
+          0x46, 0xFF, 0x00, //     Physical Maximum (255)
+          0x75, 0x08, //     Report Size (8)
+          0x95, 0x02, //     Report Count (2)
+          0x81, 0x02, //     Input (Data, Variable, Absolute)
+          0xC0, //   End Collection
+          // Right Stick X (Z) & Y (Rz)
+          0x09, 0x01, //   Usage (Pointer)
+          0xA1, 0x00, //   Collection (Physical)
+          0x09, 0x32, //     Usage (Z)
+          0x09, 0x35, //     Usage (Rz)
+          0x15, 0x00, //     Logical Minimum (0)
+          0x26, 0xFF, 0x00, //     Logical Maximum (255)
+          0x35, 0x00, //     Physical Minimum (0)
+          0x46, 0xFF, 0x00, //     Physical Maximum (255)
+          0x75, 0x08, //     Report Size (8)
+          0x95, 0x02, //     Report Count (2)
+          0x81, 0x02, //     Input (Data, Variable, Absolute)
+          0xC0, //   End Collection
+          // 12 Buttons
+          0x05, 0x09, //   Usage Page (Button)
+          0x19, 0x01, //   Usage Minimum (Button 1)
+          0x29, 0x0C, //   Usage Maximum (Button 12)
+          0x15, 0x00, //   Logical Minimum (0)
+          0x25, 0x01, //   Logical Maximum (1)
+          0x75, 0x01, //   Report Size (1)
+          0x95, 0x0C, //   Report Count (12)
+          0x81, 0x02, //   Input (Data, Variable, Absolute)
+          // 4-bit padding
+          0x75, 0x01, //   Report Size (1)
+          0x95, 0x04, //   Report Count (4)
+          0x81, 0x01, //   Input (Constant)
+          // Hat Switch (D-pad)
+          0x05, 0x01, //   Usage Page (Generic Desktop)
+          0x09, 0x39, //   Usage (Hat Switch)
+          0x15, 0x00, //   Logical Minimum (0)
+          0x25, 0x07, //   Logical Maximum (7)
+          0x35, 0x00, //   Physical Minimum (0)
+          0x46, 0x3B, 0x01, //   Physical Maximum (315)
+          0x65, 0x14, //   Unit (Eng Rot : Angular Pos)
+          0x75, 0x04, //   Report Size (4)
+          0x95, 0x01, //   Report Count (1)
+          0x81, 0x42, //   Input (Data, Variable, Absolute, Null State)
+          // 4-bit padding
+          0x75, 0x04, //   Report Size (4)
+          0x95, 0x01, //   Report Count (1)
+          0x81, 0x01, //   Input (Constant)
+          0xC0, // End Collection
+        ]),
         subclass: .none,
         protocol: .none,
-        config: const .inputOnly(maxPacketSize: 9, reportIntervalMs: 8),
+        config: const .inputOnly(
+          maxPacketSize: 7,
+          reportInterval: .new(milliseconds: 10),
+        ),
         speeds: {.fullSpeed, .highSpeed},
         strings: {
-          .enUS: ['Generic USB Gamepad'],
+          .enUS: ['Logitech Dual Action'],
         },
       );
 
-  int _frameCounter = 0;
-  Timer? _reportTimer;
+  final F310Report report = F310Report();
 
-  final GamepadReport report = GamepadReport();
+  int _frame = 0;
+  Timer? _timer;
 
   @override
   Future<void> onEnable() async {
     super.onEnable();
-    await waitUSBDeviceState(.configured);
-    _reportTimer = Timer.periodic(
-      Duration(milliseconds: config.reportIntervalMs),
-      (timer) {
-        if (state != .enabled) {
-          return timer.cancel();
-        }
-        _animateFrame();
-        epIn.writeAsync(report.toBytes());
-      },
-    );
+    _timer = .periodic(config.reportInterval, (_) {
+      _animateFrame();
+      epIn.write(report.toBytes());
+    });
   }
 
   @override
-  void release() {
-    if (!isReleased) {
-      _reportTimer?.cancel();
-      _reportTimer = null;
-      super.release();
-    }
+  Future<void> release() async {
+    _timer?.cancel();
+    _timer = null;
+    await super.release();
   }
 
   void _animateFrame() {
-    _frameCounter++;
-    final time = _frameCounter * config.reportIntervalMs / 1000.0;
+    _frame++;
+    final t = _frame * config.reportInterval.inMilliseconds / 1000.0;
 
-    // Left stick: circular motion (slow rotation)
-    final leftAngle = time * 0.5 * (2 * pi);
-    report.leftStick.x = (128 + 100 * cos(leftAngle)).round();
-    report.leftStick.y = (128 + 100 * sin(leftAngle)).round();
+    // Left stick: slow clockwise circle
+    final la = t * pi;
+    report.leftStick.setPosition(
+      (128 + 110 * cos(la)).round(),
+      (128 + 110 * sin(la)).round(),
+    );
 
-    // Right stick: figure-8 pattern (Lissajous curve)
-    final rightAngle = time * 0.8 * (2 * pi);
-    report.rightStick.x = (128 + 80 * cos(rightAngle)).round();
-    report.rightStick.y = (128 + 80 * sin(2 * rightAngle)).round();
+    // Right stick: Lissajous figure-8
+    final ra = t * 1.5 * pi;
+    report.rightStick.setPosition(
+      (128 + 90 * cos(ra)).round(),
+      (128 + 90 * sin(2 * ra)).round(),
+    );
 
-    // Left trigger: sine wave (0-255)
-    report.leftTrigger.value = ((sin(time * 2) + 1) * 127.5).round();
+    // D-pad: step through all 8 directions then centre (~0.75 s each)
+    final hatPhase = (t / 0.75).floor() % 9;
+    report.hat = F310Hat.values[hatPhase];
 
-    // Right trigger: sawtooth wave (0-255)
-    final sawtoothPhase = (time * 0.5) % 1.0;
-    report.rightTrigger.value = (sawtoothPhase * 255).round();
-
-    // D-pad: rotate through all 8 directions (plus center)
-    final dpadCycle = (time * 0.5).floor() % 9;
-    report.dpad = dpadCycle < 8
-        ? dpadCycle
-        : 15; // 0-7 = directions, 15 = center
-
-    // Buttons: sequential toggle pattern
-    report.releaseAllButtons();
-    final buttonIndex = (_frameCounter ~/ 30) % GamepadButton.values.length;
-    report.setButton(GamepadButton.values[buttonIndex], true);
+    // Buttons: press one at a time, advancing every 30 frames (~0.3 s)
+    // report.releaseAllButtons();
+    // final btnIdx = (_frame ~/ 30) % F310Button.values.length;
+    // report.pressButton(F310Button.values[btnIdx]);
   }
 }
 
 Future<void> main() async {
-  final gamepad = SimpleGamepad();
+  final gamepad = LogitechF310();
   final gadget = Gadget(
-    name: 'generic_gamepad',
-    idVendor: 0x1209,
-    idProduct: 0x0001,
+    name: 'logitech_f310',
+    idVendor: 0x046D,
+    idProduct: 0xC216,
     deviceClass: .composite,
     strings: const {
       .enUS: .new(
-        manufacturer: 'Generic',
-        product: 'USB Gamepad',
-        serialnumber: 'GP000001',
+        manufacturer: 'Logitech',
+        product: 'Logitech Dual Action',
+        serialnumber: 'DA000001',
       ),
     },
     config: .new(
       attributes: .busPowered,
-      maxPower: .fromMilliAmps(500),
-      strings: const {.enUS: 'USB Gamepad Configuration'},
+      maxPower: .fromMilliAmps(100),
+      strings: const {.enUS: 'Logitech Dual Action Configuration'},
       functions: [gamepad],
     ),
   );
 
   try {
     await gadget.bind();
-    stdout.writeln('Press Ctrl+C to stop');
+    await gadget.awaitState(.configured);
+    stdout.writeln(
+      'Logitech F310 (DirectInput) gadget active. Press Ctrl+C to stop.',
+    );
     await ProcessSignal.sigint.watch().first;
   } finally {
     await gadget.unbind();
