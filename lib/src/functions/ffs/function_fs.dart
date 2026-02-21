@@ -73,11 +73,15 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
   /// Per-endpoint status buffers, keyed by [EndpointAddress].
   final Map<EndpointAddress, int> _endpointStatus = {};
 
-  /// Raw byte device-status buffer, returned verbatim by GET_STATUS (device).
-  /// Bit 0: self-powered (0 = bus-powered, 1 = self-powered).
-  /// Bit 1: remote-wakeup enabled.
-  /// Set bit 0 after construction when the powered state of your hardware
-  /// is known; bit 1 is managed by SET/CLEAR_FEATURE (DEVICE_REMOTE_WAKEUP).
+  /// Device-status value returned verbatim by GET_STATUS (device).
+  ///
+  /// Encoded as a 2-byte little-endian word (USB 2.0 §9.4.5):
+  ///   Bit 0: self-powered (0 = bus-powered, 1 = self-powered).
+  ///   Bit 1: remote-wakeup enabled.
+  ///
+  /// Set bit 0 after construction once the powered state of your hardware
+  /// is known; bit 1 is managed automatically by SET/CLEAR_FEATURE
+  /// (DEVICE_REMOTE_WAKEUP) requests.
   int _deviceStatus = 0;
 
   /// State stream
@@ -374,6 +378,8 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
   }
 
   /// Called when the host de-configures the device.
+  ///
+  /// Resets all per-endpoint halt status bits and transitions to [FunctionFsState.bound].
   @mustCallSuper
   void onDisable() {
     _endpointStatus.clear();
