@@ -218,7 +218,7 @@ final class EndpointControlFile extends EndpointFile with Releasable {
     if (_eventReadingActive) return;
     _eventReadingActive = true;
 
-    _pollingTimer ??= .periodic(const Duration(milliseconds: 10), (_) {
+    _pollingTimer ??= .periodic(const .new(milliseconds: 1), (_) {
       try {
         final data = Unistd.read(_fd!, eventBufferSize);
         const offset = FunctionFsEvent.size;
