@@ -184,8 +184,8 @@ final class AioSink with Releasable implements StreamSink<Uint8List> {
     try {
       await Future.wait(_writeQueue.map((e) => e.completer.future));
       if (!_doneCompleter.isCompleted) _doneCompleter.complete();
-    } catch (e, st) {
-      if (!_doneCompleter.isCompleted) _doneCompleter.completeError(e, st);
+    } catch (err, st) {
+      if (!_doneCompleter.isCompleted) _doneCompleter.completeError(err, st);
     }
   }
 
@@ -220,8 +220,10 @@ final class AioSink with Releasable implements StreamSink<Uint8List> {
       try {
         final written = await _kernelWrite(entry);
         if (!entry.completer.isCompleted) entry.completer.complete(written);
-      } catch (e, st) {
-        if (!entry.completer.isCompleted) entry.completer.completeError(e, st);
+      } catch (err, st) {
+        if (!entry.completer.isCompleted) {
+          entry.completer.completeError(err, st);
+        }
       }
 
       _writeQueue.removeFirst();

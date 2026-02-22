@@ -160,8 +160,8 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
       // Write descriptors with error recovery
       try {
         _ep0.write(descriptor);
-      } catch (e) {
-        log?.error('Failed to write descriptors: $e');
+      } catch (err, st) {
+        log?.error('Failed to write descriptors', err, st);
         await _ep0.close();
         _setState(.uninitialized);
         rethrow;
@@ -178,8 +178,8 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
 
       try {
         _ep0.write(stringBytes);
-      } catch (e) {
-        log?.error('Failed to write strings: $e');
+      } catch (err, st) {
+        log?.error('Failed to write strings', err, st);
         await _ep0.close();
         _setState(.uninitialized);
         rethrow;
@@ -188,8 +188,8 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
       // Open endpoint files with error recovery
       try {
         await _openEndpointFiles();
-      } catch (e) {
-        log?.error('Failed to open endpoint files: $e');
+      } catch (err, st) {
+        log?.error('Failed to open endpoint files', err, st);
         await _ep0.close();
         _setState(.uninitialized);
         rethrow;
@@ -277,8 +277,8 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
           await endpoint.open();
           openedEndpoints[desc.address] = endpoint;
           log?.info('Opened ${desc.address} at $epPath (fd: ${endpoint.fd})');
-        } catch (e) {
-          log?.error('Failed to open ${desc.address} at $epPath: $e');
+        } catch (err, st) {
+          log?.error('Failed to open ${desc.address} at $epPath', err, st);
           // Close all previously opened endpoints
           await _closeEndpoints(openedEndpoints);
           rethrow;
@@ -289,7 +289,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
 
       // All endpoints opened successfully, commit to instance map
       _endpoints.addAll(openedEndpoints);
-    } catch (e) {
+    } catch (_) {
       // Ensure cleanup on any error
       await _closeEndpoints(openedEndpoints);
       rethrow;
@@ -303,8 +303,8 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
     for (final ep in endpoints.values) {
       try {
         await ep.close();
-      } catch (e) {
-        log?.warn('Error closing endpoint during cleanup: $e');
+      } catch (err, st) {
+        log?.warn('Error closing endpoint during cleanup', err, st);
       }
     }
     endpoints.clear();

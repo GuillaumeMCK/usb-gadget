@@ -112,8 +112,8 @@ class HIDFunction extends KernelFunction {
     log?.info('Closing HID device');
     try {
       _file?.closeSync();
-    } catch (e) {
-      log?.warn('Failed to close HID device file: $e');
+    } catch (err, st) {
+      log?.warn('Failed to close HID device file:', err, st);
     }
     _file = null;
     await super.release();

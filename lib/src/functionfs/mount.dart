@@ -55,9 +55,9 @@ class FunctionFsMount with USBGadgetLogger {
     if (!dir.existsSync()) {
       try {
         dir.createSync(recursive: true);
-      } on FileSystemException catch (e) {
+      } on FileSystemException catch (err) {
         throw StateError(
-          'Failed to create mount point directory $mountPoint: ${e.message}',
+          'Failed to create mount point directory $mountPoint: ${err.message}',
         );
       }
     }
@@ -154,8 +154,8 @@ class FunctionFsMount with USBGadgetLogger {
       try {
         Mount.umount2(mountPoint, const [.detach]);
         log?.info('Force unmounted FunctionFs from $mountPoint');
-      } catch (e) {
-        log?.error('Failed to unmount FunctionFs: $e');
+      } catch (err, st) {
+        log?.error('Failed to unmount FunctionFs:', err, st);
       }
     }
   }
