@@ -225,8 +225,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
     }
 
     try {
-      log?.info('Closing EP0 and unmounting FunctionFs...');
-      await _ep0.close();
+      if (_state != .uninitialized) await _ep0.close();
     } catch (err) {
       log?.warn('Failed to close EP0:', err);
     }
