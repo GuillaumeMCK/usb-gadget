@@ -46,7 +46,6 @@ abstract final class Errno {
   /// Interrupted system call (EINTR) — 4
   ///
   /// Most blocking syscalls return EINTR when a signal is delivered.
-  /// Use [callUninterruptible] to automatically restart on EINTR.
   static const int eintr = 4;
 
   /// I/O error (EIO) — 5
