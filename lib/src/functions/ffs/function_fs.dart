@@ -200,7 +200,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
       log?.debug('Ready for UDC binding');
     } catch (err, st) {
       _setState(.uninitialized);
-      log?.error('Error preparing FunctionFs function: $err', err, st);
+      log?.error('Error preparing FunctionFs function: ', err, st);
       rethrow;
     }
   }
@@ -218,7 +218,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
           log?.info('Closing endpoint: ${ep.fd}');
           await ep.close();
         } catch (err) {
-          log?.warn('Failed to close endpoint: $err');
+          log?.warn('Failed to close endpoint:', err);
         }
       }
       _endpoints.clear();
@@ -228,7 +228,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
       log?.info('Closing EP0 and unmounting FunctionFs...');
       await _ep0.close();
     } catch (err) {
-      log?.warn('Failed to close EP0: $err');
+      log?.warn('Failed to close EP0:', err);
     }
 
     // Clear maps to release strong references
@@ -316,7 +316,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
     _eventSubscription ??= _ep0.stream.listen(
       _handleEvent,
       onError: (Object err, StackTrace st) {
-        log?.error('Error in EP0 event stream: $err', err, st);
+        log?.error('Error in EP0 event stream: ', err, st);
       },
       cancelOnError: false,
     );

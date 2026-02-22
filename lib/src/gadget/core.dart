@@ -255,7 +255,7 @@ class Gadget with USBGadgetLogger {
       _bindToUdc(targetUdc);
       log?.success('Gadget bound to UDC: $_boundUdc');
     } catch (err, st) {
-      log?.error('Bind failed: $err', err, st);
+      log?.error('Bind failed: ', err, st);
       await unbind();
       rethrow;
     }
@@ -282,7 +282,7 @@ class Gadget with USBGadgetLogger {
       try {
         _writeAttr('$_gadgetPath/UDC', '');
       } catch (err) {
-        log?.warn('Failed to unbind from UDC: $err');
+        log?.warn('Failed to unbind from UDC:', err);
       }
       _boundUdc = null;
     }
@@ -292,7 +292,7 @@ class Gadget with USBGadgetLogger {
         await function.release();
         log?.debug('Released function: ${function.name}');
       } catch (err) {
-        log?.warn('Failed to release function ${function.name}: $err');
+        log?.warn('Failed to release function ${function.name}:', err);
       }
     }
 
@@ -300,7 +300,7 @@ class Gadget with USBGadgetLogger {
       try {
         Link(link).deleteSync();
       } catch (err) {
-        log?.warn('Failed to remove symlink $link: $err');
+        log?.warn('Failed to remove symlink $link:', err);
       }
     }
     _createdSymlinks.clear();
@@ -309,7 +309,7 @@ class Gadget with USBGadgetLogger {
       try {
         Directory(dir).deleteSync();
       } catch (err) {
-        log?.warn('Failed to remove directory $dir: $err');
+        log?.warn('Failed to remove directory $dir:', err);
       }
     }
     _createdDirs.clear();
@@ -514,7 +514,7 @@ class Gadget with USBGadgetLogger {
       try {
         function.prepare(functionPath);
       } catch (err, st) {
-        log?.error('Function preparation failed: $err', err, st);
+        log?.error('Function preparation failed: ', err, st);
         function.release();
         rethrow;
       }
@@ -567,7 +567,7 @@ class Gadget with USBGadgetLogger {
           udcFile.writeAsStringSync('');
         }
       } catch (err) {
-        log?.warn('Could not check/unbind gadget "$gadgetName": $err');
+        log?.warn('Could not check/unbind gadget "$gadgetName":', err);
       }
     }
   }
