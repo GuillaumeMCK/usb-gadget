@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="usb_gadget API docs, for the Dart programming language.">
+  <title>usb_gadget - Dart API docs</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="static-assets/github.css?v1">
+  <link rel="stylesheet" href="static-assets/styles.css?v1">
+  <link rel="icon" href="static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="https://github.com/GuillaumeMCK/usb-gadget">usb_gadget package</a></li>
+  </ol>
+  <div class="self-name">usb_gadget</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+  <div id="dartdoc-main-content" class="main-content">
+      
+<section class="desc markdown">
+  <h1 id="usb-gadget">usb-gadget</h1>
+<div class="markdown-alert markdown-alert-important">
+<p class="markdown-alert-title">Important</p>
+<p>This library is experimental and not suitable for production use. Breaking changes may occur without warning.</p>
+</div>
+<p>A comprehensive Dart library for creating USB gadgets on Linux using ConfigFS and FunctionFS. Transform your Linux
+device into a USB peripheral—implement keyboards, mice, storage devices, network interfaces, or create entirely custom
+USB protocols in pure Dart.</p>
+<p><a href="https://pub.dev/packages/usb_gadget"><img src="https://img.shields.io/pub/v/usb_gadget.svg" alt="pub package"></a>
+<a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a></p>
+<h2 id="features">Features</h2>
+<h3 id="kernel-based-functions">Kernel-Based Functions</h3>
+<p>Pre-configured USB functions implemented by kernel drivers, ready to use with minimal setup:</p>
+<h4 id="network-interfaces"><strong>Network Interfaces</strong></h4>
+<ul>
+<li><strong>CDC ECM</strong> - Ethernet over USB (widely supported)</li>
+<li><strong>CDC ECM Subset</strong> - Simplified ECM for legacy hosts</li>
+<li><strong>CDC EEM</strong> - Ethernet Emulation Model (lowest overhead)</li>
+<li><strong>CDC NCM</strong> - Network Control Model (high performance)</li>
+<li><strong>RNDIS</strong> - Remote NDIS (Windows compatibility)</li>
+</ul>
+<h4 id="serial-ports"><strong>Serial Ports</strong></h4>
+<ul>
+<li><strong>CDC ACM</strong> - Abstract Control Model (standard virtual serial)</li>
+<li><strong>Generic Serial</strong> - Non-CDC serial implementation</li>
+</ul>
+<h4 id="human-interface-devices"><strong>Human Interface Devices</strong></h4>
+<ul>
+<li><strong>HID</strong> - Keyboards, mice, gamepads, and custom HID devices</li>
+</ul>
+<h4 id="storage--media"><strong>Storage &amp; Media</strong></h4>
+<ul>
+<li><strong>Mass Storage Device (MSD)</strong> - USB flash drive emulation</li>
+<li><strong>Printer</strong> - USB printer class device</li>
+</ul>
+<h4 id="audio--video"><strong>Audio &amp; Video</strong></h4>
+<ul>
+<li><strong>MIDI</strong> - Musical Instrument Digital Interface</li>
+<li><strong>UAC1</strong> - USB Audio Class 1.0</li>
+<li><strong>UAC2</strong> - USB Audio Class 2.0</li>
+<li><strong>UVC</strong> - USB Video Class (webcam emulation)</li>
+</ul>
+<h4 id="testing--development"><strong>Testing &amp; Development</strong></h4>
+<ul>
+<li><strong>Loopback</strong> - Data loopback for testing</li>
+<li><strong>SourceSink</strong> - Pattern generation and validation</li>
+</ul>
+<h3 id="functionfs-custom-usb-functions">FunctionFS (Custom USB Functions)</h3>
+<p>FunctionFS provides complete control over USB functionality in userspace, enabling you to:</p>
+<ul>
+<li><strong>Define custom USB descriptors</strong> - Create devices with any interface, endpoint configuration, or capability</li>
+<li><strong>Handle USB endpoints directly</strong> - Full control over data transfer, timing, and flow control</li>
+<li><strong>Implement custom protocols</strong> - Build proprietary or specialized USB communication protocols</li>
+<li><strong>Process control requests</strong> - Handle vendor-specific, class-specific, or standard USB requests</li>
+<li><strong>React to USB events</strong> - Respond to bind, unbind, enable, disable, suspend, and resume events</li>
+</ul>
+<p><strong>Ideal for:</strong></p>
+<ul>
+<li>Complex HID devices with custom report descriptors</li>
+<li>Proprietary USB protocols and interfaces</li>
+<li>USB device prototyping and experimentation</li>
+<li>Devices requiring precise timing or advanced USB features</li>
+<li>Applications needing complete protocol control</li>
+</ul>
+<p>The library includes <code>HIDFunctionFs</code> as a specialized FunctionFS implementation with built-in HID protocol handling,
+making custom HID devices straightforward to implement.</p>
+<h2 id="requirements">Requirements</h2>
+<h3 id="platform-support">Platform Support</h3>
+<ul>
+<li><strong>Operating System</strong>: Linux with USB Device Controller (UDC) support</li>
+<li><strong>Architecture</strong>: ARM, ARM64, x86_64 (any architecture with Linux UDC support)</li>
+<li><strong>Dart SDK</strong>: 3.10.0 or higher</li>
+</ul>
+<h3 id="hardware-requirements">Hardware Requirements</h3>
+<p>A Linux device with a USB Device Controller (UDC) is required. Standard desktop PCs typically do <strong>not</strong> include a
+UDC—they only have USB host controllers.</p>
+<p><strong>Compatible devices include:</strong></p>
+<ul>
+<li>Raspberry Pi 4, Pi Zero (USB-C or micro-USB port)</li>
+<li>Raspberry Pi 5 (USB-C port)</li>
+<li>Orange Pi, Banana Pi (model-dependent)</li>
+<li>BeagleBone Black, BeagleBone AI</li>
+<li>Most embedded Linux boards with USB OTG capability</li>
+</ul>
+<p><strong>To check if your device has a UDC:</strong></p>
+<pre class="language-bash"><code class="language-bash">ls /sys/class/udc/
+# Should list one or more UDC devices (e.g., fe980000.usb)
+</code></pre>
+<h3 id="system-dependencies">System Dependencies</h3>
+<p>Install the Linux Asynchronous I/O library:</p>
+<p><strong>Debian/Ubuntu:</strong></p>
+<pre class="language-bash"><code class="language-bash">sudo apt-get install libaio-dev
+</code></pre>
+<p><strong>Arch Linux:</strong></p>
+<pre class="language-bash"><code class="language-bash">sudo pacman -S libaio
+</code></pre>
+<p><strong>Fedora/RHEL:</strong></p>
+<pre class="language-bash"><code class="language-bash">sudo dnf install libaio-devel
+</code></pre>
+<h3 id="linux-kernel-configuration">Linux Kernel Configuration</h3>
+<p>The following kernel options must be enabled. Most modern embedded Linux distributions include these by default.</p>
+<details>
+<summary>Required Kernel Configuration Options</summary>
+<p><strong>Core USB Gadget Support:</strong></p>
+<ul>
+<li><code>CONFIG_USB_GADGET</code> - USB Gadget framework</li>
+<li><code>CONFIG_USB_CONFIGFS</code> - ConfigFS-based gadget configuration</li>
+<li><code>CONFIG_USB_FUNCTIONFS</code> - FunctionFS support</li>
+</ul>
+<p><strong>Kernel Function Drivers:</strong></p>
+<ul>
+<li><code>CONFIG_USB_CONFIGFS_SERIAL</code> - Serial functions</li>
+<li><code>CONFIG_USB_CONFIGFS_ACM</code> - CDC ACM serial</li>
+<li><code>CONFIG_USB_CONFIGFS_NCM</code> - CDC NCM ethernet</li>
+<li><code>CONFIG_USB_CONFIGFS_ECM</code> - CDC ECM ethernet</li>
+<li><code>CONFIG_USB_CONFIGFS_ECM_SUBSET</code> - ECM Subset ethernet</li>
+<li><code>CONFIG_USB_CONFIGFS_RNDIS</code> - RNDIS ethernet</li>
+<li><code>CONFIG_USB_CONFIGFS_EEM</code> - CDC EEM ethernet</li>
+<li><code>CONFIG_USB_CONFIGFS_MASS_STORAGE</code> - Mass storage</li>
+<li><code>CONFIG_USB_CONFIGFS_F_HID</code> - HID functions</li>
+<li><code>CONFIG_USB_CONFIGFS_F_PRINTER</code> - Printer function</li>
+<li><code>CONFIG_USB_CONFIGFS_F_MIDI</code> - MIDI function</li>
+<li><code>CONFIG_USB_CONFIGFS_F_UAC1</code> - Audio Class 1.0</li>
+<li><code>CONFIG_USB_CONFIGFS_F_UAC2</code> - Audio Class 2.0</li>
+<li><code>CONFIG_USB_CONFIGFS_F_UVC</code> - Video Class</li>
+</ul>
+<p><strong>Check your kernel configuration:</strong></p>
+<pre class="language-bash"><code class="language-bash">zcat /proc/config.gz | grep -E 'CONFIG_USB_(GADGET|CONFIGFS|FUNCTIONFS)'
+# or
+grep -E 'CONFIG_USB_(GADGET|CONFIGFS|FUNCTIONFS)' /boot/config-$(uname -r)
+</code></pre>
+</details>
+<h3 id="permissions">Permissions</h3>
+<p>Root privileges or the <code>CAP_SYS_ADMIN</code> capability are required to configure USB gadgets.</p>
+<p><strong>Verify ConfigFS is mounted:</strong></p>
+<pre class="language-bash"><code class="language-bash">mount | grep configfs
+# Should show: configfs on /sys/kernel/config type configfs (rw,relatime)
+</code></pre>
+<p><strong>Mount ConfigFS if needed:</strong></p>
+<pre class="language-bash"><code class="language-bash">sudo mount -t configfs none /sys/kernel/config
+</code></pre>
+<p><strong>Running without full root (using capabilities):</strong></p>
+<pre class="language-bash"><code class="language-bash"># Grant CAP_SYS_ADMIN to your Dart executable
+sudo setcap cap_sys_admin+ep /path/to/your/dart/executable
+</code></pre>
+<h2 id="installation--usage">Installation &amp; Usage</h2>
+<h3 id="add-the-package">Add the Package</h3>
+<pre class="language-bash"><code class="language-bash">dart pub add usb_gadget
+</code></pre>
+<h3 id="basic-example-usb-keyboard">Basic Example: USB Keyboard</h3>
+<p>This example creates a USB HID keyboard that types "hello world" when connected:</p>
+<pre class="language-dart"><code class="language-dart">import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:usb_gadget/usb_gadget.dart';
+
+final _descriptor = Uint8List.fromList([0x05, 0x01, 0x09, 0x06, 0xA1, 0x01, 0x05, 0x07, 0x19, 0xE0, 0x29, 0xE7, 0x15, 0x00, 0x25, 0x01, 0x75, 0x01, 0x95, 0x08, 0x81, 0x02, 0x95, 0x01, 0x75, 0x08, 0x81, 0x01, 0x95, 0x06, 0x75, 0x08, 0x15, 0x00, 0x25, 0x65, 0x05, 0x07, 0x19, 0x00, 0x29, 0x65, 0x81, 0x00, 0xC0]);
+
+class Keyboard extends HIDFunction {
+  Keyboard()
+    : super(
+        name: 'keyboard',
+        descriptor: _descriptor,
+        protocol: .keyboard,
+        subclass: .boot,
+        reportLength: 8,
+      );
+
+  void sendKey(int keyCode, {int modifiers = 0}) =&gt; file
+    ..writeFromSync(
+      Uint8List(8)
+        ..[0] = modifiers
+        ..[2] = keyCode,
+    )
+    ..writeFromSync(Uint8List(8));
+}
+
+Future&lt;void&gt; main() async {
+  final keyboard = Keyboard();
+  final gadget = Gadget(
+    name: 'hid_keyboard',
+    idVendor: 0x1234,
+    idProduct: 0x5679,
+    deviceClass: .composite,
+    deviceSubClass: .none,
+    deviceProtocol: .none,
+    strings: {
+      .enUS: const .new(
+        manufacturer: 'ACME Corp',
+        product: 'USB Keyboard',
+        serialnumber: 'KB001',
+      ),
+    },
+    config: .new(functions: [keyboard]),
+  );
+
+  try {
+    await gadget.bind();
+    await gadget.awaitState(.configured);
+    // An additional delay here prevents the first few keypresses from
+    // being missed on some hosts.
+    await Future&lt;void&gt;.delayed(const .new(milliseconds: 100));
+    [0x0B, 0x08, 0x0F, 0x0F, 0x12, 0x2C, 0x1A, 0x12, 0x15, 0x0F, 0x07, 0x28]
+    // Write "hello world\n"
+    .forEach(keyboard.sendKey);
+    stdout.writeln('Ctrl+C to exit.');
+    await ProcessSignal.sigint.watch().first;
+  } finally {
+    await gadget.unbind();
+  }
+}
+</code></pre>
+<h3 id="running-your-gadget">Running Your Gadget</h3>
+<p><strong>Standard execution (requires root):</strong></p>
+<pre class="language-bash"><code class="language-bash">sudo dart run bin/your_app.dart
+</code></pre>
+<p><strong>Compiled executable:</strong></p>
+<pre class="language-bash"><code class="language-bash">dart compile exe bin/your_app.dart -o keyboard
+sudo ./keyboard
+</code></pre>
+<p><strong>With debug logging:</strong></p>
+<pre class="language-bash"><code class="language-bash">dart compile exe -DUSB_GADGET_DEBUG=true bin/your_app.dart -o keyboard
+sudo ./keyboard
+</code></pre>
+<h3 id="more-examples">More Examples</h3>
+<p>The <a href="example/">examples</a> directory contains ready-to-run implementations:</p>
+<h2 id="resources">Resources</h2>
+<ul>
+<li><strong><a href="https://pub.dev/documentation/usb_gadget/latest/">API Documentation</a></strong></li>
+<li><strong><a href="https://www.kernel.org/doc/html/latest/usb/gadget.html">Linux USB Gadget API</a></strong></li>
+<li><strong><a href="https://www.beyondlogic.org/usbnutshell/usb1.shtml">USB in a Nutshell</a></strong></li>
+<li><strong><a href="https://usb.org/sites/default/files/hut1_3_0.pdf">HID Usage Tables</a></strong></li>
+<li><strong><a href="https://github.com/surban/usb-gadget">usb-gadget (Rust)</a></strong></li>
+<li><strong><a href="https://github.com/vpelletier/python-functionfs">functionfs (Python)</a></strong></li>
+</ul>
+</section>
+
+
+      <section class="summary">
+          <h2>Libraries</h2>
+        <dl>
+          <dt id="usb_gadget">
+  <span class="name"><a href="usb_gadget/">usb_gadget</a></span> 
+
+</dt>
+<dd>
+</dd>
+
+        </dl>
+      </section>
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="https://github.com/GuillaumeMCK/usb-gadget">usb_gadget package</a></li>
+</ol>
+
+    <h5 class="hidden-xs"><span class="package-name">usb_gadget</span> <span class="package-kind">package</span></h5>
+    <ol>
+      <li class="section-title">Libraries</li>
+      <li><a href="usb_gadget/">usb_gadget</a></li>
+</ol>
+
+  </div>
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+  </div>
+</main>
+<footer>
+  <span class="no-break">
+    usb_gadget
+      0.3.2
+  </span>
+  
+</footer>
+
+
+<script src="static-assets/highlight.pack.js?v1"></script>
+<script src="static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

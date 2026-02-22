@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="usb_gadget library API docs, for the Dart programming language.">
+  <title>usb_gadget library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../static-assets/styles.css?v1">
+  <link rel="icon" href="../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../index.html">usb_gadget</a></li>
+    <li class="self-crumb">usb_gadget.dart</li>
+  </ol>
+  <div class="self-name">usb_gadget</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar=""
+    data-below-sidebar="usb_gadget&#47;usb_gadget-library-sidebar.html">
+  
+    <div>
+      
+
+      <h1>
+        <span class="kind-library">usb_gadget</span>
+        library 
+ 
+
+      </h1>
+    </div>
+
+    
+
+
+    <section class="summary offset-anchor" id="classes">
+      <h2>Classes</h2>
+      <dl>
+          <dt id="AcmFunction">
+  <span class="name "><a href="../usb_gadget/AcmFunction-class.html">AcmFunction</a></span> 
+
+</dt>
+<dd>
+  Serial (CDC ACM) function (virtual serial port).
+</dd>
+
+          <dt id="AlternateSetting">
+  <span class="name "><a href="../usb_gadget/AlternateSetting-class.html">AlternateSetting</a></span> 
+
+</dt>
+<dd>
+  Type-safe alternate setting number (0-255).
+</dd>
+
+          <dt id="BindEvent">
+  <span class="name "><a href="../usb_gadget/BindEvent-class.html">BindEvent</a></span> 
+
+</dt>
+<dd>
+  Function has been bound to a UDC.
+</dd>
+
+          <dt id="BitFlag">
+  <span class="name "><a href="../usb_gadget/BitFlag-class.html">BitFlag</a></span> 
+
+</dt>
+<dd>
+  Base class for defining enum-based bit flags.
+</dd>
+
+          <dt id="BulkEndpointConfig">
+  <span class="name "><a href="../usb_gadget/BulkEndpointConfig-class.html">BulkEndpointConfig</a></span> 
+
+</dt>
+<dd>
+  Bulk transfer endpoint configuration.
+</dd>
+
+          <dt id="BurstSize">
+  <span class="name "><a href="../usb_gadget/BurstSize-class.html">BurstSize</a></span> 
+
+</dt>
+<dd>
+  Type-safe SuperSpeed burst size (0-15).
+</dd>
+
+          <dt id="BytesPerInterval">
+  <span class="name "><a href="../usb_gadget/BytesPerInterval-class.html">BytesPerInterval</a></span> 
+
+</dt>
+<dd>
+  Type-safe bytes per interval (0-65535).
+</dd>
+
+          <dt id="ControlEndpointConfig">
+  <span class="name "><a href="../usb_gadget/ControlEndpointConfig-class.html">ControlEndpointConfig</a></span> 
+
+</dt>
+<dd>
+  Control transfer endpoint configuration.
+</dd>
+
+          <dt id="DescriptorGenerator">
+  <span class="name "><a href="../usb_gadget/DescriptorGenerator-class.html">DescriptorGenerator</a></span> 
+
+</dt>
+<dd>
+  Descriptor generator for creating speed-specific descriptors.
+</dd>
+
+          <dt id="DescriptorSet">
+  <span class="name "><a href="../usb_gadget/DescriptorSet-class.html">DescriptorSet</a></span> 
+
+</dt>
+<dd>
+  A set of USB descriptors for a specific speed.
+</dd>
+
+          <dt id="DeviceClass">
+  <span class="name "><a href="../usb_gadget/DeviceClass-class.html">DeviceClass</a></span> 
+
+</dt>
+<dd>
+  Type-safe device class code.
+</dd>
+
+          <dt id="DeviceProtocol">
+  <span class="name "><a href="../usb_gadget/DeviceProtocol-class.html">DeviceProtocol</a></span> 
+
+</dt>
+<dd>
+  Type-safe device protocol code.
+</dd>
+
+          <dt id="DeviceSubClass">
+  <span class="name "><a href="../usb_gadget/DeviceSubClass-class.html">DeviceSubClass</a></span> 
+
+</dt>
+<dd>
+  Type-safe device subclass code.
+</dd>
+
+          <dt id="DisableEvent">
+  <span class="name "><a href="../usb_gadget/DisableEvent-class.html">DisableEvent</a></span> 
+
+</dt>
+<dd>
+  Function has been disabled.
+</dd>
+
+          <dt id="EcmFunction">
+  <span class="name "><a href="../usb_gadget/EcmFunction-class.html">EcmFunction</a></span> 
+
+</dt>
+<dd>
+  Ethernet (CDC ECM) function.
+</dd>
+
+          <dt id="EcmSubsetFunction">
+  <span class="name "><a href="../usb_gadget/EcmSubsetFunction-class.html">EcmSubsetFunction</a></span> 
+
+</dt>
+<dd>
+  Ethernet (CDC ECM Subset) function.
+</dd>
+
+          <dt id="EemFunction">
+  <span class="name "><a href="../usb_gadget/EemFunction-class.html">EemFunction</a></span> 
+
+</dt>
+<dd>
+  Ethernet (CDC EEM) function.
+</dd>
+
+          <dt id="EnableEvent">
+  <span class="name "><a href="../usb_gadget/EnableEvent-class.html">EnableEvent</a></span> 
+
+</dt>
+<dd>
+  Function has been enabled.
+</dd>
+
+          <dt id="EndpointAddress">
+  <span class="name "><a href="../usb_gadget/EndpointAddress-class.html">EndpointAddress</a></span> 
+
+</dt>
+<dd>
+  Endpoint address combining number and direction.
+</dd>
+
+          <dt id="EndpointAttributes">
+  <span class="name "><a href="../usb_gadget/EndpointAttributes-class.html">EndpointAttributes</a></span> 
+
+</dt>
+<dd>
+  Endpoint attributes (bmAttributes field).
+</dd>
+
+          <dt id="EndpointConfig">
+  <span class="name "><a href="../usb_gadget/EndpointConfig-class.html">EndpointConfig</a></span> 
+
+</dt>
+<dd>
+  Endpoint configuration: transfer type, packet size, and polling interval.
+</dd>
+
+          <dt id="EndpointControlFile">
+  <span class="name "><a href="../usb_gadget/EndpointControlFile-class.html">EndpointControlFile</a></span> 
+
+</dt>
+<dd>
+  Manages the USB control endpoint (EP0) for FunctionFs.
+</dd>
+
+          <dt id="EndpointCount">
+  <span class="name "><a href="../usb_gadget/EndpointCount-class.html">EndpointCount</a></span> 
+
+</dt>
+<dd>
+  Type-safe endpoint count (0-30).
+</dd>
+
+          <dt id="EndpointFile">
+  <span class="name "><a href="../usb_gadget/EndpointFile-class.html">EndpointFile</a></span> 
+
+</dt>
+<dd>
+  Base class for FunctionFs endpoint file descriptors.
+</dd>
+
+          <dt id="EndpointInFile">
+  <span class="name "><a href="../usb_gadget/EndpointInFile-class.html">EndpointInFile</a></span> 
+
+</dt>
+<dd>
+  Manages a USB IN endpoint (device-to-host) using Linux AIO.
+</dd>
+
+          <dt id="EndpointNumber">
+  <span class="name "><a href="../usb_gadget/EndpointNumber-class.html">EndpointNumber</a></span> 
+
+</dt>
+<dd>
+  Endpoint number (0-15).
+</dd>
+
+          <dt id="EndpointOutFile">
+  <span class="name "><a href="../usb_gadget/EndpointOutFile-class.html">EndpointOutFile</a></span> 
+
+</dt>
+<dd>
+  Manages a USB OUT endpoint (host-to-device) using Linux AIO.
+</dd>
+
+          <dt id="EndpointTemplate">
+  <span class="name "><a href="../usb_gadget/EndpointTemplate-class.html">EndpointTemplate</a></span> 
+
+</dt>
+<dd>
+  Endpoint template for speed-independent endpoint definitions.
+</dd>
+
+          <dt id="Errno">
+  <span class="name "><a href="../usb_gadget/Errno-class.html">Errno</a></span> 
+
+</dt>
+<dd>
+  A utility class for working with Linux <code>errno</code> values via FFI.
+</dd>
+
+          <dt id="EthernetFunction">
+  <span class="name "><a href="../usb_gadget/EthernetFunction-class.html">EthernetFunction</a></span> 
+
+</dt>
+<dd>
+  Base class for ethernet functions.
+</dd>
+
+          <dt id="ExtendedBytesPerInterval">
+  <span class="name "><a href="../usb_gadget/ExtendedBytesPerInterval-class.html">ExtendedBytesPerInterval</a></span> 
+
+</dt>
+<dd>
+  Type-safe extended bytes per interval for SuperSpeedPlus (0-4294967295).
+</dd>
+
+          <dt id="FunctionFs">
+  <span class="name "><a href="../usb_gadget/FunctionFs-class.html">FunctionFs</a></span> 
+
+</dt>
+<dd>
+  User Space FunctionFs Gadget Function.
+</dd>
+
+          <dt id="FunctionFsDescriptors">
+  <span class="name "><a href="../usb_gadget/FunctionFsDescriptors-class.html">FunctionFsDescriptors</a></span> 
+
+</dt>
+<dd>
+  FunctionFs descriptor data ready to be written to ep0.
+</dd>
+
+          <dt id="FunctionFsDescriptorsBuilder">
+  <span class="name "><a href="../usb_gadget/FunctionFsDescriptorsBuilder-class.html">FunctionFsDescriptorsBuilder</a></span> 
+
+</dt>
+<dd>
+  Builder for FunctionFs descriptor data.
+</dd>
+
+          <dt id="FunctionFsEvent">
+  <span class="name "><a href="../usb_gadget/FunctionFsEvent-class.html">FunctionFsEvent</a></span> 
+
+</dt>
+<dd>
+  Base class for FunctionFs events.
+</dd>
+
+          <dt id="FunctionFsFlags">
+  <span class="name "><a href="../usb_gadget/FunctionFsFlags-class.html">FunctionFsFlags</a></span> 
+
+</dt>
+<dd>
+  Flags for FunctionFs v2 descriptor format.
+</dd>
+
+          <dt id="FunctionFsMount">
+  <span class="name "><a href="../usb_gadget/FunctionFsMount-class.html">FunctionFsMount</a></span> 
+
+</dt>
+<dd>
+  Manages FunctionFs filesystem mounting and unmounting.
+</dd>
+
+          <dt id="FunctionFsStrings">
+  <span class="name "><a href="../usb_gadget/FunctionFsStrings-class.html">FunctionFsStrings</a></span> 
+
+</dt>
+<dd>
+  FunctionFs string data ready to be written to ep0.
+</dd>
+
+          <dt id="FunctionFsStringsBuilder">
+  <span class="name "><a href="../usb_gadget/FunctionFsStringsBuilder-class.html">FunctionFsStringsBuilder</a></span> 
+
+</dt>
+<dd>
+  Builder for FunctionFs string data.
+</dd>
+
+          <dt id="Gadget">
+  <span class="name "><a href="../usb_gadget/Gadget-class.html">Gadget</a></span> 
+
+</dt>
+<dd>
+  Creates and manages a USB gadget with the specified configuration.
+</dd>
+
+          <dt id="GadgetConfiguration">
+  <span class="name "><a href="../usb_gadget/GadgetConfiguration-class.html">GadgetConfiguration</a></span> 
+
+</dt>
+<dd>
+  A gadget configuration containing functions and attributes.
+</dd>
+
+          <dt id="GadgetFunction">
+  <span class="name "><a href="../usb_gadget/GadgetFunction-class.html">GadgetFunction</a></span> 
+
+</dt>
+<dd>
+  Core abstraction for all USB gadget functions.
+</dd>
+
+          <dt id="GadgetMaxPower">
+  <span class="name "><a href="../usb_gadget/GadgetMaxPower-class.html">GadgetMaxPower</a></span> 
+
+</dt>
+<dd>
+  Handles USB bMaxPower values for gadget configurations.
+</dd>
+
+          <dt id="GadgetStrings">
+  <span class="name "><a href="../usb_gadget/GadgetStrings-class.html">GadgetStrings</a></span> 
+
+</dt>
+<dd>
+  String descriptors for a gadget.
+</dd>
+
+          <dt id="GenericSerialFunction">
+  <span class="name "><a href="../usb_gadget/GenericSerialFunction-class.html">GenericSerialFunction</a></span> 
+
+</dt>
+<dd>
+  Generic serial function (non-CDC).
+</dd>
+
+          <dt id="HIDEndpointConfig">
+  <span class="name "><a href="../usb_gadget/HIDEndpointConfig-class.html">HIDEndpointConfig</a></span> 
+
+</dt>
+<dd>
+  Configuration for HID endpoint topology and parameters.
+</dd>
+
+          <dt id="HIDFunction">
+  <span class="name "><a href="../usb_gadget/HIDFunction-class.html">HIDFunction</a></span> 
+
+</dt>
+<dd>
+  HID function (keyboard, mouse, gamepad, etc.).
+</dd>
+
+          <dt id="HIDFunctionFs">
+  <span class="name "><a href="../usb_gadget/HIDFunctionFs-class.html">HIDFunctionFs</a></span> 
+
+</dt>
+<dd>
+  Enhanced HIDFunctionFs with simplified endpoint configuration.
+</dd>
+
+          <dt id="InterfaceNumber">
+  <span class="name "><a href="../usb_gadget/InterfaceNumber-class.html">InterfaceNumber</a></span> 
+
+</dt>
+<dd>
+  Type-safe interface number (0-255).
+</dd>
+
+          <dt id="InterruptEndpointConfig">
+  <span class="name "><a href="../usb_gadget/InterruptEndpointConfig-class.html">InterruptEndpointConfig</a></span> 
+
+</dt>
+<dd>
+  Interrupt transfer endpoint configuration.
+</dd>
+
+          <dt id="IsochronousEndpointConfig">
+  <span class="name "><a href="../usb_gadget/IsochronousEndpointConfig-class.html">IsochronousEndpointConfig</a></span> 
+
+</dt>
+<dd>
+  Isochronous transfer endpoint configuration.
+</dd>
+
+          <dt id="KernelFunction">
+  <span class="name "><a href="../usb_gadget/KernelFunction-class.html">KernelFunction</a></span> 
+
+</dt>
+<dd>
+  Base class for kernel-implemented USB gadget functions.
+</dd>
+
+          <dt id="LanguageStrings">
+  <span class="name "><a href="../usb_gadget/LanguageStrings-class.html">LanguageStrings</a></span> 
+
+</dt>
+<dd>
+  String descriptors for a specific language.
+</dd>
+
+          <dt id="LoopbackFunction">
+  <span class="name "><a href="../usb_gadget/LoopbackFunction-class.html">LoopbackFunction</a></span> 
+
+</dt>
+<dd>
+  Loopback function (for USB testing).
+</dd>
+
+          <dt id="LunConfig">
+  <span class="name "><a href="../usb_gadget/LunConfig-class.html">LunConfig</a></span> 
+
+</dt>
+<dd>
+  Configuration for a mass storage LUN (Logical Unit Number).
+</dd>
+
+          <dt id="MassStorageFunction">
+  <span class="name "><a href="../usb_gadget/MassStorageFunction-class.html">MassStorageFunction</a></span> 
+
+</dt>
+<dd>
+  Mass storage function (USB flash drive emulation).
+</dd>
+
+          <dt id="MaxPacketSize">
+  <span class="name "><a href="../usb_gadget/MaxPacketSize-class.html">MaxPacketSize</a></span> 
+
+</dt>
+<dd>
+  Type-safe maximum packet size with speed-specific validation.
+</dd>
+
+          <dt id="MidiFunction">
+  <span class="name "><a href="../usb_gadget/MidiFunction-class.html">MidiFunction</a></span> 
+
+</dt>
+<dd>
+  MIDI function (Musical Instrument Digital Interface).
+</dd>
+
+          <dt id="NcmFunction">
+  <span class="name "><a href="../usb_gadget/NcmFunction-class.html">NcmFunction</a></span> 
+
+</dt>
+<dd>
+  Ethernet (CDC NCM) function.
+</dd>
+
+          <dt id="PollingInterval">
+  <span class="name "><a href="../usb_gadget/PollingInterval-class.html">PollingInterval</a></span> 
+
+</dt>
+<dd>
+  Type-safe polling interval (bInterval field).
+</dd>
+
+          <dt id="PrinterFunction">
+  <span class="name "><a href="../usb_gadget/PrinterFunction-class.html">PrinterFunction</a></span> 
+
+</dt>
+<dd>
+  Printer function (USB printer class).
+</dd>
+
+          <dt id="RawUSBDescriptor">
+  <span class="name "><a href="../usb_gadget/RawUSBDescriptor-class.html">RawUSBDescriptor</a></span> 
+
+</dt>
+<dd>
+  Raw USB descriptor wrapper.
+</dd>
+
+          <dt id="RegisteredGadget">
+  <span class="name "><a href="../usb_gadget/RegisteredGadget-class.html">RegisteredGadget</a></span> 
+
+</dt>
+<dd>
+  Lightweight representation of a registered USB gadget.
+</dd>
+
+          <dt id="ResumeEvent">
+  <span class="name "><a href="../usb_gadget/ResumeEvent-class.html">ResumeEvent</a></span> 
+
+</dt>
+<dd>
+  USB resume signaled.
+</dd>
+
+          <dt id="RndisFunction">
+  <span class="name "><a href="../usb_gadget/RndisFunction-class.html">RndisFunction</a></span> 
+
+</dt>
+<dd>
+  RNDIS function (Windows ethernet).
+</dd>
+
+          <dt id="SetupEvent">
+  <span class="name "><a href="../usb_gadget/SetupEvent-class.html">SetupEvent</a></span> 
+
+</dt>
+<dd>
+  Setup packet received.
+</dd>
+
+          <dt id="SourceSinkFunction">
+  <span class="name "><a href="../usb_gadget/SourceSinkFunction-class.html">SourceSinkFunction</a></span> 
+
+</dt>
+<dd>
+  Source/Sink function (for USB testing).
+</dd>
+
+          <dt id="SSEndpointAttributes">
+  <span class="name "><a href="../usb_gadget/SSEndpointAttributes-class.html">SSEndpointAttributes</a></span> 
+
+</dt>
+<dd>
+  Type-safe SuperSpeed endpoint companion attributes.
+</dd>
+
+          <dt id="StringIndex">
+  <span class="name "><a href="../usb_gadget/StringIndex-class.html">StringIndex</a></span> 
+
+</dt>
+<dd>
+  Type-safe string descriptor index (0-255).
+</dd>
+
+          <dt id="SuspendEvent">
+  <span class="name "><a href="../usb_gadget/SuspendEvent-class.html">SuspendEvent</a></span> 
+
+</dt>
+<dd>
+  USB suspend signaled.
+</dd>
+
+          <dt id="Uac1Function">
+  <span class="name "><a href="../usb_gadget/Uac1Function-class.html">Uac1Function</a></span> 
+
+</dt>
+<dd>
+  Audio (UAC1) function.
+</dd>
+
+          <dt id="Uac2Function">
+  <span class="name "><a href="../usb_gadget/Uac2Function-class.html">Uac2Function</a></span> 
+
+</dt>
+<dd>
+  Audio (UAC2) function.
+</dd>
+
+          <dt id="Udc">
+  <span class="name "><a href="../usb_gadget/Udc-class.html">Udc</a></span> 
+
+</dt>
+<dd>
+  USB Device Controller (UDC).
+</dd>
+
+          <dt id="UnbindEvent">
+  <span class="name "><a href="../usb_gadget/UnbindEvent-class.html">UnbindEvent</a></span> 
+
+</dt>
+<dd>
+  Function has been unbound from the UDC.
+</dd>
+
+          <dt id="USBDescriptor">
+  <span class="name "><a href="../usb_gadget/USBDescriptor-class.html">USBDescriptor</a></span> 
+
+</dt>
+<dd>
+  Base class for all USB descriptors.
+</dd>
+
+          <dt id="USBEndpointDescriptor">
+  <span class="name "><a href="../usb_gadget/USBEndpointDescriptor-class.html">USBEndpointDescriptor</a></span> 
+
+</dt>
+<dd>
+  USB Endpoint Descriptor.
+</dd>
+
+          <dt id="USBHIDDescriptor">
+  <span class="name "><a href="../usb_gadget/USBHIDDescriptor-class.html">USBHIDDescriptor</a></span> 
+
+</dt>
+<dd>
+  USB HID Descriptor.
+</dd>
+
+          <dt id="USBInterfaceAssocDescriptor">
+  <span class="name "><a href="../usb_gadget/USBInterfaceAssocDescriptor-class.html">USBInterfaceAssocDescriptor</a></span> 
+
+</dt>
+<dd>
+  USB Interface Association Descriptor.
+</dd>
+
+          <dt id="USBInterfaceDescriptor">
+  <span class="name "><a href="../usb_gadget/USBInterfaceDescriptor-class.html">USBInterfaceDescriptor</a></span> 
+
+</dt>
+<dd>
+  USB Interface Descriptor.
+</dd>
+
+          <dt id="USBSSEPCompDescriptor">
+  <span class="name "><a href="../usb_gadget/USBSSEPCompDescriptor-class.html">USBSSEPCompDescriptor</a></span> 
+
+</dt>
+<dd>
+  USB SuperSpeed Endpoint Companion Descriptor.
+</dd>
+
+          <dt id="USBSSPIsocEndpointDescriptor">
+  <span class="name "><a href="../usb_gadget/USBSSPIsocEndpointDescriptor-class.html">USBSSPIsocEndpointDescriptor</a></span> 
+
+</dt>
+<dd>
+  USB SuperSpeedPlus Isochronous Endpoint Companion Descriptor.
+</dd>
+
+          <dt id="UvcFunction">
+  <span class="name "><a href="../usb_gadget/UvcFunction-class.html">UvcFunction</a></span> 
+
+</dt>
+<dd>
+  UVC (USB Video Class) function for webcam emulation.
+</dd>
+
+      </dl>
+    </section>
+
+    <section class="summary offset-anchor" id="enums">
+      <h2>Enums</h2>
+      <dl>
+          <dt id="FunctionFsEventType">
+  <span class="name "><a href="../usb_gadget/FunctionFsEventType.html">FunctionFsEventType</a></span> 
+
+</dt>
+<dd>
+  Event type constants.
+</dd>
+
+          <dt id="FunctionFsMagic">
+  <span class="name "><a href="../usb_gadget/FunctionFsMagic.html">FunctionFsMagic</a></span> 
+
+</dt>
+<dd>
+  Magic numbers for FunctionFs descriptor headers.
+</dd>
+
+          <dt id="FunctionFsState">
+  <span class="name "><a href="../usb_gadget/FunctionFsState.html">FunctionFsState</a></span> 
+
+</dt>
+<dd>
+  FunctionFs lifecycle states
+</dd>
+
+          <dt id="GadgetAttributes">
+  <span class="name "><a href="../usb_gadget/GadgetAttributes.html">GadgetAttributes</a></span> 
+
+</dt>
+<dd>
+  USB configuration attributes (bmAttributes field).
+</dd>
+
+          <dt id="GadgetFunctionType">
+  <span class="name "><a href="../usb_gadget/GadgetFunctionType.html">GadgetFunctionType</a></span> 
+
+</dt>
+<dd>
+  Type of gadget function.
+</dd>
+
+          <dt id="HIDDescriptorType">
+  <span class="name "><a href="../usb_gadget/HIDDescriptorType.html">HIDDescriptorType</a></span> 
+
+</dt>
+<dd>
+  HID descriptor type codes (bDescriptorType).
+</dd>
+
+          <dt id="HIDProtocol">
+  <span class="name "><a href="../usb_gadget/HIDProtocol.html">HIDProtocol</a></span> 
+
+</dt>
+<dd>
+  HID protocol codes (bInterfaceProtocol).
+</dd>
+
+          <dt id="HIDReportType">
+  <span class="name "><a href="../usb_gadget/HIDReportType.html">HIDReportType</a></span> 
+
+</dt>
+<dd>
+  HID report types.
+</dd>
+
+          <dt id="HIDRequest">
+  <span class="name "><a href="../usb_gadget/HIDRequest.html">HIDRequest</a></span> 
+
+</dt>
+<dd>
+  HID class-specific request codes (bRequest).
+</dd>
+
+          <dt id="HIDSubclass">
+  <span class="name "><a href="../usb_gadget/HIDSubclass.html">HIDSubclass</a></span> 
+
+</dt>
+<dd>
+  HID subclass codes (bInterfaceSubClass).
+</dd>
+
+          <dt id="IsoSyncType">
+  <span class="name "><a href="../usb_gadget/IsoSyncType.html">IsoSyncType</a></span> 
+
+</dt>
+<dd>
+  Isochronous synchronization type (bits 2-3 of bmAttributes).
+</dd>
+
+          <dt id="IsoUsageType">
+  <span class="name "><a href="../usb_gadget/IsoUsageType.html">IsoUsageType</a></span> 
+
+</dt>
+<dd>
+  Isochronous usage type (bits 4-5 of bmAttributes).
+</dd>
+
+          <dt id="KernelFunctionType">
+  <span class="name "><a href="../usb_gadget/KernelFunctionType.html">KernelFunctionType</a></span> 
+
+</dt>
+<dd>
+  Types of kernel-based USB gadget functions
+</dd>
+
+          <dt id="Speed">
+  <span class="name "><a href="../usb_gadget/Speed.html">Speed</a></span> 
+
+</dt>
+<dd>
+  USB speed levels.
+</dd>
+
+          <dt id="TransferType">
+  <span class="name "><a href="../usb_gadget/TransferType.html">TransferType</a></span> 
+
+</dt>
+<dd>
+  USB endpoint transfer types.
+</dd>
+
+          <dt id="USBClass">
+  <span class="name "><a href="../usb_gadget/USBClass.html">USBClass</a></span> 
+
+</dt>
+<dd>
+  USB device class codes.
+</dd>
+
+          <dt id="USBDescriptorType">
+  <span class="name "><a href="../usb_gadget/USBDescriptorType.html">USBDescriptorType</a></span> 
+
+</dt>
+<dd>
+  USB descriptor types.
+</dd>
+
+          <dt id="USBDeviceState">
+  <span class="name "><a href="../usb_gadget/USBDeviceState.html">USBDeviceState</a></span> 
+
+</dt>
+<dd>
+  USB Device Controller (UDC) states.
+</dd>
+
+          <dt id="USBDirection">
+  <span class="name "><a href="../usb_gadget/USBDirection.html">USBDirection</a></span> 
+
+</dt>
+<dd>
+  USB transfer direction.
+</dd>
+
+          <dt id="USBFeature">
+  <span class="name "><a href="../usb_gadget/USBFeature.html">USBFeature</a></span> 
+
+</dt>
+<dd>
+  Standard USB feature selectors.
+</dd>
+
+          <dt id="USBLanguageId">
+  <span class="name "><a href="../usb_gadget/USBLanguageId.html">USBLanguageId</a></span> 
+
+</dt>
+<dd>
+  USB Language IDs for string descriptors.
+</dd>
+
+          <dt id="USBRecipient">
+  <span class="name "><a href="../usb_gadget/USBRecipient.html">USBRecipient</a></span> 
+
+</dt>
+<dd>
+  USB recipients (bits 0-4 of bmRequestType).
+</dd>
+
+          <dt id="USBRequest">
+  <span class="name "><a href="../usb_gadget/USBRequest.html">USBRequest</a></span> 
+
+</dt>
+<dd>
+  Standard USB requests.
+</dd>
+
+          <dt id="USBRequestType">
+  <span class="name "><a href="../usb_gadget/USBRequestType.html">USBRequestType</a></span> 
+
+</dt>
+<dd>
+  USB request types (bits 5-6 of bmRequestType).
+</dd>
+
+      </dl>
+    </section>
+
+    <section class="summary offset-anchor" id="mixins">
+      <h2>Mixins</h2>
+      <dl>
+          <dt id="PlatformLogger">
+  <span class="name "><a href="../usb_gadget/PlatformLogger-mixin.html">PlatformLogger</a></span> 
+
+</dt>
+<dd>
+  
+</dd>
+
+          <dt id="USBGadgetLogger">
+  <span class="name "><a href="../usb_gadget/USBGadgetLogger-mixin.html">USBGadgetLogger</a></span> 
+
+</dt>
+<dd>
+  
+</dd>
+
+      </dl>
+    </section>
+
+
+    <section class="summary offset-anchor" id="extensions">
+      <h2>Extensions</h2>
+      <dl>
+          <dt id="BitFlagList">
+  <span class="name "><a href="../usb_gadget/BitFlagList.html">BitFlagList</a></span>
+  on <a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter">T</span>&gt;</span>
+  
+
+</dt>
+<dd>
+  Extension for converting lists of bit flags into integer bitmasks.
+</dd>
+
+          <dt id="HexString">
+  <span class="name "><a href="../usb_gadget/HexString.html">HexString</a></span>
+  on <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a>
+  
+
+</dt>
+<dd>
+  
+</dd>
+
+          <dt id="IntBitOps">
+  <span class="name "><a href="../usb_gadget/IntBitOps.html">IntBitOps</a></span>
+  on <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a>
+  
+
+</dt>
+<dd>
+  Extension providing bit-level operations on integers.
+</dd>
+
+          <dt id="IntByteOps">
+  <span class="name "><a href="../usb_gadget/IntByteOps.html">IntByteOps</a></span>
+  on <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a>
+  
+
+</dt>
+<dd>
+  Extension providing byte-level operations on integers.
+</dd>
+
+          <dt id="XXDExt">
+  <span class="name "><a href="../usb_gadget/XXDExt.html">XXDExt</a></span>
+  on <a href="https://api.flutter.dev/flutter/dart-typed_data/Uint8List-class.html">Uint8List</a>
+  
+
+</dt>
+<dd>
+  
+</dd>
+
+      </dl>
+    </section>
+
+    <section class="summary offset-anchor" id="constants">
+      <h2>Constants</h2>
+      <dl class="properties">
+          <dt id="functionFsMountDelay" class="constant">
+    <span class="name "><a href="../usb_gadget/functionFsMountDelay-constant.html">functionFsMountDelay</a></span>
+  <span class="signature">&#8594; const <a href="https://api.flutter.dev/flutter/dart-core/Duration-class.html">Duration</a></span>
+  
+
+</dt>
+<dd>
+  Delay after mounting before opening endpoint files.
+  
+
+</dd>
+
+      </dl>
+    </section>
+
+
+    <section class="summary offset-anchor" id="functions">
+      <h2>Functions</h2>
+      <dl class="callables">
+          <dt id="getDefaultUdc" class="callable">
+  <span class="name"><a href="../usb_gadget/getDefaultUdc.html">getDefaultUdc</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; <a href="../usb_gadget/Udc-class.html">Udc</a>?</span>
+  </span>
+  
+
+</dt>
+<dd>
+  The default USB device controller (UDC) in the system by alphabetical sorting.
+  
+
+</dd>
+
+          <dt id="listUdcs" class="callable">
+  <span class="name"><a href="../usb_gadget/listUdcs.html">listUdcs</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../usb_gadget/Udc-class.html">Udc</a></span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Gets the available USB device controllers (UDCs) in the system.
+  
+
+</dd>
+
+      </dl>
+    </section>
+
+    <section class="summary offset-anchor" id="typedefs">
+      <h2>Typedefs</h2>
+      <dl>
+          
+  <dt id="USBSpeed" class="">
+  <span class="name"><a href="../usb_gadget/USBSpeed.html">USBSpeed</a></span>
+    = <a href="../usb_gadget/Speed.html">Speed</a>
+  </span>
+  
+
+</dt>
+<dd>
+  
+  
+
+</dd>
+
+
+      </dl>
+    </section>
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../index.html">usb_gadget</a></li>
+    <li class="self-crumb">usb_gadget.dart</li>
+</ol>
+
+    <h5><span class="package-name">usb_gadget</span> <span class="package-kind">package</span></h5>
+    <ol>
+      <li class="section-title">Libraries</li>
+      <li><a href="../usb_gadget/">usb_gadget</a></li>
+</ol>
+
+  </div>
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+    <h5>usb_gadget library</h5>
+  </div><!--/sidebar-offcanvas-right-->
+</main>
+<footer>
+  <span class="no-break">
+    usb_gadget
+      0.3.2
+  </span>
+  
+</footer>
+
+
+<script src="../static-assets/highlight.pack.js?v1"></script>
+<script src="../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

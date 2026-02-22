@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the prepare method from the MassStorageFunction class, for the Dart programming language.">
+  <title>prepare method - MassStorageFunction class - usb_gadget library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../../static-assets/styles.css?v1">
+  <link rel="icon" href="../../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../../index.html">usb_gadget</a></li>
+    <li><a href="../../usb_gadget/">usb_gadget.dart</a></li>
+    <li><a href="../../usb_gadget/MassStorageFunction-class.html">MassStorageFunction</a></li>
+    <li class="self-crumb">prepare method</li>
+  </ol>
+  <div class="self-name">prepare</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="usb_gadget&#47;MassStorageFunction-class-sidebar.html"
+    data-below-sidebar="">
+    <div>
+<h1><span class="kind-method">prepare</span> method 
+</h1></div>
+
+    <section class="multi-line-signature">
+      
+  <div>
+    <ol class="annotation-list">
+        <li>@<a href="https://api.flutter.dev/flutter/dart-core/override-constant.html">override</a></li>
+    </ol>
+  </div>
+<span class="returntype"><a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+<span class="name ">prepare</span>(<wbr><ol class="parameter-list single-line"> <li><span class="parameter" id="prepare-param-path"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">path</span></span></li>
+</ol>)
+
+      <div class="features"><span class="feature">override</span></div>
+
+    </section>
+    
+<section class="desc markdown">
+  <p>Phase 1: Initialize function resources at the given configfs path.</p>
+<p>This method is called after the function directory is created but before
+it's linked to a configuration. It should perform all necessary setup:</p>
+<p><strong>For FunctionFs functions:</strong></p>
+<ul>
+<li>Mount the functionfs filesystem</li>
+<li>Write USB descriptors (device, endpoint, string descriptors)</li>
+<li>Open endpoint files for I/O</li>
+</ul>
+<p><strong>For kernel functions:</strong></p>
+<ul>
+<li>Write configuration attributes (LUN paths, serial numbers, etc.)</li>
+<li>Validate configuration parameters</li>
+</ul>
+<p>The <code>path</code> parameter is the full configfs path where the function should
+write its attributes (e.g., <code>/sys/kernel/config/usb_gadget/g1/functions/ffs.adb</code>).</p>
+<p><strong>Important:</strong> This method must be synchronous in execution but can
+initiate asynchronous operations. Use <a href="../../usb_gadget/KernelFunction/awaitState.html">awaitState</a> to wait for completion.</p>
+<p>Throws:</p>
+<ul>
+<li><a href="https://api.flutter.dev/flutter/dart-io/FileSystemException-class.html">FileSystemException</a> if configuration files cannot be written</li>
+<li><a href="https://api.flutter.dev/flutter/dart-core/ArgumentError-class.html">ArgumentError</a> if invalid configuration is provided</li>
+</ul>
+</section>
+
+
+    
+<section class="summary source-code" id="source">
+  <h2><span>Implementation</span></h2>
+  <pre class="language-dart"><code class="language-dart">@override
+Future&lt;void&gt; prepare(String path) async {
+  await super.prepare(path);
+  for (var i = 0; i &lt; luns.length; i++) {
+    final lun = luns[i];
+    final lunPath = &#39;$functionPath&#47;lun.$i&#39;;
+    log?.info(&#39;Configuring LUN $i&#39;);
+    Directory(lunPath).createSync(recursive: true);
+    if (lun.path != null) {
+      _writeLunAttribute(lunPath, &#39;file&#39;, lun.path!);
+    }
+    if (lun.cdrom) {
+      _writeLunAttribute(lunPath, &#39;cdrom&#39;, &#39;1&#39;);
+    }
+    if (lun.ro) {
+      _writeLunAttribute(lunPath, &#39;ro&#39;, &#39;1&#39;);
+    }
+    if (lun.removable) {
+      _writeLunAttribute(lunPath, &#39;removable&#39;, &#39;1&#39;);
+    }
+    if (lun.nofua) {
+      _writeLunAttribute(lunPath, &#39;nofua&#39;, &#39;1&#39;);
+    }
+  }
+}</code></pre>
+</section>
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../../index.html">usb_gadget</a></li>
+    <li><a href="../../usb_gadget/">usb_gadget</a></li>
+    <li><a href="../../usb_gadget/MassStorageFunction-class.html">MassStorageFunction</a></li>
+    <li class="self-crumb">prepare method</li>
+</ol>
+
+    <h5>MassStorageFunction class</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div><!--/.sidebar-offcanvas-->
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+</div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    usb_gadget
+      0.3.2
+  </span>
+  
+</footer>
+
+
+<script src="../../static-assets/highlight.pack.js?v1"></script>
+<script src="../../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+
