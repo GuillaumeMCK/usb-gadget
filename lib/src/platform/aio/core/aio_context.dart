@@ -7,7 +7,11 @@ import '/src/platform/aio/aio.dart';
 import '/src/platform/errno/errno.dart';
 import '../aio.ffi.dart' as ffi_aio;
 
-final _aio = ffi_aio.Aio();
+final _aio = ffi_aio.Aio(
+  ffi.DynamicLibrary.open(
+    String.fromEnvironment('AIO_LIB', defaultValue: 'libaio.so'),
+  ),
+);
 
 /// Kernel AIO context with event loop.
 final class AioContext with Releasable {
