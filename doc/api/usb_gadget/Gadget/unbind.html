@@ -87,7 +87,7 @@ errors are logged as warnings.</p>
     try {
       _writeAttr(&#39;$_gadgetPath&#47;UDC&#39;, &#39;&#39;);
     } catch (err) {
-      log?.warn(&#39;Failed to unbind from UDC: $err&#39;);
+      log?.warn(&#39;Failed to unbind from UDC:&#39;, err);
     }
     _boundUdc = null;
   }
@@ -97,7 +97,7 @@ errors are logged as warnings.</p>
       await function.release();
       log?.debug(&#39;Released function: ${function.name}&#39;);
     } catch (err) {
-      log?.warn(&#39;Failed to release function ${function.name}: $err&#39;);
+      log?.warn(&#39;Failed to release function ${function.name}:&#39;, err);
     }
   }
 
@@ -105,7 +105,7 @@ errors are logged as warnings.</p>
     try {
       Link(link).deleteSync();
     } catch (err) {
-      log?.warn(&#39;Failed to remove symlink $link: $err&#39;);
+      log?.warn(&#39;Failed to remove symlink $link:&#39;, err);
     }
   }
   _createdSymlinks.clear();
@@ -114,7 +114,7 @@ errors are logged as warnings.</p>
     try {
       Directory(dir).deleteSync();
     } catch (err) {
-      log?.warn(&#39;Failed to remove directory $dir: $err&#39;);
+      log?.warn(&#39;Failed to remove directory $dir:&#39;, err);
     }
   }
   _createdDirs.clear();
@@ -146,7 +146,7 @@ errors are logged as warnings.</p>
 <footer>
   <span class="no-break">
     usb_gadget
-      0.3.2
+      0.3.3
   </span>
   
 </footer>

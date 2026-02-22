@@ -100,17 +100,16 @@ Future&lt;void&gt; release() async {
         log?.info(&#39;Closing endpoint: ${ep.fd}&#39;);
         await ep.close();
       } catch (err) {
-        log?.warn(&#39;Failed to close endpoint: $err&#39;);
+        log?.warn(&#39;Failed to close endpoint:&#39;, err);
       }
     }
     _endpoints.clear();
   }
 
   try {
-    log?.info(&#39;Closing EP0 and unmounting FunctionFs...&#39;);
-    await _ep0.close();
+    if (_state != .uninitialized) await _ep0.close();
   } catch (err) {
-    log?.warn(&#39;Failed to close EP0: $err&#39;);
+    log?.warn(&#39;Failed to close EP0:&#39;, err);
   }
 
   &#47;&#47; Clear maps to release strong references
@@ -146,7 +145,7 @@ Future&lt;void&gt; release() async {
 <footer>
   <span class="no-break">
     usb_gadget
-      0.3.2
+      0.3.3
   </span>
   
 </footer>

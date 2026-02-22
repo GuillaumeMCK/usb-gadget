@@ -107,7 +107,7 @@ await gadget.bind();  // Device is now active
     _bindToUdc(targetUdc);
     log?.success(&#39;Gadget bound to UDC: $_boundUdc&#39;);
   } catch (err, st) {
-    log?.error(&#39;Bind failed: $err&#39;, err, st);
+    log?.error(&#39;Bind failed: &#39;, err, st);
     await unbind();
     rethrow;
   }
@@ -139,7 +139,7 @@ await gadget.bind();  // Device is now active
 <footer>
   <span class="no-break">
     usb_gadget
-      0.3.2
+      0.3.3
   </span>
   
 </footer>

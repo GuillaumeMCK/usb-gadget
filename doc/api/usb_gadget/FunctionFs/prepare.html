@@ -188,7 +188,7 @@ Future&lt;void&gt; prepare(String path) async {
     log?.debug(&#39;Ready for UDC binding&#39;);
   } catch (err, st) {
     _setState(.uninitialized);
-    log?.error(&#39;Error preparing FunctionFs function: $err&#39;, err, st);
+    log?.error(&#39;Error preparing FunctionFs function: &#39;, err, st);
     rethrow;
   }
 }</code></pre>
@@ -219,7 +219,7 @@ Future&lt;void&gt; prepare(String path) async {
 <footer>
   <span class="no-break">
     usb_gadget
-      0.3.2
+      0.3.3
   </span>
   
 </footer>
