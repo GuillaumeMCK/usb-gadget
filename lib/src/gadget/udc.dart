@@ -10,7 +10,7 @@ import '/usb_gadget.dart';
 ///
 /// Example:
 /// ```dart
-/// final udcs = await queryUdcs();
+/// final udcs = await listUdcs();
 /// for (final udc in udcs) {
 ///   print('UDC: ${udc.name}');
 ///   print('Max speed: ${udc.maxSpeed}');
@@ -121,12 +121,12 @@ class Udc {
 ///
 /// Example:
 /// ```dart
-/// final udcs = queryUdcs();
+/// final udcs = listUdcs();
 /// if (udcs.isEmpty) {
 ///   print('No UDCs available');
 /// }
 /// ```
-List<Udc> queryUdcs() {
+List<Udc> listUdcs() {
   const classDir = '/sys/class';
   if (!Directory(classDir).existsSync()) {
     return [];
@@ -160,7 +160,7 @@ List<Udc> queryUdcs() {
 /// }
 /// ```
 Udc? getDefaultUdc() {
-  final udcs = queryUdcs();
+  final udcs = listUdcs();
   if (udcs.isEmpty) {
     return null;
   }
