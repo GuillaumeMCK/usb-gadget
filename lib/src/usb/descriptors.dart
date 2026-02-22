@@ -120,9 +120,9 @@ class LanguageStrings {
   /// Creates a string set for a specific language.
   ///
   /// The [strings] list contains the actual string values, where:
-  /// - strings[0] is string descriptor index 1
-  /// - strings[1] is string descriptor index 2
-  /// - etc.
+  /// - Index 0 corresponds to string descriptor index 1
+  /// - Index 1 corresponds to string descriptor index 2
+  /// and so on. The language ID is specified separately in [language].
   const LanguageStrings({required this.language, required this.strings});
 
   /// The language ID for these strings.
@@ -579,7 +579,7 @@ class USBInterfaceAssocDescriptor implements USBDescriptor {
   /// Number of contiguous interfaces in the function.
   ///
   /// The function includes interfaces [firstInterface] through
-  /// [firstInterface + interfaceCount - 1].
+  /// (firstInterface + interfaceCount - 1).
   final int interfaceCount;
 
   /// Function class code.
