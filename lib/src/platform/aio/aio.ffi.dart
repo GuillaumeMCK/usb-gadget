@@ -147,6 +147,9 @@ final class io_context extends ffi.Opaque {}
 final class io_iocb_poll extends ffi.Struct {
   @ffi.Int()
   external int events;
+
+  @ffi.Int()
+  external int __pad1;
 }
 
 final class io_iocb_sockaddr extends ffi.Struct {
@@ -164,6 +167,9 @@ final class io_iocb_common extends ffi.Struct {
 
   @ffi.LongLong()
   external int offset;
+
+  @ffi.LongLong()
+  external int __pad3;
 
   @ffi.UnsignedInt()
   external int flags;
