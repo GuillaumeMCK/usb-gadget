@@ -14,14 +14,8 @@ class PongFunction extends FunctionFs {
             numEndpoints: .two,
             interfaceClass: .vendorSpecific,
           ),
-          const EndpointTemplate(
-            address: .in_(.ep1),
-            config: BulkEndpointConfig(),
-          ),
-          const EndpointTemplate(
-            address: .out(.ep2),
-            config: BulkEndpointConfig(),
-          ),
+          const EndpointTemplate(address: .in_(.ep1), config: .bulk()),
+          const EndpointTemplate(address: .out(.ep2), config: .bulk()),
         ],
         strings: {
           .enUS: ['Pong Function'],
