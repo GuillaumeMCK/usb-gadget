@@ -647,6 +647,22 @@ class USBInterfaceAssocDescriptor implements USBDescriptor {
 sealed class EndpointConfig {
   const EndpointConfig({this.maxPacketSize});
 
+  const factory EndpointConfig.bulk({int? maxPacketSize}) = BulkEndpointConfig;
+
+  const factory EndpointConfig.control({int? maxPacketSize}) =
+      ControlEndpointConfig;
+
+  const factory EndpointConfig.interrupt({
+    required Duration interval,
+    int? maxPacketSize,
+  }) = InterruptEndpointConfig;
+
+  const factory EndpointConfig.isochronous({
+    required IsoSyncType syncType,
+    required IsoUsageType usageType,
+    int? maxPacketSize,
+  }) = IsochronousEndpointConfig;
+
   /// Optional custom maximum packet size override (bytes).
   ///
   /// When `null`, the spec-mandated default for the transfer type and speed
