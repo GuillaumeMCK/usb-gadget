@@ -688,8 +688,7 @@ final class BulkEndpointConfig extends EndpointConfig {
   };
 
   @override
-  PollingInterval getPollingInterval(USBSpeed speed) =>
-      const PollingInterval.none();
+  PollingInterval getPollingInterval(USBSpeed speed) => const .none();
 }
 
 /// Control transfer endpoint configuration.
@@ -714,8 +713,7 @@ final class ControlEndpointConfig extends EndpointConfig {
   };
 
   @override
-  PollingInterval getPollingInterval(USBSpeed speed) =>
-      const PollingInterval.none();
+  PollingInterval getPollingInterval(USBSpeed speed) => const .none();
 }
 
 /// Interrupt transfer endpoint configuration.
