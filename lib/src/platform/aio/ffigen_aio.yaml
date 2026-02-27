@@ -21,3 +21,5 @@ structs:
   include:
     - 'iocb'
     - 'io_event'
+preamble: |
+  // ignore_for_file: type=lint, unused_import, unused_field
