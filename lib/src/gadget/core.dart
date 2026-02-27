@@ -244,18 +244,15 @@ class Gadget with USBGadgetLogger {
       throw StateError('Gadget is already bound to UDC $_boundUdc');
     }
 
-    log?.debug('Starting bind process');
-    final targetUdc = udc ?? _findUdc();
-    log?.debug('Using UDC: $targetUdc');
-
+    String? effectiveUdc;
     try {
+      effectiveUdc = udc ?? _findUdc();
       _createGadget();
       await _setupFunctions();
-      log?.info('All functions are ready, binding to UDC...');
-      _bindToUdc(targetUdc);
+      _bindToUdc(effectiveUdc);
       log?.success('Gadget bound to UDC: $_boundUdc');
     } catch (err, st) {
-      log?.error('Bind failed: ', err, st);
+      log?.error('Failed to bind gadget (UDC: $effectiveUdc):', err, st);
       await unbind();
       rethrow;
     }
