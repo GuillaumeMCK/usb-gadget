@@ -432,11 +432,10 @@ class Gadget with USBGadgetLogger {
   ///
   /// This ensures synchronized initialization - no function is left behind.
   Future<void> _setupFunctions() async {
-    final stream = stateStream().asBroadcastStream();
     for (final function in config.functions) {
-      function.usbDeviceStateStream = stream;
       if (function.type == .ffs) {
         await function.awaitState(.ready);
+        log?.info('Function "${function.name}" is ready');
       }
     }
   }

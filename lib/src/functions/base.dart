@@ -41,12 +41,6 @@ abstract class GadgetFunction with Releasable {
   /// configuration attribute setup.
   GadgetFunctionType get type;
 
-  /// Stream of USB device state changes propagated from the gadget.
-  ///
-  /// This stream automatically receives updates when the gadget's USB
-  /// state changes. Use this to react to enumeration lifecycle events.
-  Stream<USBDeviceState>? usbDeviceStateStream;
-
   /// Returns the configfs instance name for this function.
   ///
   /// The format depends on the function type:
