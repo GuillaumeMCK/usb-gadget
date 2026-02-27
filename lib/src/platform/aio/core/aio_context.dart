@@ -7,11 +7,8 @@ import '/src/platform/aio/aio.dart';
 import '/src/platform/errno/errno.dart';
 import '../aio.ffi.dart' as ffi_aio;
 
-final _aio = ffi_aio.Aio(
-  ffi.DynamicLibrary.open(
-    String.fromEnvironment('AIO_LIB', defaultValue: 'libaio.so'),
-  ),
-);
+/// FFI bindings for Linux kernel AIO, loaded from libaio.so.
+final _libaio = ffi_aio.Aio(ffi.DynamicLibrary.open('libaio.so'));
 
 /// Kernel AIO context with event loop.
 final class AioContext with Releasable {
@@ -21,7 +18,7 @@ final class AioContext with Releasable {
   ]) {
     final ctxp = calloc<ffi.Pointer<ffi_aio.io_context>>()..value = ffi.nullptr;
     try {
-      final res = _aio.io_setup(maxEvents, ctxp);
+      final res = _libaio.io_setup(maxEvents, ctxp);
       if (res != 0) throw AioKernelException.fromErrno(-res, 'io_setup');
       _ctx = ctxp.value;
     } finally {
@@ -71,7 +68,7 @@ final class AioContext with Releasable {
         for (var i = 0; i < batch.length; i++) {
           arr[i] = batch[i];
         }
-        _aio.io_submit(_ctx, batch.length, arr);
+        _libaio.io_submit(_ctx, batch.length, arr);
       } finally {
         calloc.free(arr);
       }
@@ -86,7 +83,7 @@ final class AioContext with Releasable {
 
     final events = calloc<ffi_aio.io_event>(128);
     try {
-      final n = _aio.io_getevents(_ctx, 0, 128, events, ffi.nullptr);
+      final n = _libaio.io_getevents(_ctx, 0, 128, events, ffi.nullptr);
       if (n < 0) return;
 
       for (var i = 0; i < n; i++) {
@@ -128,6 +125,6 @@ final class AioContext with Releasable {
     _pending.clear();
     _queue.clear();
 
-    _aio.io_destroy(_ctx);
+    _libaio.io_destroy(_ctx);
   }
 }

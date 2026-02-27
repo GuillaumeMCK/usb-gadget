@@ -8,14 +8,7 @@ import '/src/utils/bitwise.dart';
 import '../errno/errno.dart';
 import 'unistd.ffi.dart' as unistd_ffi;
 
-/// Singleton library loader for unistd
-class UnistdBindings {
-  UnistdBindings._();
-
-  static final instance = UnistdBindings._();
-
-  final unistd_ffi.Unistd lib = unistd_ffi.Unistd(ffi.DynamicLibrary.process());
-}
+final _unistd = unistd_ffi.Unistd(ffi.DynamicLibrary.process());
 
 /// POSIX open() flags
 enum OpenFlag implements BitFlag {
@@ -134,8 +127,7 @@ abstract final class Unistd {
     final pathPtr = path.toNativeUtf8();
     try {
       return Errno.call(
-        () =>
-            UnistdBindings.instance.lib.open(pathPtr.cast(), flags.toBitmask()),
+        () => _unistd.open(pathPtr.cast(), flags.toBitmask()),
         isError: (r) => r == -1,
         message: 'open($path)',
       );
@@ -151,7 +143,7 @@ abstract final class Unistd {
   /// This method does not throw on error, as double-closes are common
   /// and usually harmless. Use [closeStrict] if you need error checking.
   static void close(int fd) {
-    UnistdBindings.instance.lib.close(fd);
+    _unistd.close(fd);
   }
 
   /// Closes a file descriptor with error checking
@@ -164,7 +156,7 @@ abstract final class Unistd {
     }
 
     Errno.call(
-      () => UnistdBindings.instance.lib.close(fd),
+      () => _unistd.close(fd),
       isError: (r) => r == -1,
       message: 'close',
     );
@@ -192,7 +184,7 @@ abstract final class Unistd {
     final bufferPtr = malloc<ffi.Uint8>(count);
     try {
       final (bytesRead, errnoCode) = Errno.capture(
-        () => UnistdBindings.instance.lib.read(fd, bufferPtr.cast(), count),
+        () => _unistd.read(fd, bufferPtr.cast(), count),
       );
 
       if (bytesRead < 0) {
@@ -259,7 +251,7 @@ abstract final class Unistd {
 
     // Handle zero-length writes
     if (data.isEmpty) {
-      return UnistdBindings.instance.lib.write(fd, ffi.nullptr, 0);
+      return _unistd.write(fd, ffi.nullptr, 0);
     }
 
     final bufferPtr = malloc<ffi.Uint8>(data.length);
@@ -267,11 +259,7 @@ abstract final class Unistd {
       bufferPtr.asTypedList(data.length).setAll(0, data);
 
       return Errno.call(
-        () => UnistdBindings.instance.lib.write(
-          fd,
-          bufferPtr.cast(),
-          data.length,
-        ),
+        () => _unistd.write(fd, bufferPtr.cast(), data.length),
         isError: (r) => r == -1,
         message: 'write',
       );
@@ -329,7 +317,7 @@ abstract final class Unistd {
     }
 
     return Errno.call(
-      () => UnistdBindings.instance.lib.fcntl(fd, cmd.value),
+      () => _unistd.fcntl(fd, cmd.value),
       isError: (r) => r == -1,
       message: 'fcntl',
     );

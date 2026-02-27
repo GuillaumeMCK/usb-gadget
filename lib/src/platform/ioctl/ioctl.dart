@@ -5,78 +5,60 @@ import '/src/utils/bitwise.dart';
 import '../errno/errno.dart';
 import 'ioctl.ffi.dart' as ioctl_lib;
 
-/// Singleton library loader for ioctl
-class IoctlLibrary {
-  IoctlLibrary._();
-
-  static final instance = IoctlLibrary._();
-
-  final ioctl_lib.Ioctl lib = ioctl_lib.Ioctl(ffi.DynamicLibrary.process());
-}
+/// Singleton loader for ioctl
+final _ioctl = ioctl_lib.Ioctl(ffi.DynamicLibrary.process());
 
 /// Direct FFI binding for ioctl with pointer argument
 ///
 /// This handles the variadic nature of ioctl by providing
 /// specific overloads for different argument types.
-class _IoctlVariadic {
-  static final _withPtr = ffi.DynamicLibrary.process()
-      .lookupFunction<
-        ffi.Int Function(ffi.Int, ffi.UnsignedLong, ffi.Pointer<ffi.Void>),
-        int Function(int, int, ffi.Pointer<ffi.Void>)
-      >('ioctl');
+final _ioctl_withPtr = ffi.DynamicLibrary.process()
+    .lookupFunction<
+      ffi.Int Function(ffi.Int, ffi.UnsignedLong, ffi.Pointer<ffi.Void>),
+      int Function(int, int, ffi.Pointer<ffi.Void>)
+    >('ioctl');
 
-  static final _withInt = ffi.DynamicLibrary.process()
-      .lookupFunction<
-        ffi.Int Function(ffi.Int, ffi.UnsignedLong, ffi.Int),
-        int Function(int, int, int)
-      >('ioctl');
-
-  static int callWithPtr(int fd, int request, ffi.Pointer<ffi.Void> arg) {
-    return _withPtr(fd, request, arg);
-  }
-
-  static int callWithInt(int fd, int request, int arg) {
-    return _withInt(fd, request, arg);
-  }
-}
+final _ioctl_withInt = ffi.DynamicLibrary.process()
+    .lookupFunction<
+      ffi.Int Function(ffi.Int, ffi.UnsignedLong, ffi.Int),
+      int Function(int, int, int)
+    >('ioctl');
 
 /// FunctionFs ioctl request identifiers
 ///
 /// These ioctls are used with the FunctionFs (USB Gadget) subsystem.
 enum IoctlRequest implements BitFlag {
   /// Get FIFO status
-  fifoStatus(ioctl_lib.FUNCTIONFS_FIFO_STATUS, 'FIFO_STATUS'),
+  fifoStatus(ioctl_lib.FUNCTIONFS_FIFO_STATUS),
 
   /// Flush FIFO
-  fifoFlush(ioctl_lib.FUNCTIONFS_FIFO_FLUSH, 'FIFO_FLUSH'),
+  fifoFlush(ioctl_lib.FUNCTIONFS_FIFO_FLUSH),
 
   /// Clear halt condition on endpoint
-  clearHalt(ioctl_lib.FUNCTIONFS_CLEAR_HALT, 'CLEAR_HALT'),
+  clearHalt(ioctl_lib.FUNCTIONFS_CLEAR_HALT),
 
   /// Get interface reverse mapping
-  interfaceRevmap(ioctl_lib.FUNCTIONFS_INTERFACE_REVMAP, 'INTERFACE_REVMAP'),
+  interfaceRevmap(ioctl_lib.FUNCTIONFS_INTERFACE_REVMAP),
 
   /// Get endpoint reverse mapping
-  endpointRevmap(ioctl_lib.FUNCTIONFS_ENDPOINT_REVMAP, 'ENDPOINT_REVMAP'),
+  endpointRevmap(ioctl_lib.FUNCTIONFS_ENDPOINT_REVMAP),
 
   /// Get endpoint descriptor
-  endpointDesc(ioctl_lib.FUNCTIONFS_ENDPOINT_DESC, 'ENDPOINT_DESC'),
+  endpointDesc(ioctl_lib.FUNCTIONFS_ENDPOINT_DESC),
 
   /// Attach DMA buffer
-  dmabufAttach(ioctl_lib.FUNCTIONFS_DMABUF_ATTACH, 'DMABUF_ATTACH'),
+  dmabufAttach(ioctl_lib.FUNCTIONFS_DMABUF_ATTACH),
 
   /// Detach DMA buffer
-  dmabufDetach(ioctl_lib.FUNCTIONFS_DMABUF_DETACH, 'DMABUF_DETACH'),
+  dmabufDetach(ioctl_lib.FUNCTIONFS_DMABUF_DETACH),
 
   /// Transfer via DMA buffer
-  dmabufTransfer(ioctl_lib.FUNCTIONFS_DMABUF_TRANSFER, 'DMABUF_TRANSFER');
+  dmabufTransfer(ioctl_lib.FUNCTIONFS_DMABUF_TRANSFER);
 
-  const IoctlRequest(this.value, this.name);
+  const IoctlRequest(this.value);
 
   @override
   final int value;
-
-  final String name;
 
   @override
   String toString() => 'IoctlRequest.$name';
@@ -120,7 +102,7 @@ abstract final class Ioctl {
     }
 
     return Errno.call(
-      () => IoctlLibrary.instance.lib.ioctl(fd, request.value),
+      () => _ioctl.ioctl(fd, request.value),
       message: request.name,
     );
   }
@@ -133,9 +115,7 @@ abstract final class Ioctl {
       throw ArgumentError.value(fd, 'fd', 'Must be non-negative');
     }
 
-    final (value, errno) = Errno.capture(
-      () => IoctlLibrary.instance.lib.ioctl(fd, request.value),
-    );
+    final (value, errno) = Errno.capture(() => _ioctl.ioctl(fd, request.value));
     return IoctlResult(value, value < 0 ? errno : 0);
   }
 
@@ -154,7 +134,7 @@ abstract final class Ioctl {
     }
 
     return Errno.call(
-      () => _IoctlVariadic.callWithInt(fd, request.value, arg),
+      () => _ioctl_withInt(fd, request.value, arg),
       message: request.name,
     );
   }
@@ -166,7 +146,7 @@ abstract final class Ioctl {
     }
 
     final (value, errno) = Errno.capture(
-      () => _IoctlVariadic.callWithInt(fd, request.value, arg),
+      () => _ioctl_withInt(fd, request.value, arg),
     );
     return IoctlResult(value, value < 0 ? errno : 0);
   }
@@ -189,7 +169,7 @@ abstract final class Ioctl {
     }
 
     return Errno.call(
-      () => _IoctlVariadic.callWithPtr(fd, request.value, arg),
+      () => _ioctl_withPtr(fd, request.value, arg),
       message: request.name,
     );
   }
@@ -208,7 +188,7 @@ abstract final class Ioctl {
     }
 
     final (value, errno) = Errno.capture(
-      () => _IoctlVariadic.callWithPtr(fd, request.value, arg),
+      () => _ioctl_withPtr(fd, request.value, arg),
     );
     return IoctlResult(value, value < 0 ? errno : 0);
   }

@@ -8,13 +8,7 @@ import '../errno/errno.dart';
 import 'mount.ffi.dart' as mount_lib;
 
 /// Singleton library loader for mount
-class MountLibrary {
-  MountLibrary._();
-
-  static final instance = MountLibrary._();
-
-  final mount_lib.Mount lib = mount_lib.Mount(ffi.DynamicLibrary.process());
-}
+final _mount = mount_lib.Mount(ffi.DynamicLibrary.process());
 
 /// Filesystem types recognized by the Linux kernel mount() syscall
 ///
@@ -284,7 +278,7 @@ abstract final class Mount {
 
     try {
       Errno.call(
-        () => MountLibrary.instance.lib.mount(
+        () => _mount.mount(
           sourcePtr.cast(),
           targetPtr.cast(),
           fsTypePtr.cast(),
@@ -319,7 +313,7 @@ abstract final class Mount {
     final targetPtr = target.toNativeUtf8();
     try {
       Errno.call(
-        () => MountLibrary.instance.lib.umount(targetPtr.cast()),
+        () => _mount.umount(targetPtr.cast()),
         isError: (r) => r != 0,
         message: 'umount($target)',
       );
@@ -343,10 +337,7 @@ abstract final class Mount {
     final targetPtr = target.toNativeUtf8();
     try {
       Errno.call(
-        () => MountLibrary.instance.lib.umount2(
-          targetPtr.cast(),
-          flags.toBitmask(),
-        ),
+        () => _mount.umount2(targetPtr.cast(), flags.toBitmask()),
         isError: (r) => r != 0,
         message: 'umount2($target)',
       );
