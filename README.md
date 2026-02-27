@@ -277,7 +277,6 @@ you must compile the **Dart SDK** and **libaio** yourself, then compile your app
 ### Set up the Dart SDK source tree
 
 > Refer to the official guide:
->
 > [Building Dart SDK for ARM or RISC-V](https://github.com/dart-lang/sdk/blob/main/docs/Building-Dart-SDK-for-ARM-or-RISC-V.md)
 > and
 > [Building the Dart VM for Android](https://github.com/dart-lang/sdk/blob/main/docs/Building-the-Dart-VM-for-Android.md)
