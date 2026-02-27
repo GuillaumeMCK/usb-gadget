@@ -12,13 +12,13 @@ final _ioctl = ioctl_lib.Ioctl(ffi.DynamicLibrary.process());
 ///
 /// This handles the variadic nature of ioctl by providing
 /// specific overloads for different argument types.
-final _ioctl_withPtr = ffi.DynamicLibrary.process()
+final _ioctlWithPtr = ffi.DynamicLibrary.process()
     .lookupFunction<
       ffi.Int Function(ffi.Int, ffi.UnsignedLong, ffi.Pointer<ffi.Void>),
       int Function(int, int, ffi.Pointer<ffi.Void>)
     >('ioctl');
 
-final _ioctl_withInt = ffi.DynamicLibrary.process()
+final _ioctlWithInt = ffi.DynamicLibrary.process()
     .lookupFunction<
       ffi.Int Function(ffi.Int, ffi.UnsignedLong, ffi.Int),
       int Function(int, int, int)
@@ -134,7 +134,7 @@ abstract final class Ioctl {
     }
 
     return Errno.call(
-      () => _ioctl_withInt(fd, request.value, arg),
+      () => _ioctlWithInt(fd, request.value, arg),
       message: request.name,
     );
   }
@@ -146,7 +146,7 @@ abstract final class Ioctl {
     }
 
     final (value, errno) = Errno.capture(
-      () => _ioctl_withInt(fd, request.value, arg),
+      () => _ioctlWithInt(fd, request.value, arg),
     );
     return IoctlResult(value, value < 0 ? errno : 0);
   }
@@ -169,7 +169,7 @@ abstract final class Ioctl {
     }
 
     return Errno.call(
-      () => _ioctl_withPtr(fd, request.value, arg),
+      () => _ioctlWithPtr(fd, request.value, arg),
       message: request.name,
     );
   }
@@ -188,7 +188,7 @@ abstract final class Ioctl {
     }
 
     final (value, errno) = Errno.capture(
-      () => _ioctl_withPtr(fd, request.value, arg),
+      () => _ioctlWithPtr(fd, request.value, arg),
     );
     return IoctlResult(value, value < 0 ? errno : 0);
   }
