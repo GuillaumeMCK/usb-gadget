@@ -273,8 +273,8 @@ you must compile the <strong>Dart SDK</strong> and <strong>libaio</strong> yours
 <hr>
 <h3 id="set-up-the-dart-sdk-source-tree">Set up the Dart SDK source tree</h3>
 <blockquote>
-<p>Refer to the official guide:</p>
-<p><a href="https://github.com/dart-lang/sdk/blob/main/docs/Building-Dart-SDK-for-ARM-or-RISC-V.md">Building Dart SDK for ARM or RISC-V</a>
+<p>Refer to the official guide:
+<a href="https://github.com/dart-lang/sdk/blob/main/docs/Building-Dart-SDK-for-ARM-or-RISC-V.md">Building Dart SDK for ARM or RISC-V</a>
 and
 <a href="https://github.com/dart-lang/sdk/blob/main/docs/Building-the-Dart-VM-for-Android.md">Building the Dart VM for Android</a></p>
 </blockquote>
@@ -340,16 +340,12 @@ adb shell
 su
 
 export PATH=/data/local/tmp/dart-sdk/bin:$PATH
+export PUB_CACHE=/data/local/tmp/.pub-cache/
 cd /data/local/tmp/usb_gadget_project
 
-# Fetch dependencies
 dart pub get
-
-# Compile
 dart compile exe bin/your_app.dart -o usb_gadget_app
-
-# Run
-LD_LIBRARY_PATH=/data/local/tmp ./usb_gadget_app
+chmod +x usb_gadget_app
 </code></pre>
 <p>Before running, make sure no other USB gadget is active and ConfigFS is mounted:</p>
 <pre class="language-bash"><code class="language-bash"># Save the current USB config before disabling it
@@ -365,6 +361,8 @@ sleep 1
 
 # Mount ConfigFS if not already mounted
 mount -t configfs none /sys/kernel/config
+
+LD_LIBRARY_PATH=/data/local/tmp ./usb_gadget_app
 </code></pre>
 <hr>
 <h2 id="resources">Resources</h2>
@@ -418,7 +416,7 @@ mount -t configfs none /sys/kernel/config
 <footer>
   <span class="no-break">
     usb_gadget
-      0.3.5
+      0.3.6
   </span>
   
 </footer>
