@@ -370,16 +370,12 @@ adb shell
 su
 
 export PATH=/data/local/tmp/dart-sdk/bin:$PATH
+export PUB_CACHE=/data/local/tmp/.pub-cache/
 cd /data/local/tmp/usb_gadget_project
 
-# Fetch dependencies
 dart pub get
-
-# Compile
 dart compile exe bin/your_app.dart -o usb_gadget_app
-
-# Run
-LD_LIBRARY_PATH=/data/local/tmp ./usb_gadget_app
+chmod +x usb_gadget_app
 ```
 
 Before running, make sure no other USB gadget is active and ConfigFS is mounted:
@@ -398,6 +394,8 @@ sleep 1
 
 # Mount ConfigFS if not already mounted
 mount -t configfs none /sys/kernel/config
+
+LD_LIBRARY_PATH=/data/local/tmp ./usb_gadget_app
 ```
 
 ---
