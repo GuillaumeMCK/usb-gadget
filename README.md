@@ -1,183 +1,88 @@
 # usb-gadget
 
-> [!IMPORTANT]
-> This library is experimental and not suitable for production use. Breaking changes may occur without warning.
+> [!WARNING]
+> This library is under active development. Breaking changes may occur without warning.
 
-A Dart library for creating USB gadgets on Linux using ConfigFS and FunctionFS. Transform your Linux device into a USB
-peripheral — implement keyboards, mice, storage devices, network interfaces, or create entirely custom USB protocols in
-pure Dart.
+Turn any Linux device with a USB controller into a USB peripheral — keyboard, mouse, storage, network adapter, audio
+device, or your own custom protocol — written entirely in Dart.
 
 [![pub package](https://img.shields.io/pub/v/usb_gadget.svg)](https://pub.dev/packages/usb_gadget)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 ---
 
-## Table of Contents
+## What You Can Build
 
-- [Features](#features)
-- [Requirements](#requirements)
-- [Installation & Usage](#installation--usage)
-- [Android Support](#android-support)
-- [Resources](#resources)
+### Ready-Made Kernel Functions
 
----
+These work with zero protocol boilerplate — just configure and go.
 
-## Features
+| Category        | Functions                                       |
+|-----------------|-------------------------------------------------|
+| **Network**     | CDC ECM, ECM Subset, EEM, NCM, RNDIS            |
+| **Serial**      | CDC ACM, Generic Serial                         |
+| **HID**         | Keyboards, mice, gamepads, custom devices       |
+| **Storage**     | Mass Storage Device (USB flash drive emulation) |
+| **Audio/Video** | MIDI, UAC1, UAC2, UVC (webcam)                  |
+| **Printer**     | USB Printer Class                               |
+| **Testing**     | Loopback, SourceSink                            |
 
-### Kernel-Based Functions
+### Custom Functions with FunctionFS
 
-Pre-configured USB functions implemented by kernel drivers, ready to use with minimal setup:
+Need full control? FunctionFS lets you define your own USB descriptors, handle endpoints directly, implement proprietary
+protocols, and respond to USB lifecycle events (bind, unbind, enable, disable, suspend, resume).
 
-#### **Network Interfaces**
-
-- **CDC ECM** - Ethernet over USB (widely supported)
-- **CDC ECM Subset** - Simplified ECM for legacy hosts
-- **CDC EEM** - Ethernet Emulation Model (lowest overhead)
-- **CDC NCM** - Network Control Model (high performance)
-- **RNDIS** - Remote NDIS (Windows compatibility)
-
-#### **Serial Ports**
-
-- **CDC ACM** - Abstract Control Model (standard virtual serial)
-- **Generic Serial** - Non-CDC serial implementation
-
-#### **Human Interface Devices**
-
-- **HID** - Keyboards, mice, gamepads, and custom HID devices
-
-#### **Storage & Media**
-
-- **Mass Storage Device (MSD)** - USB flash drive emulation
-- **Printer** - USB printer class device
-
-#### **Audio & Video**
-
-- **MIDI** - Musical Instrument Digital Interface
-- **UAC1** - USB Audio Class 1.0
-- **UAC2** - USB Audio Class 2.0
-- **UVC** - USB Video Class (webcam emulation)
-
-#### **Testing & Development**
-
-- **Loopback** - Data loopback for testing
-- **SourceSink** - Pattern generation and validation
-
-### FunctionFS — Custom USB Functions
-
-FunctionFS gives you complete control over USB functionality in userspace. Use it to define custom USB descriptors,
-handle endpoints directly, implement proprietary protocols, process control requests, and react to USB events (bind,
-unbind, enable, disable, suspend, resume).
-
-Ideal for complex HID devices with custom report descriptors, proprietary USB protocols, device prototyping, or anything
-requiring precise timing or full protocol control.
-
-The library ships `HIDFunctionFs` as a ready-made FunctionFS specialization with built-in HID protocol handling.
+The library includes `HIDFunctionFs` — a ready-made FunctionFS specialization for custom HID devices with complex report
+descriptors.
 
 ---
 
-## Requirements
+## Quick Start
 
-### Platform Support
+### 1. Check hardware compatibility
 
-- **OS**: Linux with USB Device Controller (UDC) support
-- **Architecture**: ARM, ARM64, x86_64, RISC-V64 (any architecture with Linux UDC support)
-- **Dart SDK**: ≥ 3.11.0
-
-### Hardware
-
-A device with a USB Device Controller (UDC) is required. Standard desktop PCs typically do **not** include a UDC — they
-only have USB host controllers.
-
-**Tested devices include:**
-
-- Raspberry Pi 4/5 (ARM64)
-- Raspberry Pi Zero 2 W (ARM64)
-- One Plus 7 Pro (Android, ARM64)
-
-To check if your device has a UDC:
+You need a device with a USB Device Controller (UDC). Desktop PCs typically don't have one — embedded boards like the
+Raspberry Pi do.
 
 ```bash
 ls /sys/class/udc/
-# Should list one or more UDC devices (e.g., fe980000.usb)
+# Should list at least one device, e.g.: fe980000.usb
 ```
 
-### Dependencies
+**Tested devices:** Raspberry Pi 4/5, Raspberry Pi Zero 2 W, OnePlus 7 Pro (Android)
 
-Install the Linux Asynchronous I/O library:
+### 2. Install the system dependency
 
 ```bash
 # Debian/Ubuntu
 sudo apt-get install libaio-dev
+
 # Arch Linux
 sudo pacman -S libaio
+
 # Fedora/RHEL
 sudo dnf install libaio-devel
 ```
 
-### Linux Kernel Configuration
-
-The following kernel options must be enabled. Most modern embedded Linux distributions include these by default.
-
-**Core USB Gadget Support**
-
-- `CONFIG_USB_GADGET` — USB Gadget framework
-- `CONFIG_USB_CONFIGFS` — ConfigFS-based gadget configuration
-- `CONFIG_USB_FUNCTIONFS` — FunctionFS support
-
-**Kernel Function Drivers**
-
-- `CONFIG_USB_CONFIGFS_SERIAL` — Serial functions
-- `CONFIG_USB_CONFIGFS_ACM` — CDC ACM serial
-- `CONFIG_USB_CONFIGFS_NCM` — CDC NCM ethernet
-- `CONFIG_USB_CONFIGFS_ECM` — CDC ECM ethernet
-- `CONFIG_USB_CONFIGFS_ECM_SUBSET` — ECM Subset ethernet
-- `CONFIG_USB_CONFIGFS_RNDIS` — RNDIS ethernet
-- `CONFIG_USB_CONFIGFS_EEM` — CDC EEM ethernet
-- `CONFIG_USB_CONFIGFS_MASS_STORAGE` — Mass storage
-- `CONFIG_USB_CONFIGFS_F_HID` — HID functions
-- `CONFIG_USB_CONFIGFS_F_PRINTER` — Printer function
-- `CONFIG_USB_CONFIGFS_F_MIDI` — MIDI function
-- `CONFIG_USB_CONFIGFS_F_UAC1` — Audio Class 1.0
-- `CONFIG_USB_CONFIGFS_F_UAC2` — Audio Class 2.0
-- `CONFIG_USB_CONFIGFS_F_UVC` — Video Class
-
-**Check your kernel configuration:**
-
-```bash
-zcat /proc/config.gz | grep -E 'CONFIG_USB_(GADGET|CONFIGFS|FUNCTIONFS)'
-# or
-grep -E 'CONFIG_USB_(GADGET|CONFIGFS|FUNCTIONFS)' /boot/config-$(uname -r)
-```
-
-### Permissions
-
-Root privileges or the `CAP_SYS_ADMIN` capability are required to configure USB gadgets.
-
-```bash
-# Verify ConfigFS is mounted
-mount | grep configfs
-# Should show: configfs on /sys/kernel/config type configfs (rw,relatime)
-
-# Mount ConfigFS if needed
-sudo mount -t configfs none /sys/kernel/config
-
-# Running without full root (using capabilities)
-sudo setcap cap_sys_admin+ep /path/to/your/dart/executable
-```
-
----
-
-## Installation & Usage
-
-### Add the Package
+### 3. Add the package
 
 ```bash
 dart pub add usb_gadget
 ```
 
-### Basic Example: USB Keyboard
+### 4. Mount ConfigFS (if needed)
 
-This example creates a USB HID keyboard that types "hello world" when connected:
+```bash
+# Check if already mounted
+mount | grep configfs
+
+# Mount if not present
+sudo mount -t configfs none /sys/kernel/config
+```
+
+---
+
+## Example: USB Keyboard
 
 ```dart
 import 'dart:io';
@@ -188,8 +93,7 @@ import 'package:usb_gadget/usb_gadget.dart';
 final _descriptor = Uint8List.fromList([0x05, 0x01, 0x09, 0x06, 0xA1, 0x01, 0x05, 0x07, 0x19, 0xE0, 0x29, 0xE7, 0x15, 0x00, 0x25, 0x01, 0x75, 0x01, 0x95, 0x08, 0x81, 0x02, 0x95, 0x01, 0x75, 0x08, 0x81, 0x01, 0x95, 0x06, 0x75, 0x08, 0x15, 0x00, 0x25, 0x65, 0x05, 0x07, 0x19, 0x00, 0x29, 0x65, 0x81, 0x00, 0xC0]);
 
 class Keyboard extends HIDFunction {
-  Keyboard()
-      : super(
+  Keyboard() : super(
     name: 'keyboard',
     descriptor: _descriptor,
     protocol: .keyboard,
@@ -240,13 +144,13 @@ Future<void> main() async {
 }
 ```
 
-### Running Your Gadget
+### Run it
 
 ```bash
-# During development (requires root)
+# Development
 sudo dart run bin/your_app.dart
 
-# Compile to a self-contained executable
+# Compiled executable (recommended for deployment)
 dart compile exe bin/your_app.dart -o my_gadget
 sudo ./my_gadget
 
@@ -255,158 +159,156 @@ dart compile exe -DUSB_GADGET_DEBUG=true bin/your_app.dart -o my_gadget
 sudo ./my_gadget
 ```
 
-### Examples
-
-The [`example/`](example/) directory contains ready-to-run implementations.
+More examples are available in the [`example/`](example/) directory.
 
 ---
+
+## Permissions
+
+Root or `CAP_SYS_ADMIN` is required to configure USB gadgets.
+
+```bash
+# Option A: run with sudo
+sudo ./my_gadget
+
+# Option B: grant capability to the binary (avoids full root)
+sudo setcap cap_sys_admin+ep ./my_gadget
+./my_gadget
+```
+
+---
+
+## Kernel Configuration
+
+Most modern embedded distributions already include the required options. To verify:
+
+```bash
+zcat /proc/config.gz | grep -E 'CONFIG_USB_(GADGET|CONFIGFS|FUNCTIONFS)'
+```
+
+Key options: `CONFIG_USB_GADGET`, `CONFIG_USB_CONFIGFS`, `CONFIG_USB_FUNCTIONFS`, plus any function-specific drivers you
+need (e.g. `CONFIG_USB_CONFIGFS_F_HID` for HID).
+
+---
+
+To incorporate the official Android build documentation into your guide, I have refined the steps to ensure the
+`.gclient` configuration is correct and added the necessary dependency installation step required for Linux hosts.
 
 ## Android Support
 
-> [!WARNING]
-> Running `usb-gadget` on Android requires a **rooted device** with USB OTG/device controller (UDC) support. Not all
-> Android devices expose a UDC — this is hardware-dependent. Stock Android kernels rarely ship with `CONFIG_USB_GADGET`
-> or
-> ConfigFS enabled; this is more common on development boards running AOSP or custom kernels.
+> [!IMPORTANT]
+> **Prerequisites:** The host (build) machine must be an x64 Linux machine or a Mac. The target
+> Android device must support the Android NDK. The resulting Dart VM can only be run from the
+> Android command line and **only has access to `dart:core` APIs** — it does not have access to
+> Android C or Java APIs.
 
-Android devices with USB OTG capability can act as USB gadgets. Because Dart does not ship a pre-built SDK for Android,
-you must compile the **Dart SDK** and **libaio** yourself, then compile your app **on the device**.
+Because there are no pre-built Dart SDKs for Android, you must cross-compile the SDK and `libaio`
+on your host machine before deploying to your device.
 
----
+<details>
+<summary>Expand Android setup instructions</summary>
 
-### Set up the Dart SDK source tree
+### 1. Build the Dart SDK for Android
 
-> Refer to the official guide:
-> [Building Dart SDK for ARM or RISC-V](https://github.com/dart-lang/sdk/blob/main/docs/Building-Dart-SDK-for-ARM-or-RISC-V.md)
-> and
-> [Building the Dart VM for Android](https://github.com/dart-lang/sdk/blob/main/docs/Building-the-Dart-VM-for-Android.md)
+First, follow the [official Dart SDK build guide](https://github.com/dart-lang/sdk/blob/main/docs/Building.md)
+to set up `depot_tools` and fetch the Dart source tree.
 
-Follow the [standard Dart SDK build setup](https://github.com/dart-lang/sdk/blob/main/docs/Building.md) first — cloning
-the repository directly will not work. You must use `gclient`.
+Then, use a text editor to add the `download_android_deps` variable to your `.gclient` file
+(located in the directory where you ran `fetch dart`):
 
-Then enable Android dependencies by adding this line to your `.gclient` file (in the parent directory of `dart/`):
-
+```python
+solutions = [
+  {
+    "name": "sdk",
+    "url": "https://dart.googlesource.com/sdk.git",
+    "deps_file": "DEPS",
+    "managed": False,
+    "custom_deps": {},
+    "custom_vars": {
+        "download_android_deps": True,
+    },
+  },
+]
 ```
-solutions = [ { 'custom_vars': {'download_android_deps': True},
-    'deps_file': 'DEPS',
-    'managed': True,
-    'name': 'sdk',
-    'url': 'https://dart.googlesource.com/sdk.git'}]
-target_os = ['android']
-```
 
-Run `gclient sync` to download the Android NDK/SDK (~2 GB):
+Then sync dependencies and build:
 
 ```bash
+# Download Android NDK and SDK dependencies
 gclient sync
-```
 
----
-
-### Cross-compile the Dart SDK for Android
-
-The build scripts include a Clang toolchain that can target ARM, ARM64, and RISC-V64 from an x64 or ARM64 host — no
-separate cross-compiler is needed for these architectures.
-
-```bash
+# Build the full SDK for ARM64 Android
 ./tools/build.py --mode=release --arch=arm64 --os=android create_sdk
-```
 
-Push the full SDK to your device (the full SDK is required to compile on-device — not just the `dart` binary):
-
-```bash
-adb push out/ReleaseAndroidARM64/dart-sdk /data/local/tmp/dart-sdk
+# Push the built SDK to your device
+adb push out/android/ReleaseAndroidARM64/dart-sdk /data/local/tmp/dart-sdk
 ```
 
 ---
 
-### Cross-compile `libaio` for Android
+### 2. Cross-compile `libaio`
 
-`usb-gadget` depends on `libaio`. Cross-compile it using the Android NDK bundled with the Dart SDK source tree.
+`libaio` is required by this library but is not available via a package manager on Android. You
+must cross-compile it on your host using the Clang toolchain bundled with the Dart SDK's
+third-party dependencies.
 
 ```bash
-git clone https://pagure.io/libaio.git
-cd libaio
+git clone https://pagure.io/libaio.git && cd libaio
 
-# Point to the NDK bundled in the Dart SDK source
-export ANDROID_NDK=$HOME/dart-android/sdk/third_party/android_tools/ndk
-
-# Adjust the host prebuilt path for your OS:
-export TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/darwin-x86_64
-
-# Set the target triple — see the architecture table below
+# Adjust the path below to match your Dart SDK checkout location
+export TOOLCHAIN=$HOME/dart-sdk/sdk/third_party/android_tools/ndk/toolchains/llvm/prebuilt/linux-x86_64
 export CC=$TOOLCHAIN/bin/aarch64-linux-android21-clang
 export AR=$TOOLCHAIN/bin/llvm-ar
 export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
-export STRIP=$TOOLCHAIN/bin/llvm-strip
 
-# Verify the toolchain
-$CC --version
+make clean && make CC="$CC" AR="$AR" RANLIB="$RANLIB"
 
-make clean
-make CC="$CC" AR="$AR" RANLIB="$RANLIB"
-```
-
-Push the compiled library to the device:
-
-```bash
+# Deploy to device
 adb push src/libaio.so.1.0.2 /data/local/tmp/
 adb shell ln -s /data/local/tmp/libaio.so.1.0.2 /data/local/tmp/libaio.so
 ```
 
 ---
 
-### Compile and run your app on-device
-
-Because `dart compile exe` must run on the **same platform as the target**, you must compile your app directly on the
-Android device using the SDK you pushed in Step 2.
+### 3. Compile and Execute On-Device
 
 ```bash
-# Push your project to the device
-adb push /path/to/your/usb_gadget_project /data/local/tmp/usb_gadget_project
-
-# Open a root shell
+# Upload your project
+adb push /path/to/your/project /data/local/tmp/usb_gadget_project
 adb shell
 su
 
+# Setup environment
 export PATH=/data/local/tmp/dart-sdk/bin:$PATH
 export PUB_CACHE=/data/local/tmp/.pub-cache/
 cd /data/local/tmp/usb_gadget_project
 
+# Fetch dependencies and compile
 dart pub get
 dart compile exe bin/your_app.dart -o usb_gadget_app
 chmod +x usb_gadget_app
-```
 
-Before running, make sure no other USB gadget is active and ConfigFS is mounted:
-
-```bash
-# Save the current USB config before disabling it
-ORIGINAL_USB_CONFIG=$(getprop sys.usb.config)
-
-# Disable any active Android USB gadget (MTP, ADB, etc.)
-# Without this, the UDC may already be claimed and gadget binding will fail
-setprop sys.usb.config none
-sleep 1
-
-# To restore Android's USB gadget after you're done:
-# setprop sys.usb.config "$ORIGINAL_USB_CONFIG"
-
-# Mount ConfigFS if not already mounted
+# Detach the UDC from the Android USB stack
+ORIGINAL=$(getprop sys.usb.config)
+setprop sys.usb.config none && sleep 1
 mount -t configfs none /sys/kernel/config
 
+# Run the app with the cross-compiled libaio
 LD_LIBRARY_PATH=/data/local/tmp ./usb_gadget_app
+
+# Cleanup: Restore USB config when finished
+# setprop sys.usb.config "$ORIGINAL"
 ```
+
+</details>
 
 ---
 
 ## Resources
 
 - [API Documentation](https://pub.dev/documentation/usb_gadget/latest/)
-- [Linux USB Gadget API](https://www.kernel.org/doc/html/latest/usb/gadget.html)
+- [Linux USB Gadget API](https://www.kernel.org/doc/html/latest/driver-api/usb/gadget.html)
 - [USB in a Nutshell](https://www.beyondlogic.org/usbnutshell/usb1.shtml)
 - [HID Usage Tables](https://usb.org/sites/default/files/hut1_3_0.pdf)
 - [usb-gadget (Rust)](https://github.com/surban/usb-gadget)
 - [functionfs (Python)](https://github.com/vpelletier/python-functionfs)
-- [Building the Dart VM for Android](https://github.com/dart-lang/sdk/blob/main/docs/Building-the-Dart-VM-for-Android.md)
-- [Building Dart SDK for ARM or RISC-V](https://github.com/dart-lang/sdk/blob/main/docs/Building-Dart-SDK-for-ARM-or-RISC-V.md)
