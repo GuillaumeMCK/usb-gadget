@@ -96,18 +96,15 @@ await gadget.bind();  // Device is now active
     throw StateError(&#39;Gadget is already bound to UDC $_boundUdc&#39;);
   }
 
-  log?.debug(&#39;Starting bind process&#39;);
-  final targetUdc = udc ?? _findUdc();
-  log?.debug(&#39;Using UDC: $targetUdc&#39;);
-
+  String? effectiveUdc;
   try {
+    effectiveUdc = udc ?? _findUdc();
     _createGadget();
     await _setupFunctions();
-    log?.info(&#39;All functions are ready, binding to UDC...&#39;);
-    _bindToUdc(targetUdc);
+    _bindToUdc(effectiveUdc);
     log?.success(&#39;Gadget bound to UDC: $_boundUdc&#39;);
   } catch (err, st) {
-    log?.error(&#39;Bind failed: &#39;, err, st);
+    log?.error(&#39;Failed to bind gadget (UDC: $effectiveUdc):&#39;, err, st);
     await unbind();
     rethrow;
   }
@@ -139,7 +136,7 @@ await gadget.bind();  // Device is now active
 <footer>
   <span class="no-break">
     usb_gadget
-      0.3.6
+      0.4.0
   </span>
   
 </footer>
