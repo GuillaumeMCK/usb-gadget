@@ -5,7 +5,7 @@ final class Logger {
 
   static IPrinter? _printer;
 
-  static int _logLevel = LogLevel.debug.value;
+  static int _logLevel = kLogLevel;
 
   static const root = Logger('root');
 
