@@ -365,6 +365,12 @@ final class EndpointInFile extends EndpointFile with Releasable {
       );
     }
   }
+
+  @override
+  Future<void> release() async {
+    super.release();
+    this.close();
+  }
 }
 
 /// Manages a USB OUT endpoint (host-to-device) using Linux AIO.
@@ -442,5 +448,11 @@ final class EndpointOutFile extends EndpointFile with Releasable {
   Stream<Uint8List> get stream {
     if (_reader == null) throw StateError('Endpoint not open');
     return _reader!.stream;
+  }
+
+  @override
+  Future<void> release() async {
+    super.release();
+    this.close();
   }
 }

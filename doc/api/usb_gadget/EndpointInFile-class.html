@@ -351,21 +351,21 @@ a <a href="https://pub.dev/documentation/using/1.0.5/using/ReleasedException-cla
 
 </dd>
 
-        <dt id="release" class="callable inherited">
-  <span class="name"><a href="https://pub.dev/documentation/using/1.0.5/using/Releasable/release.html">release</a></span><span class="signature">(<wbr>)
-    <span class="returntype parameter">&#8594; void</span>
+        <dt id="release" class="callable">
+  <span class="name"><a href="../usb_gadget/EndpointInFile/release.html">release</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
   </span>
   
 
 </dt>
-<dd class="inherited">
-  The <a href="https://pub.dev/documentation/using/1.0.5/using/Releasable/release.html">release</a> method must be overriden in derived classes to clean up
+<dd>
+  The <a href="../usb_gadget/EndpointInFile/release.html">release</a> method must be overriden in derived classes to clean up
 any resources they use. Implementations should not throw and must call
 <code>super.release()</code> in a <code>finally</code> block. If a derived class defines
 <a href="https://pub.dev/documentation/using/1.0.5/using/Releasable-mixin.html">Releasable</a> fields, these fields should be released of in this method.
 Note for implementers: it should be safe to call this method several
 times.
-  <div class="features"><span class="feature">inherited</span></div>
+  <div class="features"><span class="feature">override</span></div>
 
 </dd>
 

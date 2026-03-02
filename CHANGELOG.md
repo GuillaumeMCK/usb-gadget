@@ -1,3 +1,7 @@
+## 0.4.2
+
+* **FIX**: Release endpoints on disable to prevent resource leaks.
+
 ## 0.4.1
 
 * **FEAT**: Add compile-time environment-based logging configuration.

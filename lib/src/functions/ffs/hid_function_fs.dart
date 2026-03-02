@@ -106,7 +106,9 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
 
   @override
   void onDisable() {
+    _interruptIn?.release();
     _interruptIn = null;
+    _interruptOut?.release();
     _interruptOut = null;
     super.onDisable();
   }
