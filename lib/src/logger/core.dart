@@ -48,6 +48,10 @@ final class Logger {
     _log(.error, message, error, stack);
   }
 
+  void fatal(String message, [Object? error, StackTrace? stack]) {
+    _log(.fatal, message, error, stack);
+  }
+
   void _log(
     LogLevel level,
     String message, [
