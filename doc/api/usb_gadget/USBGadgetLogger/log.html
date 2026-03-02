@@ -71,7 +71,7 @@
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">@override
-late final Logger? log = _isDebugMode ? .new(&#39;$runtimeType&#39;) : null;</code></pre>
+late final Logger? log = kLogEnabled ? .new(&#39;$runtimeType&#39;) : null;</code></pre>
 </section>
 
 
@@ -100,7 +100,7 @@ late final Logger? log = _isDebugMode ? .new(&#39;$runtimeType&#39;) : null;</co
 <footer>
   <span class="no-break">
     usb_gadget
-      0.4.0
+      0.4.1
   </span>
   
 </footer>
