@@ -13,22 +13,27 @@ final class DefaultPrinter extends IPrinter {
     LogLevel.warning: '\x1b[38;5;214m',
     LogLevel.success: '\x1b[38;5;34m',
     LogLevel.error: '\x1b[38;5;196m',
+    LogLevel.fatal: '\x1b[38;5;160m',
   };
 
   static const _rst = '\x1b[0m';
 
+  String levelColor(LogLevel level) => _levelColors[level]!;
+
   @override
   void onLog(LogRecord record) {
-    final color = levelColor(record.level);
-    final type = '[${record.level.name}] $_rst';
-    stdout.writeln('$color$type[${record.loggerName}] ${record.message}');
-    if (record.error != null) {
-      stderr.writeln('$color${record.error}$_rst');
+    final buffer = StringBuffer();
+    if (kLogColors) {
+      buffer.write(levelColor(record.level));
     }
-    if (record.stackTrace != null) {
-      stderr.writeln('$color${record.stackTrace}$_rst');
+    buffer.write('[${record.level}]');
+    if (kLogColors) {
+      buffer.write(_rst);
+    }
+    buffer.write(' [${record.loggerName}] ${record.message}');
+    stdout.writeln(buffer.toString());
+    if (record.error != null) {
+      stderr.writeln(record.error);
     }
   }
-
-  String levelColor(LogLevel level) => _levelColors[level]!;
 }
