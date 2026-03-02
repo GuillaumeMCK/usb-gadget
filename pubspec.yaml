@@ -12,7 +12,6 @@ environment:
 
 dependencies:
   ffi: ^2.1.5
-  meta: ^1.17.0
   using: ^1.0.5
 
 dev_dependencies:
