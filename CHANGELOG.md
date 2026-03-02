@@ -1,3 +1,9 @@
+## 0.4.3
+
+* **FIX**: Add missing `fatal` method to `Logger` class
+* **CHORE**: Update logger exports to include the `Logger` class
+* **CHORE**: Remove the `PlatformLogger` export
+
 ## 0.4.2
 
 * **CHORE**: Export `ILogger` as public to allow custom mixin creation outside the library.
