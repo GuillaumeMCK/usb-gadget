@@ -70,16 +70,21 @@ final class Logger {
 }
 
 enum LogLevel {
-  debug(0, '?'),
-  info(1, '*'),
-  success(1, '+'),
-  warning(2, '!'),
-  error(3, 'x');
+  debug('?'),
+  info('*'),
+  success('+'),
+  warning('!'),
+  error('x'),
+  fatal('X');
 
-  const LogLevel(this.value, this.name);
+  const LogLevel(this._char);
 
-  final int value;
-  final String name;
+  final String _char;
+
+  int get value => index;
+
+  @override
+  String toString() => _char;
 }
 
 final class LogRecord {
