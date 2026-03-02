@@ -99,6 +99,7 @@ final class AioStream with Releasable {
 
   @override
   void release() {
+    if (isReleased) return;
     super.release();
     if (!_controller.isClosed) _controller.close();
   }

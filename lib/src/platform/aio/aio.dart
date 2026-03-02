@@ -94,6 +94,7 @@ final class Aio with Releasable {
 
   @override
   void release() {
+    if (isReleased) return;
     super.release();
     _ctx.release();
     _pool.release();

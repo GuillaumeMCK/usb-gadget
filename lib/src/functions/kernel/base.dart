@@ -128,6 +128,7 @@ abstract class KernelFunction extends GadgetFunction with USBGadgetLogger {
   @override
   @mustCallSuper
   Future<void> release() async {
+    if (isReleased) return;
     if (prepared) {
       log?.info('Releasing kernel function');
       _functionPath = null;

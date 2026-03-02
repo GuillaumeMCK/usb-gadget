@@ -109,6 +109,7 @@ class HIDFunction extends KernelFunction {
 
   @override
   Future<void> release() async {
+    if (isReleased) return;
     log?.info('Closing HID device');
     try {
       _file?.closeSync();

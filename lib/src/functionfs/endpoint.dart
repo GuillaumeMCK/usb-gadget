@@ -133,6 +133,7 @@ final class EndpointControlFile extends EndpointFile with Releasable {
   @override
   Future<void> close() async {
     if (_fd == null) return;
+    if (isReleased) return;
     super.release();
 
     _eventReadingActive = false;
@@ -294,6 +295,7 @@ final class EndpointInFile extends EndpointFile with Releasable {
   @override
   Future<void> close() async {
     if (_fd == null) return;
+    if (isReleased) return;
     super.release();
 
     // Close and wait for pending writes
@@ -368,6 +370,7 @@ final class EndpointInFile extends EndpointFile with Releasable {
 
   @override
   Future<void> release() async {
+    if (isReleased) return;
     super.release();
     this.close();
   }
@@ -415,6 +418,7 @@ final class EndpointOutFile extends EndpointFile with Releasable {
   @override
   Future<void> close() async {
     if (_fd == null) return;
+    if (isReleased) return;
     super.release();
 
     // Release reader stream
@@ -452,6 +456,7 @@ final class EndpointOutFile extends EndpointFile with Releasable {
 
   @override
   Future<void> release() async {
+    if (isReleased) return;
     super.release();
     this.close();
   }

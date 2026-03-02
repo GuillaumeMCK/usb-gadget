@@ -257,6 +257,7 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   @override
   @mustCallSuper
   Future<void> release() async {
+    if (isReleased) return;
     _idleRates.clear();
     _interruptIn?.release();
     _interruptIn = null;

@@ -116,6 +116,7 @@ final class AioContext with Releasable {
 
   @override
   void release() {
+    if (isReleased) return;
     super.release();
 
     _timer?.cancel();

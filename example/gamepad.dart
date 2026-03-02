@@ -210,6 +210,7 @@ class LogitechF310 extends HIDFunctionFs {
 
   @override
   Future<void> release() async {
+    if (isReleased) return;
     _timer?.cancel();
     _timer = null;
     await super.release();

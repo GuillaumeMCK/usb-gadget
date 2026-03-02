@@ -208,6 +208,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
   @override
   @mustCallSuper
   Future<void> release() async {
+    if (isReleased) return;
     log?.info('Releasing function (current state: $_state)');
     await _eventSubscription?.cancel();
     _eventSubscription = null;
