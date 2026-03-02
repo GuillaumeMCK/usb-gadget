@@ -1,5 +1,6 @@
 ## 0.4.2
 
+* **CHORE**: Export `ILogger` as public to allow custom mixin creation outside the library.
 * **FIX**: Release endpoints on disable to prevent resource leaks.
 
 ## 0.4.1
