@@ -35,5 +35,8 @@ final class DefaultPrinter extends IPrinter {
     if (record.error != null) {
       stderr.writeln(record.error);
     }
+    if (record.stackTrace != null) {
+      stderr.writeln(record.stackTrace);
+    }
   }
 }
