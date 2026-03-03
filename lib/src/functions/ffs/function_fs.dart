@@ -213,20 +213,11 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
     await _eventSubscription?.cancel();
     _eventSubscription = null;
 
-    if (_endpoints.isNotEmpty) {
-      for (final ep in _endpoints.values) {
-        try {
-          log?.info('Closing endpoint: ${ep.fd}');
-          await ep.close();
-        } catch (err) {
-          log?.warn('Failed to close endpoint:', err);
-        }
-      }
-      _endpoints.clear();
-    }
+    _releaseEndpoints(_endpoints);
+    _endpoints.clear();
 
     try {
-      if (_state != .uninitialized) await _ep0.close();
+      if (_state != .uninitialized) await _ep0.release();
     } catch (err) {
       log?.warn('Failed to close EP0:', err);
     }
@@ -273,16 +264,9 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
           .out => EndpointOutFile(epPath, config: desc.config),
         };
 
-        try {
-          await endpoint.open();
-          openedEndpoints[desc.address] = endpoint;
-          log?.info('Opened ${desc.address} at $epPath (fd: ${endpoint.fd})');
-        } catch (err, st) {
-          log?.error('Failed to open ${desc.address} at $epPath', err, st);
-          // Close all previously opened endpoints
-          await _closeEndpoints(openedEndpoints);
-          rethrow;
-        }
+        await endpoint.open();
+        openedEndpoints[desc.address] = endpoint;
+        log?.info('Opened ${desc.address} at $epPath (fd: ${endpoint.fd})');
 
         index++;
       }
@@ -290,19 +274,18 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
       // All endpoints opened successfully, commit to instance map
       _endpoints.addAll(openedEndpoints);
     } catch (_) {
-      // Ensure cleanup on any error
-      await _closeEndpoints(openedEndpoints);
+      await _releaseEndpoints(openedEndpoints);
       rethrow;
     }
   }
 
   /// Closes a map of endpoints (helper for error recovery).
-  Future<void> _closeEndpoints(
+  Future<void> _releaseEndpoints(
     Map<EndpointAddress, EndpointFile> endpoints,
   ) async {
     for (final ep in endpoints.values) {
       try {
-        await ep.close();
+        await ep.release();
       } catch (err, st) {
         log?.warn('Error closing endpoint during cleanup', err, st);
       }
