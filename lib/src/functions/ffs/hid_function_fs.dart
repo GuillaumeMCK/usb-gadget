@@ -105,10 +105,8 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   }
 
   @override
-  void onDisable() {
-    _interruptIn?.release();
+  Future<void> onDisable() async {
     _interruptIn = null;
-    _interruptOut?.release();
     _interruptOut = null;
     super.onDisable();
   }
@@ -259,10 +257,9 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   Future<void> release() async {
     if (isReleased) return;
     _idleRates.clear();
-    _interruptIn?.release();
-    _interruptIn = null;
-    _interruptOut?.release();
     _interruptOut = null;
+    _interruptIn = null;
+
     await super.release();
   }
 }
