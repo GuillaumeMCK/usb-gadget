@@ -90,24 +90,15 @@ and ready for garbage collection.</p>
   <pre class="language-dart"><code class="language-dart">@override
 @mustCallSuper
 Future&lt;void&gt; release() async {
+  if (isReleased) return;
   log?.info(&#39;Releasing function (current state: $_state)&#39;);
   await _eventSubscription?.cancel();
   _eventSubscription = null;
 
-  if (_endpoints.isNotEmpty) {
-    for (final ep in _endpoints.values) {
-      try {
-        log?.info(&#39;Closing endpoint: ${ep.fd}&#39;);
-        await ep.close();
-      } catch (err) {
-        log?.warn(&#39;Failed to close endpoint:&#39;, err);
-      }
-    }
-    _endpoints.clear();
-  }
+  await _releaseEndpoints(_endpoints);
 
   try {
-    if (_state != .uninitialized) await _ep0.close();
+    if (_state != .uninitialized) await _ep0.release();
   } catch (err) {
     log?.warn(&#39;Failed to close EP0:&#39;, err);
   }
@@ -145,7 +136,7 @@ Future&lt;void&gt; release() async {
 <footer>
   <span class="no-break">
     usb_gadget
-      0.4.3
+      0.5.0
   </span>
   
 </footer>

@@ -71,13 +71,13 @@
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">void write(Uint8List data) {
-  final currentFd = _fd;
-  if (currentFd == null) throw StateError(&#39;write: Endpoint is not open&#39;);
+  final fd = _fd;
+  if (fd == null) throw StateError(&#39;write: Endpoint is not open&#39;);
 
   var offset = 0;
   while (offset &lt; data.length) {
     try {
-      offset += Unistd.write(currentFd, data.sublist(offset));
+      offset += Unistd.write(fd, data.sublist(offset));
     } on OSError catch (e) {
       if (e.errorCode == Errno.eagain) continue;
       rethrow;
@@ -111,7 +111,7 @@
 <footer>
   <span class="no-break">
     usb_gadget
-      0.4.3
+      0.5.0
   </span>
   
 </footer>

@@ -158,7 +158,19 @@
 
 </dt>
 <dd>
-  <p>Suspended by host</p>
+  <p>Operation suspended by host (e.g., due to USB reset or disconnect)</p>
+  
+
+</dd>
+
+            <dt id="disabled" class="constant">
+    <span class="name ">disabled</span>
+  <span class="signature">&#8594; const <a href="../usb_gadget/FunctionFsState.html">FunctionFsState</a></span>
+  
+
+</dt>
+<dd>
+  <p>Disabled by host (e.g., due to configuration change or unbind)</p>
   
 
 </dd>
@@ -170,7 +182,7 @@
 
 </dt>
 <dd>
-  <p>Disposed and cleaned up</p>
+  <p>Released and resources cleaned up</p>
   
 
 </dd>
@@ -338,7 +350,7 @@
 <footer>
   <span class="no-break">
     usb_gadget
-      0.4.3
+      0.5.0
   </span>
   
 </footer>

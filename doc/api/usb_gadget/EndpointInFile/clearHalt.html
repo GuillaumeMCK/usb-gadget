@@ -75,12 +75,11 @@ Throws <a href="https://api.flutter.dev/flutter/dart-io/OSError-class.html">OSEr
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">void clearHalt() {
-  if (_fd == null) {
-    throw StateError(&#39;Cannot clear halt: Endpoint is not open&#39;);
-  }
+  final fd = _fd;
+  if (fd == null) throw StateError(&#39;Cannot clear halt: Endpoint is not open&#39;);
 
   try {
-    Ioctl.call(_fd!, .clearHalt);
+    Ioctl.call(fd, .clearHalt);
   } on OSError catch (e) {
     if (e.errorCode == Errno.einval) {
       &#47;&#47; Endpoint not halted, this is not an error
@@ -119,7 +118,7 @@ Throws <a href="https://api.flutter.dev/flutter/dart-io/OSError-class.html">OSEr
 <footer>
   <span class="no-break">
     usb_gadget
-      0.4.3
+      0.5.0
   </span>
   
 </footer>

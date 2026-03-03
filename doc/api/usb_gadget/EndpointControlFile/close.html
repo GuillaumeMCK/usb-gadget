@@ -77,9 +77,6 @@
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">@override
 Future&lt;void&gt; close() async {
-  if (_fd == null) return;
-  super.release();
-
   _eventReadingActive = false;
   _pollingTimer?.cancel();
   _pollingTimer = null;
@@ -87,8 +84,10 @@ Future&lt;void&gt; close() async {
   await _streamController?.close();
   _streamController = null;
 
+  final fd = _fd;
+  if (fd == null) return;
   try {
-    Unistd.close(_fd!);
+    Unistd.close(fd);
   } on OSError catch (e) {
     log?.error(&#39;Failed to close EP0 file descriptor: ${e.message}&#39;);
   } finally {
@@ -124,7 +123,7 @@ Future&lt;void&gt; close() async {
 <footer>
   <span class="no-break">
     usb_gadget
-      0.4.3
+      0.5.0
   </span>
   
 </footer>

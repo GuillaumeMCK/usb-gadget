@@ -70,8 +70,9 @@
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">void ack() {
+  final fd = _fd;
   if (fd == null) throw StateError(&#39;Cannot ACK: Endpoint is not open&#39;);
-  Unistd.write(fd!, Uint8List(0));
+  Unistd.write(fd, Uint8List(0));
 }</code></pre>
 </section>
 
@@ -100,7 +101,7 @@
 <footer>
   <span class="no-break">
     usb_gadget
-      0.4.3
+      0.5.0
   </span>
   
 </footer>

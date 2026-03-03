@@ -1,3 +1,9 @@
+## 0.5.0
+
+* **FIX**: Various endpoint lifecycle and resource management fixes across `FunctionFs` and `HIDFunctionFs`.
+* **FIX**: Several reliability improvements to `AioSink` around write queue and resource release.
+* **REFACTOR**: Consolidate endpoint and resource lifecycle management into base classes.
+
 ## 0.4.3
 
 * **FIX**: Add missing `fatal` method to `Logger` class

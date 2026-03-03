@@ -88,6 +88,7 @@ and ready for garbage collection.</p>
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">@override
 Future&lt;void&gt; release() async {
+  if (isReleased) return;
   log?.info(&#39;Closing HID device&#39;);
   try {
     _file?.closeSync();
@@ -124,7 +125,7 @@ Future&lt;void&gt; release() async {
 <footer>
   <span class="no-break">
     usb_gadget
-      0.4.3
+      0.5.0
   </span>
   
 </footer>

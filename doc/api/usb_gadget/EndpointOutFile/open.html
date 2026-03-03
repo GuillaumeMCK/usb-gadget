@@ -80,15 +80,14 @@ Throws <a href="https://api.flutter.dev/flutter/dart-core/StateError-class.html"
   <pre class="language-dart"><code class="language-dart">@override
 Future&lt;void&gt; open() async {
   if (_fd != null) return;
-
-  _fd = Unistd.open(path, const [.rdOnly]);
+  final fd = Unistd.open(path, const [.rdOnly]);
 
   &#47;&#47; Create AIO context if not provided
-  _aio ??= Aio.fromEndpointConfig(config);
+  _aio ??= .fromEndpointConfig(config);
 
   &#47;&#47; Create reader stream for this endpoint
-  _reader ??= _aio!.createReader(
-    _fd!,
+  _reader = _aio!.createReader(
+    fd,
     maxInflight: switch (config) {
       BulkEndpointConfig() =&gt; 16,
       IsochronousEndpointConfig() =&gt; 8,
@@ -96,6 +95,7 @@ Future&lt;void&gt; open() async {
       ControlEndpointConfig() =&gt; 2,
     },
   );
+  _fd = fd;
 }</code></pre>
 </section>
 
@@ -124,7 +124,7 @@ Future&lt;void&gt; open() async {
 <footer>
   <span class="no-break">
     usb_gadget
-      0.4.3
+      0.5.0
   </span>
   
 </footer>

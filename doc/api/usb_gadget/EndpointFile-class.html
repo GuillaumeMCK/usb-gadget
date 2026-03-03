@@ -71,6 +71,7 @@ exposed via the Linux FunctionFs (FFS) interface.</p>
   <dd>
     <ul class="comma-separated clazz-relationships">
         <li><a href="../usb_gadget/USBGadgetLogger-mixin.html">USBGadgetLogger</a></li>
+        <li><a href="https://pub.dev/documentation/using/1.0.5/using/Releasable-mixin.html">Releasable</a></li>
     </ul>
   </dd>
 
@@ -82,6 +83,11 @@ exposed via the Linux FunctionFs (FFS) interface.</p>
           </ul></dd>
 
         
+  <dt>Available extensions</dt>
+  <dd><ul class="comma-separated clazz-relationships">
+      <li><a href="https://pub.dev/documentation/using/1.0.5/using/Streaming.html">Streaming</a></li>
+      <li><a href="https://pub.dev/documentation/using/1.0.5/using/Using.html">Using</a></li>
+  </ul></dd>
         
 
 
@@ -126,6 +132,18 @@ exposed via the Linux FunctionFs (FFS) interface.</p>
 </dt>
 <dd class="inherited">
   The hash code for this object.
+  <div class="features"><span class="feature">no setter</span><span class="feature">inherited</span></div>
+
+</dd>
+
+        <dt id="isReleased" class="property inherited">
+  <span class="name"><a href="https://pub.dev/documentation/using/1.0.5/using/Releasable/isReleased.html">isReleased</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span>
+  
+
+</dt>
+<dd class="inherited">
+  Returns <code>true</code> if the instance has been released, <code>false</code> otherwise.
   <div class="features"><span class="feature">no setter</span><span class="feature">inherited</span></div>
 
 </dd>
@@ -175,6 +193,26 @@ exposed via the Linux FunctionFs (FFS) interface.</p>
       id="instance-methods">
     <h2>Methods</h2>
     <dl class="callables">
+        <dt id="autoRelease" class="callable inherited">
+  <span class="name"><a href="https://pub.dev/documentation/using/1.0.5/using/Releasable/autoRelease.html">autoRelease</a></span><span class="signature">(<wbr><span class="parameter" id="autoRelease-param-instances"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://pub.dev/documentation/using/1.0.5/using/Releasable-mixin.html">Releasable</a>?</span>&gt;</span></span> <span class="parameter-name">instances</span></span>)
+    <span class="returntype parameter">&#8594; void</span>
+  </span>
+  
+
+</dt>
+<dd class="inherited">
+  The <a href="https://pub.dev/documentation/using/1.0.5/using/Releasable/autoRelease.html">autoRelease</a> method is used to register a set of <a href="https://pub.dev/documentation/using/1.0.5/using/Releasable-mixin.html">Releasable</a>
+instances that will be automatically released when this instance becomes
+unreachable. Please note that this mechanism is based on Dart's <a href="https://api.flutter.dev/flutter/dart-core/Finalizer-class.html">Finalizer</a>
+feature which makes no guarantee that it will ever be called. Depending
+on instance dependencies and their relationship with the internal <a href="https://api.flutter.dev/flutter/dart-core/Finalizer-class.html">Finalizer</a>
+instance, it may even never be called. For instance, make sure <code>this</code> is
+never passed to <a href="https://pub.dev/documentation/using/1.0.5/using/Releasable/autoRelease.html">autoRelease</a> as this will create a cyclic graph of
+dependencies that will prevent finalization to happen.
+  <div class="features"><span class="feature">inherited</span></div>
+
+</dd>
+
         <dt id="close" class="callable">
   <span class="name"><a href="../usb_gadget/EndpointFile/close.html">close</a></span><span class="signature">(<wbr>)
     <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
@@ -184,6 +222,27 @@ exposed via the Linux FunctionFs (FFS) interface.</p>
 </dt>
 <dd>
   Closes the underlying file descriptor and releases kernel resources.
+  
+
+</dd>
+
+        <dt id="consume" class="callable">
+  <span class="name"><a href="https://pub.dev/documentation/using/1.0.5/using/Streaming/consume.html">consume</a></span><span class="signature">&lt;<wbr><span class="type-parameter">E</span>, <span class="type-parameter">X</span>&gt;</span><span class="signature">(<wbr><span class="parameter" id="consume-param-input"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter">E</span>&gt;</span></span> <span class="parameter-name">input</span>, </span><span class="parameter" id="consume-param-process"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-async/FutureOr-class.html">FutureOr</a><span class="signature">&lt;<wbr><span class="type-parameter">X</span>&gt;</span></span> <span class="parameter-name">process</span>(<span class="parameter" id="param-"><span class="type-annotation">T</span>, </span><span class="parameter" id="param-"><span class="type-annotation">E</span></span>)</span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter">X</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+      <p class="from-extension">
+        <span>Available on T,
+        provided by the <a href="https://pub.dev/documentation/using/1.0.5/using/Streaming.html">Streaming</a> extension</span>
+      </p>
+  Consumes and process events of a <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a> with the current <a href="https://pub.dev/documentation/using/1.0.5/using/Releasable-mixin.html">Releasable</a>
+instance and make sure it is released when all events have been consumed.
+Returns a <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a> with values returned by <code>process(this, event)</code>. If the
+<a href="https://pub.dev/documentation/using/1.0.5/using/Releasable-mixin.html">Releasable</a> instance is released while processing events from <code>input</code>,
+a <a href="https://pub.dev/documentation/using/1.0.5/using/ReleasedException-class.html">ReleasedException</a> will be sent to the output <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a>.
   
 
 </dd>
@@ -253,6 +312,24 @@ exposed via the Linux FunctionFs (FFS) interface.</p>
 
 </dd>
 
+        <dt id="release" class="callable">
+  <span class="name"><a href="../usb_gadget/EndpointFile/release.html">release</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  The <a href="../usb_gadget/EndpointFile/release.html">release</a> method must be overriden in derived classes to clean up
+any resources they use. Implementations should not throw and must call
+<code>super.release()</code> in a <code>finally</code> block. If a derived class defines
+<a href="https://pub.dev/documentation/using/1.0.5/using/Releasable-mixin.html">Releasable</a> fields, these fields should be released of in this method.
+Note for implementers: it should be safe to call this method several
+times.
+  <div class="features"><span class="feature">override</span></div>
+
+</dd>
+
         <dt id="toString" class="callable">
   <span class="name"><a href="../usb_gadget/EndpointFile/toString.html">toString</a></span><span class="signature">(<wbr>)
     <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>
@@ -263,6 +340,63 @@ exposed via the Linux FunctionFs (FFS) interface.</p>
 <dd>
   A string representation of this object.
   <div class="features"><span class="feature">override</span></div>
+
+</dd>
+
+        <dt id="track" class="callable inherited">
+  <span class="name"><a href="https://pub.dev/documentation/using/1.0.5/using/Releasable/track.html">track</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; void</span>
+  </span>
+  
+
+</dt>
+<dd class="inherited">
+  Implementations should call this method e.g. at construction time to make
+sure they will be trackable in debugging scenarios. See <a href="https://pub.dev/documentation/using/1.0.5/using/ReleasableTracker/enable.html">ReleasableTracker.enable</a>
+for more information.
+  <div class="features"><span class="feature">inherited</span></div>
+
+</dd>
+
+        <dt id="use" class="callable">
+  <span class="name"><a href="https://pub.dev/documentation/using/1.0.5/using/Using/use.html">use</a></span><span class="signature">&lt;<wbr><span class="type-parameter">R</span>&gt;</span><span class="signature">(<wbr><span class="parameter" id="use-param-process"><span class="type-annotation">R</span> <span class="parameter-name">process</span>(<span class="parameter" id="param-"><span class="type-annotation">T</span></span>)</span>)
+    <span class="returntype parameter">&#8594; R</span>
+  </span>
+  
+
+</dt>
+<dd>
+      <p class="from-extension">
+        <span>Available on T,
+        provided by the <a href="https://pub.dev/documentation/using/1.0.5/using/Using.html">Using</a> extension</span>
+      </p>
+  Calls <code>process</code> with the current <a href="https://pub.dev/documentation/using/1.0.5/using/Releasable-mixin.html">Releasable</a> instance and make sure it
+is released after processing completes. Returns the value returned by
+<code>process(this)</code>. <code>process</code> is called in the context of a new <a href="https://api.flutter.dev/flutter/dart-async/Zone-class.html">Zone</a>. If
+the <a href="https://pub.dev/documentation/using/1.0.5/using/Releasable-mixin.html">Releasable</a> instance has been released, this method throws a
+<a href="https://pub.dev/documentation/using/1.0.5/using/ReleasedException-class.html">ReleasedException</a>.
+  
+
+</dd>
+
+        <dt id="useAsync" class="callable">
+  <span class="name"><a href="https://pub.dev/documentation/using/1.0.5/using/Using/useAsync.html">useAsync</a></span><span class="signature">&lt;<wbr><span class="type-parameter">R</span>&gt;</span><span class="signature">(<wbr><span class="parameter" id="useAsync-param-asyncProcess"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">R</span>&gt;</span></span> <span class="parameter-name">asyncProcess</span>(<span class="parameter" id="param-"><span class="type-annotation">T</span></span>)</span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">R</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+      <p class="from-extension">
+        <span>Available on T,
+        provided by the <a href="https://pub.dev/documentation/using/1.0.5/using/Using.html">Using</a> extension</span>
+      </p>
+  Calls <code>asyncProcess</code> with the current <a href="https://pub.dev/documentation/using/1.0.5/using/Releasable-mixin.html">Releasable</a> instance and make sure
+it is released after processing completes. Returns the value returned by
+<code>asyncProcess(this)</code>. <code>asyncProcess</code> is called in the context of a new
+<a href="https://api.flutter.dev/flutter/dart-async/Zone-class.html">Zone</a>. If the <a href="https://pub.dev/documentation/using/1.0.5/using/Releasable-mixin.html">Releasable</a> instance has been released, this method throws
+a <a href="https://pub.dev/documentation/using/1.0.5/using/ReleasedException-class.html">ReleasedException</a>.
+  
 
 </dd>
 
@@ -316,7 +450,7 @@ exposed via the Linux FunctionFs (FFS) interface.</p>
 <footer>
   <span class="no-break">
     usb_gadget
-      0.4.3
+      0.5.0
   </span>
   
 </footer>

@@ -90,11 +90,11 @@ and ready for garbage collection.</p>
   <pre class="language-dart"><code class="language-dart">@override
 @mustCallSuper
 Future&lt;void&gt; release() async {
+  if (isReleased) return;
   _idleRates.clear();
-  _interruptIn?.release();
-  _interruptIn = null;
-  _interruptOut?.release();
   _interruptOut = null;
+  _interruptIn = null;
+
   await super.release();
 }</code></pre>
 </section>
@@ -124,7 +124,7 @@ Future&lt;void&gt; release() async {
 <footer>
   <span class="no-break">
     usb_gadget
-      0.4.3
+      0.5.0
   </span>
   
 </footer>

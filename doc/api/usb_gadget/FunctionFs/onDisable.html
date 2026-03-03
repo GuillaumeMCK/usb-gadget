@@ -68,7 +68,7 @@
     
 <section class="desc markdown">
   <p>Called when the host de-configures the device.</p>
-<p>Resets all per-endpoint halt status bits and transitions to <a href="../../usb_gadget/FunctionFsState.html">FunctionFsState.bound</a>.</p>
+<p>Resets all per-endpoint halt status bits and transitions to <a href="../../usb_gadget/FunctionFsState.html">FunctionFsState.disabled</a>.</p>
 </section>
 
 
@@ -78,7 +78,7 @@
   <pre class="language-dart"><code class="language-dart">@mustCallSuper
 void onDisable() {
   _endpointStatus.clear();
-  _setState(.bound);
+  _setState(.disabled);
 }</code></pre>
 </section>
 
@@ -107,7 +107,7 @@ void onDisable() {
 <footer>
   <span class="no-break">
     usb_gadget
-      0.4.3
+      0.5.0
   </span>
   
 </footer>

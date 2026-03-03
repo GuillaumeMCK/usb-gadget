@@ -82,10 +82,7 @@ will restart them. This provides natural flow control.</p>
     
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">Stream&lt;Uint8List&gt; get stream {
-  if (_reader == null) throw StateError(&#39;Endpoint not open&#39;);
-  return _reader!.stream;
-}</code></pre>
+  <pre class="language-dart"><code class="language-dart">Stream&lt;Uint8List&gt; get stream =&gt; _reader.stream;</code></pre>
 </section>
 
   </section>
@@ -115,7 +112,7 @@ will restart them. This provides natural flow control.</p>
 <footer>
   <span class="no-break">
     usb_gadget
-      0.4.3
+      0.5.0
   </span>
   
 </footer>

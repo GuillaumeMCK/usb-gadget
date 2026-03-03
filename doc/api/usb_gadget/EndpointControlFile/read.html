@@ -71,8 +71,9 @@
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">Uint8List read(int length) {
-  if (_fd == null) throw StateError(&#39;read: Endpoint is not open&#39;);
-  return Unistd.read(_fd!, length);
+  final fd = _fd;
+  if (fd == null) throw StateError(&#39;read: Endpoint is not open&#39;);
+  return Unistd.read(fd, length);
 }</code></pre>
 </section>
 
@@ -101,7 +102,7 @@
 <footer>
   <span class="no-break">
     usb_gadget
-      0.4.3
+      0.5.0
   </span>
   
 </footer>

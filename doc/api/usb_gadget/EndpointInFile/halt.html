@@ -79,7 +79,8 @@ unconditionally, as manual STALL is not supported for OUT endpoints.</p>
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">@override
 void halt() {
-  if (_fd != null) Unistd.write(_fd!, Uint8List(0));
+  final fd = _fd;
+  if (fd != null) Unistd.write(fd, Uint8List(0));
 }</code></pre>
 </section>
 
@@ -108,7 +109,7 @@ void halt() {
 <footer>
   <span class="no-break">
     usb_gadget
-      0.4.3
+      0.5.0
   </span>
   
 </footer>

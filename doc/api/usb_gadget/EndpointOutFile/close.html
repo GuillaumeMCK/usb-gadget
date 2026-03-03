@@ -77,18 +77,15 @@
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">@override
 Future&lt;void&gt; close() async {
-  if (_fd == null) return;
-  super.release();
+  final fd = _fd;
+  if (fd == null) return;
 
-  &#47;&#47; Release reader stream
-  _reader?.release();
-  _reader = null;
+  _reader.release();
 
-  &#47;&#47; Release AIO
   _aio?.release();
   _aio = null;
 
-  Unistd.close(_fd!);
+  Unistd.close(fd);
   _fd = null;
 }</code></pre>
 </section>
@@ -118,7 +115,7 @@ Future&lt;void&gt; close() async {
 <footer>
   <span class="no-break">
     usb_gadget
-      0.4.3
+      0.5.0
   </span>
   
 </footer>
