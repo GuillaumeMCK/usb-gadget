@@ -92,11 +92,6 @@ final class AioSink with Releasable implements StreamSink<Uint8List> {
   /// Nulled out once space is confirmed so the next enqueue creates a fresh one.
   Completer<void>? _queueSpaceCompleter;
 
-  /// Total number of writes discarded by [dropOldest] or [dropNewest].
-  int _droppedWrites = 0;
-
-  int get droppedWrites => _droppedWrites;
-
   int get queued => _writeQueue.length;
 
   final Completer<void> _doneCompleter = Completer<void>();
@@ -130,13 +125,11 @@ final class AioSink with Releasable implements StreamSink<Uint8List> {
 
         case .dropOldest:
           final dropped = _writeQueue.removeFirst();
-          _droppedWrites++;
           if (!dropped.completer.isCompleted) {
             dropped.completer.complete(0);
           }
 
         case .dropNewest:
-          _droppedWrites++;
           return 0;
 
         case .throwError:
