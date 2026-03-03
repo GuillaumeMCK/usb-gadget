@@ -109,7 +109,7 @@ final class AioSink with Releasable implements StreamSink<Uint8List> {
   /// [BackpressureBehavior.dropNewest].
   Future<int> write(Uint8List data) async {
     if (_closed || isReleased) {
-      throw StateError('Cannot write to a closed sink');
+      return Future.error(StateError('Cannot write to a closed sink'));
     }
 
     if (_writeQueue.length >= config.maxQueueSize) {
@@ -149,10 +149,7 @@ final class AioSink with Releasable implements StreamSink<Uint8List> {
 
   @override
   void add(Uint8List data) {
-    if (_closed || isReleased) {
-      throw StateError('Cannot write to a closed sink');
-    }
-    write(data).ignore();
+    return write(data).ignore();
   }
 
   @override
