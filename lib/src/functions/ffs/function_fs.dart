@@ -216,8 +216,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
     await _eventSubscription?.cancel();
     _eventSubscription = null;
 
-    _releaseEndpoints(_endpoints);
-    _endpoints.clear();
+    await _releaseEndpoints(_endpoints);
 
     try {
       if (_state != .uninitialized) await _ep0.release();
