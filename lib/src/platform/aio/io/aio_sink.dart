@@ -217,7 +217,7 @@ final class AioSink with Releasable implements StreamSink<Uint8List> {
         }
       }
 
-      _writeQueue.removeFirst();
+      if (_writeQueue.isNotEmpty) _writeQueue.removeFirst();
 
       // Wake any callers blocked on queue space.
       if (_queueSpaceCompleter != null && !_queueSpaceCompleter!.isCompleted) {
