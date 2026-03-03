@@ -21,10 +21,13 @@ enum FunctionFsState {
   /// Enabled and actively transferring data
   enabled,
 
-  /// Suspended by host
+  /// Operation suspended by host (e.g., due to USB reset or disconnect)
   suspended,
 
-  /// Disposed and cleaned up
+  /// Disabled by host (e.g., due to configuration change or unbind)
+  disabled,
+
+  /// Released and resources cleaned up
   disposed,
 }
 
@@ -362,11 +365,11 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
 
   /// Called when the host de-configures the device.
   ///
-  /// Resets all per-endpoint halt status bits and transitions to [FunctionFsState.bound].
+  /// Resets all per-endpoint halt status bits and transitions to [FunctionFsState.disabled].
   @mustCallSuper
   void onDisable() {
     _endpointStatus.clear();
-    _setState(.bound);
+    _setState(.disabled);
   }
 
   /// Called when the host suspends the USB bus.
