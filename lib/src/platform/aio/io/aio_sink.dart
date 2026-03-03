@@ -180,7 +180,7 @@ final class AioSink with Releasable implements StreamSink<Uint8List> {
   }
 
   @override
-  void release() {
+  Future<void> release() async {
     if (isReleased) return;
     super.release();
 
@@ -195,7 +195,7 @@ final class AioSink with Releasable implements StreamSink<Uint8List> {
     }
     _writeQueue.clear();
 
-    if (!_closed) close();
+    if (!_closed) await close();
   }
 
   void _wakeProcessor() {
