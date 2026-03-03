@@ -11,7 +11,7 @@ import '/usb_gadget.dart';
 ///
 /// Manages the low-level lifecycle (open, close, halt) for USB endpoints
 /// exposed via the Linux FunctionFs (FFS) interface.
-abstract class EndpointFile with USBGadgetLogger {
+abstract class EndpointFile with USBGadgetLogger, Releasable {
   /// Creates an endpoint file manager for the specified [path].
   EndpointFile(this.path) {
     if (path.isEmpty) {
@@ -72,6 +72,13 @@ abstract class EndpointFile with USBGadgetLogger {
   }
 
   @override
+  Future<void> release() async {
+    if (isReleased) return;
+    super.release();
+    await close();
+  }
+
+  @override
   String toString() => 'EndpointFile(path: $path, open: ${_fd != null})';
 }
 
@@ -79,7 +86,7 @@ abstract class EndpointFile with USBGadgetLogger {
 ///
 /// Handles the FunctionFs mount lifecycle and provides a broadcast stream
 /// for USB setup events (BIND, ENABLE, SETUP, etc.).
-final class EndpointControlFile extends EndpointFile with Releasable {
+final class EndpointControlFile extends EndpointFile {
   /// Creates a control endpoint manager with mounting capabilities.
   EndpointControlFile(
     super.path, {
@@ -132,10 +139,6 @@ final class EndpointControlFile extends EndpointFile with Releasable {
 
   @override
   Future<void> close() async {
-    if (_fd == null) return;
-    if (isReleased) return;
-    super.release();
-
     _eventReadingActive = false;
     _pollingTimer?.cancel();
     _pollingTimer = null;
@@ -143,8 +146,10 @@ final class EndpointControlFile extends EndpointFile with Releasable {
     await _streamController?.close();
     _streamController = null;
 
+    final fd = _fd;
+    if (fd == null) return;
     try {
-      Unistd.close(_fd!);
+      Unistd.close(fd);
     } on OSError catch (e) {
       log?.error('Failed to close EP0 file descriptor: ${e.message}');
     } finally {
@@ -157,10 +162,11 @@ final class EndpointControlFile extends EndpointFile with Releasable {
   /// Sends a STALL response to the host via a 0-length read.
   @override
   void halt() {
+    final fd = _fd;
     if (fd == null) throw StateError('Cannot halt: Endpoint is not open');
 
     try {
-      Unistd.read(fd!, 0);
+      Unistd.read(fd, 0);
     } on OSError catch (e) {
       final code = e.errorCode;
       if (const [Errno.epipe, Errno.eshutdown, Errno.enotconn].contains(code)) {
@@ -173,13 +179,13 @@ final class EndpointControlFile extends EndpointFile with Releasable {
 
   /// Performs a synchronous write to EP0, retrying on `EAGAIN`.
   void write(Uint8List data) {
-    final currentFd = _fd;
-    if (currentFd == null) throw StateError('write: Endpoint is not open');
+    final fd = _fd;
+    if (fd == null) throw StateError('write: Endpoint is not open');
 
     var offset = 0;
     while (offset < data.length) {
       try {
-        offset += Unistd.write(currentFd, data.sublist(offset));
+        offset += Unistd.write(fd, data.sublist(offset));
       } on OSError catch (e) {
         if (e.errorCode == Errno.eagain) continue;
         rethrow;
@@ -189,14 +195,16 @@ final class EndpointControlFile extends EndpointFile with Releasable {
 
   /// Reads up to [length] bytes from EP0 in non-blocking mode.
   Uint8List read(int length) {
-    if (_fd == null) throw StateError('read: Endpoint is not open');
-    return Unistd.read(_fd!, length);
+    final fd = _fd;
+    if (fd == null) throw StateError('read: Endpoint is not open');
+    return Unistd.read(fd, length);
   }
 
   /// Acknowledges a host request with a Zero-Length Packet (ZLP).
   void ack() {
+    final fd = _fd;
     if (fd == null) throw StateError('Cannot ACK: Endpoint is not open');
-    Unistd.write(fd!, Uint8List(0));
+    Unistd.write(fd, Uint8List(0));
   }
 
   /// A broadcast stream emitting control events from the kernel.
@@ -208,7 +216,7 @@ final class EndpointControlFile extends EndpointFile with Releasable {
       return controller.stream;
     }
 
-    _streamController ??= StreamController.broadcast(
+    _streamController ??= .broadcast(
       onListen: _startReading,
       onCancel: _stopReading,
     );
@@ -245,7 +253,7 @@ final class EndpointControlFile extends EndpointFile with Releasable {
 ///
 /// Provides high-performance asynchronous writes with automatic buffer
 /// management and backpressure handling.
-final class EndpointInFile extends EndpointFile with Releasable {
+final class EndpointInFile extends EndpointFile {
   /// Creates an IN endpoint with optional custom AIO instance.
   EndpointInFile(super.path, {required this.config})
     : _aio = .fromEndpointConfig(config);
@@ -257,7 +265,7 @@ final class EndpointInFile extends EndpointFile with Releasable {
   Aio? _aio;
 
   /// Writer sink for asynchronous writes.
-  AioSink? _sink;
+  late AioSink _sink;
 
   @override
   Future<void> open() async {
@@ -269,7 +277,7 @@ final class EndpointInFile extends EndpointFile with Releasable {
     _aio ??= Aio.fromEndpointConfig(config);
 
     // Create writer sink for this endpoint
-    _sink ??= _aio!.createWriter(
+    _sink = _aio!.createWriter(
       _fd!,
       config: switch (config) {
         BulkEndpointConfig() => const .new(
@@ -294,25 +302,24 @@ final class EndpointInFile extends EndpointFile with Releasable {
 
   @override
   Future<void> close() async {
-    if (_fd == null) return;
-    if (isReleased) return;
-    super.release();
+    final fd = _fd;
+    if (fd == null) return;
 
-    // Close and wait for pending writes
-    await _sink?.close();
-    _sink = null;
+    // Release writer sink (draining queued operations)
+    await _sink.release();
 
     // Release AIO
     _aio?.release();
     _aio = null;
 
-    Unistd.close(_fd!);
+    Unistd.close(fd);
     _fd = null;
   }
 
   @override
   void halt() {
-    if (_fd != null) Unistd.write(_fd!, Uint8List(0));
+    final fd = _fd;
+    if (fd != null) Unistd.write(fd, Uint8List(0));
   }
 
   /// Enqueues [data] for asynchronous transmission to the host.
@@ -322,8 +329,7 @@ final class EndpointInFile extends EndpointFile with Releasable {
   ///
   /// Throws [StateError] if endpoint is not open.
   void write(Uint8List data) {
-    if (_sink == null) throw StateError('Endpoint not open');
-    _sink!.add(data);
+    _sink.add(data);
   }
 
   /// Flushes all pending writes and waits for completion.
@@ -333,12 +339,10 @@ final class EndpointInFile extends EndpointFile with Releasable {
   /// Returns a future that completes when all queued data has been
   /// transmitted to the host.
   Future<void> flush() async {
-    if (_sink == null) return;
-    final config = _sink!.config;
-    await _sink!.close();
-    _sink = null;
+    final config = _sink.config;
+    await _sink.release();
     // Reopen sink for continued use
-    _sink ??= _aio!.createWriter(_fd!, config: config);
+    _sink = _aio!.createWriter(_fd!, config: config);
   }
 
   /// Clears the halt (STALL) condition on the endpoint.
@@ -350,12 +354,11 @@ final class EndpointInFile extends EndpointFile with Releasable {
   /// Throws [StateError] if endpoint is not open.
   /// Throws [OSError] if the operation fails.
   void clearHalt() {
-    if (_fd == null) {
-      throw StateError('Cannot clear halt: Endpoint is not open');
-    }
+    final fd = _fd;
+    if (fd == null) throw StateError('Cannot clear halt: Endpoint is not open');
 
     try {
-      Ioctl.call(_fd!, .clearHalt);
+      Ioctl.call(fd, .clearHalt);
     } on OSError catch (e) {
       if (e.errorCode == Errno.einval) {
         // Endpoint not halted, this is not an error
@@ -372,7 +375,7 @@ final class EndpointInFile extends EndpointFile with Releasable {
   Future<void> release() async {
     if (isReleased) return;
     super.release();
-    this.close();
+    await this.close();
   }
 }
 
@@ -380,7 +383,7 @@ final class EndpointInFile extends EndpointFile with Releasable {
 ///
 /// Provides high-performance asynchronous reads with automatic buffer
 /// management and demand-driven backpressure.
-final class EndpointOutFile extends EndpointFile with Releasable {
+final class EndpointOutFile extends EndpointFile {
   /// Creates an OUT endpoint with optional custom AIO instance.
   EndpointOutFile(super.path, {required this.config})
     : _aio = .fromEndpointConfig(config);
@@ -392,20 +395,19 @@ final class EndpointOutFile extends EndpointFile with Releasable {
   Aio? _aio;
 
   /// Reader stream for asynchronous reads.
-  AioStream? _reader;
+  late AioStream _reader;
 
   @override
   Future<void> open() async {
     if (_fd != null) return;
-
-    _fd = Unistd.open(path, const [.rdOnly]);
+    final fd = Unistd.open(path, const [.rdOnly]);
 
     // Create AIO context if not provided
-    _aio ??= Aio.fromEndpointConfig(config);
+    _aio ??= .fromEndpointConfig(config);
 
     // Create reader stream for this endpoint
-    _reader ??= _aio!.createReader(
-      _fd!,
+    _reader = _aio!.createReader(
+      fd,
       maxInflight: switch (config) {
         BulkEndpointConfig() => 16,
         IsochronousEndpointConfig() => 8,
@@ -413,23 +415,20 @@ final class EndpointOutFile extends EndpointFile with Releasable {
         ControlEndpointConfig() => 2,
       },
     );
+    _fd = fd;
   }
 
   @override
   Future<void> close() async {
-    if (_fd == null) return;
-    if (isReleased) return;
-    super.release();
+    final fd = _fd;
+    if (fd == null) return;
 
-    // Release reader stream
-    _reader?.release();
-    _reader = null;
+    _reader.release();
 
-    // Release AIO
     _aio?.release();
     _aio = null;
 
-    Unistd.close(_fd!);
+    Unistd.close(fd);
     _fd = null;
   }
 
@@ -449,15 +448,12 @@ final class EndpointOutFile extends EndpointFile with Releasable {
   ///   // Stream pauses automatically if processing is slow
   /// }
   /// ```
-  Stream<Uint8List> get stream {
-    if (_reader == null) throw StateError('Endpoint not open');
-    return _reader!.stream;
-  }
+  Stream<Uint8List> get stream => _reader.stream;
 
   @override
   Future<void> release() async {
     if (isReleased) return;
     super.release();
-    this.close();
+    await this.close();
   }
 }
