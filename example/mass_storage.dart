@@ -34,7 +34,7 @@ Future<void> main(List<String> args) async {
     name: 'mass_storage_gadget',
     idVendor: 0x1d6b,
     idProduct: 0x0104,
-    deviceClass: .composite,
+    deviceClass: .perInterface,
     deviceSubClass: .none,
     deviceProtocol: .none,
     udc: udc,

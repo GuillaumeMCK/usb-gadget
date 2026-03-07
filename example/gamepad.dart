@@ -251,7 +251,7 @@ Future<void> main() async {
     name: 'logitech_f310',
     idVendor: 0x046D,
     idProduct: 0xC216,
-    deviceClass: .composite,
+    deviceClass: .perInterface,
     strings: const {
       .enUS: .new(
         manufacturer: 'Logitech',

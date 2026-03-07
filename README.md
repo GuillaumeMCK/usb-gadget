@@ -115,7 +115,7 @@ Future<void> main() async {
     name: 'hid_keyboard',
     idVendor: 0x1234,
     idProduct: 0x5679,
-    deviceClass: .composite,
+    deviceClass: .perInterface,
     deviceSubClass: .none,
     deviceProtocol: .none,
     strings: {

@@ -821,11 +821,11 @@ class DeviceClass {
   /// The raw device class value (0-255).
   final int value;
 
-  /// Composite device - class info at interface level (0x00).
+  /// Class information is defined at the interface level (0x00).
   ///
-  /// Use this when your device has multiple functions that each
-  /// specify their own class in interface descriptors.
-  static const DeviceClass composite = .new(0x00);
+  /// Use this when each interface specifies its own class code.
+  /// This is the correct value for HID-only devices like the DS3.
+  static const DeviceClass perInterface = .new(0x00);
 
   /// Miscellaneous device class (0xEF).
   ///
