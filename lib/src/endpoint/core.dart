@@ -4,8 +4,10 @@ import 'dart:typed_data';
 
 import 'package:using/using.dart';
 
+import '/src/functions/ffs/events.dart';
 import '/src/platform/platform.dart';
 import '/usb_gadget.dart';
+import 'aio/aio.dart';
 
 /// Base class for FunctionFs endpoint file descriptors.
 ///
@@ -98,9 +100,7 @@ final class EndpointControlFile extends EndpointFile {
          ep0Path: path,
        );
 
-  /// Event buffer size for polling (48 bytes = 4 events of 12 bytes each).
-  ///
-  /// Reading multiple events at once reduces syscall overhead during enumeration.
+  /// Maximum bytes read per epoll wake (4 events * 12 bytes each).
   static const int eventBufferSize = 4 * FunctionFsEvent.size;
 
   /// The mount manager responsible for the `functionfs` filesystem.
@@ -112,9 +112,6 @@ final class EndpointControlFile extends EndpointFile {
   /// Periodic timer that reads from the non-blocking EP0 file descriptor
   /// at a fixed interval to deliver kernel USB events to the stream.
   Timer? _pollingTimer;
-
-  /// Internal flag to track if the polling loop is active.
-  bool _eventReadingActive = false;
 
   /// Indicates if the FunctionFs backing store is currently mounted.
   bool get isMounted => _mount.isMounted;
@@ -139,7 +136,6 @@ final class EndpointControlFile extends EndpointFile {
 
   @override
   Future<void> close() async {
-    _eventReadingActive = false;
     _pollingTimer?.cancel();
     _pollingTimer = null;
 
@@ -169,7 +165,7 @@ final class EndpointControlFile extends EndpointFile {
       Unistd.read(fd, 0);
     } on OSError catch (e) {
       final code = e.errorCode;
-      if (const [Errno.epipe, Errno.eshutdown, Errno.enotconn].contains(code)) {
+      if (const {Errno.epipe, Errno.eshutdown, Errno.enotconn}.contains(code)) {
         log?.warn('Halt ignored: Host disconnected (${e.errorCode})');
       } else {
         rethrow;
@@ -224,9 +220,6 @@ final class EndpointControlFile extends EndpointFile {
   }
 
   void _startReading() {
-    if (_eventReadingActive) return;
-    _eventReadingActive = true;
-
     _pollingTimer ??= .periodic(const .new(milliseconds: 1), (_) {
       try {
         final data = Unistd.read(_fd!, eventBufferSize);
@@ -243,7 +236,6 @@ final class EndpointControlFile extends EndpointFile {
   }
 
   void _stopReading() {
-    _eventReadingActive = false;
     _pollingTimer?.cancel();
     _pollingTimer = null;
   }
@@ -255,8 +247,7 @@ final class EndpointControlFile extends EndpointFile {
 /// management and backpressure handling.
 final class EndpointInFile extends EndpointFile {
   /// Creates an IN endpoint with optional custom AIO instance.
-  EndpointInFile(super.path, {required this.config})
-    : _aio = .fromEndpointConfig(config);
+  EndpointInFile(super.path, {required this.config});
 
   /// Endpoint configuration defining transfer characteristics.
   final EndpointConfig config;
@@ -265,39 +256,15 @@ final class EndpointInFile extends EndpointFile {
   Aio? _aio;
 
   /// Writer sink for asynchronous writes.
-  late AioSink _sink;
+  late AioSink _aioSink;
 
   @override
   Future<void> open() async {
     if (_fd != null) return;
-
-    _fd = Unistd.open(path, const [.wrOnly]);
-
-    // Create AIO context if not provided
-    _aio ??= Aio.fromEndpointConfig(config);
-
-    // Create writer sink for this endpoint
-    _sink = _aio!.createWriter(
-      _fd!,
-      config: switch (config) {
-        BulkEndpointConfig() => const .new(
-          maxQueueSize: 64,
-          backpressure: .block,
-        ),
-        ControlEndpointConfig() => const .new(
-          maxQueueSize: 16,
-          backpressure: .block,
-        ),
-        IsochronousEndpointConfig() => const .new(
-          maxQueueSize: 32,
-          backpressure: .dropOldest,
-        ),
-        InterruptEndpointConfig() => const .new(
-          maxQueueSize: 16,
-          backpressure: .dropOldest,
-        ),
-      },
-    );
+    final fd = Unistd.open(path, const [.wrOnly]);
+    _aio ??= Aio.fromEndpointConfig(fd, config);
+    _aioSink = _aio!.sink;
+    _fd = fd;
   }
 
   @override
@@ -305,10 +272,7 @@ final class EndpointInFile extends EndpointFile {
     final fd = _fd;
     if (fd == null) return;
 
-    // Release writer sink (draining queued operations)
-    await _sink.release();
-
-    // Release AIO
+    await _aioSink.release();
     _aio?.release();
     _aio = null;
 
@@ -329,7 +293,7 @@ final class EndpointInFile extends EndpointFile {
   ///
   /// Throws [StateError] if endpoint is not open.
   void write(Uint8List data) {
-    _sink.add(data);
+    _aioSink.add(data);
   }
 
   /// Flushes all pending writes and waits for completion.
@@ -339,10 +303,8 @@ final class EndpointInFile extends EndpointFile {
   /// Returns a future that completes when all queued data has been
   /// transmitted to the host.
   Future<void> flush() async {
-    final config = _sink.config;
-    await _sink.release();
-    // Reopen sink for continued use
-    _sink = _aio!.createWriter(_fd!, config: config);
+    await _aioSink.release();
+    _aioSink = _aio!.sink;
   }
 
   /// Clears the halt (STALL) condition on the endpoint.
@@ -384,37 +346,42 @@ final class EndpointInFile extends EndpointFile {
 /// Provides high-performance asynchronous reads with automatic buffer
 /// management and demand-driven backpressure.
 final class EndpointOutFile extends EndpointFile {
-  /// Creates an OUT endpoint with optional custom AIO instance.
-  EndpointOutFile(super.path, {required this.config})
-    : _aio = .fromEndpointConfig(config);
+  EndpointOutFile(super.path, {required this.config});
 
-  /// Endpoint configuration defining transfer characteristics.
   final EndpointConfig config;
 
-  /// AIO context for asynchronous operations.
   Aio? _aio;
 
-  /// Reader stream for asynchronous reads.
-  late AioStream _reader;
+  AioStream? _aioStream;
+
+  /// Stable proxy that outlives individual [AioStream] instances.
+  final StreamController<Uint8List> _proxy = .broadcast();
+
+  /// Active subscription forwarding [_aioStream] → [_proxy].
+  /// `null` until the stream is first accessed or [restart] is called.
+  StreamSubscription<Uint8List>? _aioStreamSub;
+
+  /// Subscribes [_aioStream] into [_proxy].
+  ///
+  /// Data and errors are forwarded. `onDone` is intentionally omitted — EOF
+  /// on the inner stream means kernel disconnect/suspend, not end-of-channel.
+  void _connectReader() {
+    _aioStreamSub?.cancel();
+    _aioStreamSub = _aioStream?.stream.listen(
+      _proxy.add,
+      onError: _proxy.addError,
+      // onDone intentionally omitted — keeps the proxy open across cycles.
+    );
+  }
+
+  // ---------------------------------------------------------------------------
 
   @override
   Future<void> open() async {
     if (_fd != null) return;
     final fd = Unistd.open(path, const [.rdOnly]);
-
-    // Create AIO context if not provided
-    _aio ??= .fromEndpointConfig(config);
-
-    // Create reader stream for this endpoint
-    _reader = _aio!.createReader(
-      fd,
-      maxInflight: switch (config) {
-        BulkEndpointConfig() => 16,
-        IsochronousEndpointConfig() => 8,
-        InterruptEndpointConfig() => 4,
-        ControlEndpointConfig() => 2,
-      },
-    );
+    _aio ??= Aio.fromEndpointConfig(fd, config);
+    _aioStream = _aio!.stream;
     _fd = fd;
   }
 
@@ -423,10 +390,15 @@ final class EndpointOutFile extends EndpointFile {
     final fd = _fd;
     if (fd == null) return;
 
-    _reader.release();
+    _aioStreamSub?.cancel();
+    _aioStreamSub = null;
+    _aioStream?.release();
+    _aioStream = null;
 
     _aio?.release();
     _aio = null;
+
+    await _proxy.close();
 
     Unistd.close(fd);
     _fd = null;
@@ -435,11 +407,21 @@ final class EndpointOutFile extends EndpointFile {
   @override
   void halt() => throw UnsupportedError('Manual STALL not supported for OUT');
 
-  /// Stream of data from the host.
+  /// Stable broadcast stream of data received from the host.
   ///
-  /// The stream automatically manages backpressure - pausing the stream
-  /// will stop submitting new read operations to the kernel, and resuming
-  /// will restart them. This provides natural flow control.
+  /// Accessing this getter for the first time wires the inner [AioStream] into
+  /// the proxy and starts submitting reads to the kernel. The stream remains
+  /// open — and delivers data — across any number of disable/enable cycles.
+  Stream<Uint8List> get stream {
+    // Lazily connect on first access.  Guarded so a second call (e.g. after
+    // the consumer re-reads the getter) does not reset an active subscription.
+    if (_aioStreamSub == null && _fd != null && !_proxy.isClosed) {
+      _connectReader();
+    }
+    return _proxy.stream;
+  }
+
+  /// Replaces the inner [AioStream] after a USB disable/enable cycle.
   ///
   /// Example:
   /// ```dart
@@ -454,6 +436,6 @@ final class EndpointOutFile extends EndpointFile {
   Future<void> release() async {
     if (isReleased) return;
     super.release();
-    await this.close();
+    await close();
   }
 }

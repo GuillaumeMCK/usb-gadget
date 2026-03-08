@@ -1,4 +1,4 @@
-export 'src/functionfs/functionfs.dart';
+export 'src/endpoint/endpoint.dart';
 export 'src/functions/functions.dart';
 export 'src/gadget/gadget.dart';
 export 'src/logger/logger.dart' show USBGadgetLogger, ILogger, Logger;
