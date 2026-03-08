@@ -368,7 +368,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
   @mustCallSuper
   void onEnable() {
     for (final ep in _endpoints.values) {
-      if (ep is EndpointOutFile) ep.restart();
+      if (ep is EndpointOutFile) ep.refresh();
     }
     _setState(.enabled);
   }

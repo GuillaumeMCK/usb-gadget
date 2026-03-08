@@ -358,7 +358,7 @@ final class EndpointOutFile extends EndpointFile {
   final StreamController<Uint8List> _proxy = .broadcast();
 
   /// Active subscription forwarding [_aioStream] → [_proxy].
-  /// `null` until the stream is first accessed or [restart] is called.
+  /// `null` until the stream is first accessed or [refresh] is called.
   StreamSubscription<Uint8List>? _aioStreamSub;
 
   /// Subscribes [_aioStream] into [_proxy].
@@ -421,15 +421,18 @@ final class EndpointOutFile extends EndpointFile {
     return _proxy.stream;
   }
 
-  /// Replaces the inner [AioStream] after a USB disable/enable cycle.
+  /// Reprimes the endpoint to resume receiving data after a USB reset or 
+  /// re-configuration.
   ///
-  /// Cancels the dead subscription, releases the old [AioStream], creates a
-  /// fresh one on the same fd/[AioContext], and reconnects it to [_proxy].
-  /// Existing subscribers on [stream] are unaffected — they keep receiving
-  /// data once the host re-enables the function.
+  /// When the host de-configures the function (e.g., during a power cycle or 
+  /// mode switch), the kernel terminates all in-flight asynchronous transfers.
+  /// This causes the current [AioStream] to reach end-of-file and stop reading.
   ///
-  /// No-op if the endpoint is not open.
-  void restart() {
+  /// This method replaces the exhausted internal stream with a fresh one 
+  /// without disrupting existing subscribers to the public [stream].
+  ///
+  /// No-op if the endpoint is not currently open.
+  void refresh() {
     final fd = _fd;
     if (fd == null) return;
 
