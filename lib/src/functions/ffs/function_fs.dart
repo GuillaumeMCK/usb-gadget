@@ -359,8 +359,17 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
   }
 
   /// Called when the host configures the device.
+  ///
+  /// Calls [EndpointOutFile.restart] on every OUT endpoint so that fresh AIO
+  /// reads are submitted after a disable/enable cycle. During disable, all
+  /// in-flight reads complete as EOF (ESHUTDOWN → 0 bytes), leaving each
+  /// [AioStream] closed. [restart] replaces the dead stream and reconnects it
+  /// to the stable proxy that consumers already hold a subscription to.
   @mustCallSuper
   void onEnable() {
+    for (final ep in _endpoints.values) {
+      if (ep is EndpointOutFile) ep.restart();
+    }
     _setState(.enabled);
   }
 

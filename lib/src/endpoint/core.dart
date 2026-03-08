@@ -423,14 +423,23 @@ final class EndpointOutFile extends EndpointFile {
 
   /// Replaces the inner [AioStream] after a USB disable/enable cycle.
   ///
-  /// Example:
-  /// ```dart
-  /// await for (final data in endpoint.stream) {
-  ///   // Process data...
-  ///   // Stream pauses automatically if processing is slow
-  /// }
-  /// ```
-  Stream<Uint8List> get stream => _reader.stream;
+  /// Cancels the dead subscription, releases the old [AioStream], creates a
+  /// fresh one on the same fd/[AioContext], and reconnects it to [_proxy].
+  /// Existing subscribers on [stream] are unaffected — they keep receiving
+  /// data once the host re-enables the function.
+  ///
+  /// No-op if the endpoint is not open.
+  void restart() {
+    final fd = _fd;
+    if (fd == null) return;
+
+    _aioStreamSub?.cancel();
+    _aioStreamSub = null;
+
+    _aioStream?.release();
+    _aioStream = _aio!.stream;
+    _connectReader();
+  }
 
   @override
   Future<void> release() async {
