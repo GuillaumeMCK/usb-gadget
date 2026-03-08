@@ -1,8 +1,6 @@
 import 'dart:ffi' as ffi;
 
-// On Android, Bionic libc is the target. Use libc.so explicitly for clarity
-// and to avoid ambiguity across API levels.
-final _lib = ffi.DynamicLibrary.open('libc.so');
+final _lib = ffi.DynamicLibrary.process();
 
 typedef _ErrnoFn = ffi.Pointer<ffi.Int> Function();
 
