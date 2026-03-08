@@ -1,0 +1,30 @@
+name: Epoll
+description: FFI bindings for epoll and eventfd system calls
+output: "epoll.ffi.dart"
+exclude-all-by-default: true
+language: c
+headers:
+  entry-points:
+    - "/usr/include/sys/epoll.h"
+    - "/usr/include/sys/eventfd.h"
+
+functions:
+  include:
+    - "epoll_create1"
+    - "epoll_ctl"
+    - "epoll_wait"
+    - "eventfd"
+    - "eventfd_read"
+    - "eventfd_write"
+
+structs:
+  include:
+    - "epoll_event"
+
+macros:
+  include:
+    - "EPOLL.*"
+    - "EFD_.*"
+
+preamble: |
+  // ignore_for_file: type=lint, unused_import, unused_field
