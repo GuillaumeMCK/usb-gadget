@@ -306,9 +306,8 @@ LD_LIBRARY_PATH=/data/local/tmp ./usb_gadget_app
 
 ## Resources
 
-- [API Documentation](https://pub.dev/documentation/usb_gadget/latest/)
 - [Linux USB Gadget API](https://www.kernel.org/doc/html/latest/driver-api/usb/gadget.html)
+- [ConfigFs](https://www.kernel.org/doc/Documentation/filesystems/configfs/configfs.txt)
 - [USB in a Nutshell](https://www.beyondlogic.org/usbnutshell/usb1.shtml)
-- [HID Usage Tables](https://usb.org/sites/default/files/hut1_3_0.pdf)
 - [usb-gadget (Rust)](https://github.com/surban/usb-gadget)
 - [functionfs (Python)](https://github.com/vpelletier/python-functionfs)
