@@ -10,7 +10,6 @@ import 'libaio.ffi.dart' as ffi_aio;
 /// FFI bindings for Linux kernel AIO, loaded from libaio.so.
 final libaio = ffi_aio.Aio(ffi.DynamicLibrary.open('libaio.so'));
 
-
 /// A completed AIO event: opaque operation id and signed kernel result.
 ///
 /// [res] is positive (bytes transferred), zero (USB EOF / disconnect), or
@@ -53,8 +52,7 @@ final class Iocb {
     final iocb = Iocb._();
     iocb._ptr.ref
       ..aio_fildes = fd
-      ..aio_lio_opcode =
-          0 // IOCB_CMD_PREAD
+      ..aio_lio_opcode = ffi_aio.IOCB_CMD_PREAD
       ..data = ffi.Pointer.fromAddress(iocb.address)
       ..u.c.buf = buf.cast()
       ..u.c.nbytes = len
@@ -67,8 +65,7 @@ final class Iocb {
     final iocb = Iocb._();
     iocb._ptr.ref
       ..aio_fildes = fd
-      ..aio_lio_opcode =
-          1 // IOCB_CMD_PWRITE
+      ..aio_lio_opcode = ffi_aio.IOCB_CMD_PWRITE
       ..data = ffi.Pointer.fromAddress(iocb.address)
       ..u.c.buf = buf.cast()
       ..u.c.nbytes = len
@@ -86,13 +83,11 @@ final class Iocb {
   void setResfd(int efd) {
     _ptr.ref
       ..u.c.resfd = efd
-      ..u.c.flags = _ptr.ref.u.c.flags | _iocbFlagResfd;
+      ..u.c.flags = _ptr.ref.u.c.flags | ffi_aio.IOCB_FLAG_RESFD;
   }
 
   /// Releases the native memory. Must be called exactly once per [Iocb].
   void free() => calloc.free(_ptr);
-
-  static const int _iocbFlagResfd = 1 << 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +155,7 @@ final class Libaio {
     final n = _lib.io_getevents(_ctx(ctxAddr), 0, max, _eventBuf, ffi.nullptr);
     if (n <= 0) return const [];
 
-    return List<AioCompletion>.generate(n, (i) {
+    return .generate(n, (i) {
       final evt = _eventBuf[i];
       return (evt.data.address, evt.res.toSigned(64));
     }, growable: false);

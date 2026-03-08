@@ -1,6 +1,6 @@
-name: Aio
+name: Libaio
 description: FFI bindings for aio system calls
-output: "aio.ffi.dart"
+output: "libaio.ffi.dart"
 exclude-all-by-default: true
 language: c
 headers:
@@ -16,17 +16,19 @@ functions:
     - 'io_getevents'
     - 'io_cancel'
     - 'io_prep_.*'
+
 macros:
   include:
     - "IOCB_.*"
 
-enums:
+unnamed-enums:
   include:
-    - "IOCB_.*"
+    - "IOCB_CMD_.*"
 
 structs:
   include:
     - 'iocb'
     - 'io_event'
+
 preamble: |
   // ignore_for_file: type=lint, unused_import, unused_field
