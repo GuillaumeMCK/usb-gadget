@@ -16,6 +16,13 @@ functions:
     - 'io_getevents'
     - 'io_cancel'
     - 'io_prep_.*'
+macros:
+  include:
+    - "IOCB_.*"
+
+enums:
+  include:
+    - "IOCB_.*"
 
 structs:
   include:
