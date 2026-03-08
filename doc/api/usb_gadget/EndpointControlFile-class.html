@@ -205,7 +205,7 @@ for USB setup events (BIND, ENABLE, SETUP, etc.).</p>
 
         <dt id="stream" class="property">
   <span class="name"><a href="../usb_gadget/EndpointControlFile/stream.html">stream</a></span>
-  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../usb_gadget/FunctionFsEvent-class.html">FunctionFsEvent</a></span>&gt;</span></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/Stream-class.html">Stream</a><span class="signature">&lt;<wbr><span class="type-parameter">FunctionFsEvent</span>&gt;</span></span>
   
 
 </dt>
@@ -507,7 +507,7 @@ a <a href="https://pub.dev/documentation/using/1.0.5/using/ReleasedException-cla
 
 </dt>
 <dd>
-  Event buffer size for polling (48 bytes = 4 events of 12 bytes each).
+  Maximum bytes read per epoll wake (4 events * 12 bytes each).
   
 
 </dd>
@@ -537,7 +537,7 @@ a <a href="https://pub.dev/documentation/using/1.0.5/using/ReleasedException-cla
 <footer>
   <span class="no-break">
     usb_gadget
-      0.5.0
+      0.6.0
   </span>
   
 </footer>

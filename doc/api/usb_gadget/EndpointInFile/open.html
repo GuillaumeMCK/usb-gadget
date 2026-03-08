@@ -80,34 +80,10 @@ Throws <a href="https://api.flutter.dev/flutter/dart-core/StateError-class.html"
   <pre class="language-dart"><code class="language-dart">@override
 Future&lt;void&gt; open() async {
   if (_fd != null) return;
-
-  _fd = Unistd.open(path, const [.wrOnly]);
-
-  &#47;&#47; Create AIO context if not provided
-  _aio ??= Aio.fromEndpointConfig(config);
-
-  &#47;&#47; Create writer sink for this endpoint
-  _sink = _aio!.createWriter(
-    _fd!,
-    config: switch (config) {
-      BulkEndpointConfig() =&gt; const .new(
-        maxQueueSize: 64,
-        backpressure: .block,
-      ),
-      ControlEndpointConfig() =&gt; const .new(
-        maxQueueSize: 16,
-        backpressure: .block,
-      ),
-      IsochronousEndpointConfig() =&gt; const .new(
-        maxQueueSize: 32,
-        backpressure: .dropOldest,
-      ),
-      InterruptEndpointConfig() =&gt; const .new(
-        maxQueueSize: 16,
-        backpressure: .dropOldest,
-      ),
-    },
-  );
+  final fd = Unistd.open(path, const [.wrOnly]);
+  _aio ??= Aio.fromEndpointConfig(fd, config);
+  _aioSink = _aio!.sink;
+  _fd = fd;
 }</code></pre>
 </section>
 
@@ -136,7 +112,7 @@ Future&lt;void&gt; open() async {
 <footer>
   <span class="no-break">
     usb_gadget
-      0.5.0
+      0.6.0
   </span>
   
 </footer>

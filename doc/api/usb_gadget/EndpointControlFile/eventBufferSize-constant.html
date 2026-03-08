@@ -62,8 +62,7 @@
       </section>
       
 <section class="desc markdown">
-  <p>Event buffer size for polling (48 bytes = 4 events of 12 bytes each).</p>
-<p>Reading multiple events at once reduces syscall overhead during enumeration.</p>
+  <p>Maximum bytes read per epoll wake (4 events * 12 bytes each).</p>
 </section>
 
       
@@ -98,7 +97,7 @@
 <footer>
   <span class="no-break">
     usb_gadget
-      0.5.0
+      0.6.0
   </span>
   
 </footer>

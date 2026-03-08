@@ -77,7 +77,6 @@
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">@override
 Future&lt;void&gt; close() async {
-  _eventReadingActive = false;
   _pollingTimer?.cancel();
   _pollingTimer = null;
 
@@ -123,7 +122,7 @@ Future&lt;void&gt; close() async {
 <footer>
   <span class="no-break">
     usb_gadget
-      0.5.0
+      0.6.0
   </span>
   
 </footer>

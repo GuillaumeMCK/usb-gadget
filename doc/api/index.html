@@ -160,7 +160,7 @@ Future&lt;void&gt; main() async {
     name: 'hid_keyboard',
     idVendor: 0x1234,
     idProduct: 0x5679,
-    deviceClass: .composite,
+    deviceClass: .perInterface,
     deviceSubClass: .none,
     deviceProtocol: .none,
     strings: {
@@ -312,10 +312,9 @@ LD_LIBRARY_PATH=/data/local/tmp ./usb_gadget_app
 <hr>
 <h2 id="resources">Resources</h2>
 <ul>
-<li><a href="https://pub.dev/documentation/usb_gadget/latest/">API Documentation</a></li>
 <li><a href="https://www.kernel.org/doc/html/latest/driver-api/usb/gadget.html">Linux USB Gadget API</a></li>
+<li><a href="https://www.kernel.org/doc/Documentation/filesystems/configfs/configfs.txt">ConfigFs</a></li>
 <li><a href="https://www.beyondlogic.org/usbnutshell/usb1.shtml">USB in a Nutshell</a></li>
-<li><a href="https://usb.org/sites/default/files/hut1_3_0.pdf">HID Usage Tables</a></li>
 <li><a href="https://github.com/surban/usb-gadget">usb-gadget (Rust)</a></li>
 <li><a href="https://github.com/vpelletier/python-functionfs">functionfs (Python)</a></li>
 </ul>
@@ -359,7 +358,7 @@ LD_LIBRARY_PATH=/data/local/tmp ./usb_gadget_app
 <footer>
   <span class="no-break">
     usb_gadget
-      0.5.0
+      0.6.0
   </span>
   
 </footer>

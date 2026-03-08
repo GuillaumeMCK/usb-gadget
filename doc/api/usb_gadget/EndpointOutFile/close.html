@@ -80,10 +80,15 @@ Future&lt;void&gt; close() async {
   final fd = _fd;
   if (fd == null) return;
 
-  _reader.release();
+  _aioStreamSub?.cancel();
+  _aioStreamSub = null;
+  _aioStream?.release();
+  _aioStream = null;
 
   _aio?.release();
   _aio = null;
+
+  await _proxy.close();
 
   Unistd.close(fd);
   _fd = null;
@@ -115,7 +120,7 @@ Future&lt;void&gt; close() async {
 <footer>
   <span class="no-break">
     usb_gadget
-      0.5.0
+      0.6.0
   </span>
   
 </footer>

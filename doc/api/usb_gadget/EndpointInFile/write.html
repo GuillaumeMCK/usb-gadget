@@ -74,7 +74,7 @@ Backpressure behaviour is determined by the AIO configuration.</p>
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">void write(Uint8List data) {
-  _sink.add(data);
+  _aioSink.add(data);
 }</code></pre>
 </section>
 
@@ -103,7 +103,7 @@ Backpressure behaviour is determined by the AIO configuration.</p>
 <footer>
   <span class="no-break">
     usb_gadget
-      0.5.0
+      0.6.0
   </span>
   
 </footer>

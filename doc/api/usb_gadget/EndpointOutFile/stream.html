@@ -67,22 +67,23 @@
     </section>
     
 <section class="desc markdown">
-  <p>Stream of data from the host.</p>
-<p>The stream automatically manages backpressure - pausing the stream
-will stop submitting new read operations to the kernel, and resuming
-will restart them. This provides natural flow control.</p>
-<p>Example:</p>
-<pre class="language-dart"><code class="language-dart">await for (final data in endpoint.stream) {
-  // Process data...
-  // Stream pauses automatically if processing is slow
-}
-</code></pre>
+  <p>Stable broadcast stream of data received from the host.</p>
+<p>Accessing this getter for the first time wires the inner <code>AioStream</code> into
+the proxy and starts submitting reads to the kernel. The stream remains
+open — and delivers data — across any number of disable/enable cycles.</p>
 </section>
 
     
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">Stream&lt;Uint8List&gt; get stream =&gt; _reader.stream;</code></pre>
+  <pre class="language-dart"><code class="language-dart">Stream&lt;Uint8List&gt; get stream {
+  &#47;&#47; Lazily connect on first access.  Guarded so a second call (e.g. after
+  &#47;&#47; the consumer re-reads the getter) does not reset an active subscription.
+  if (_aioStreamSub == null &amp;&amp; _fd != null &amp;&amp; !_proxy.isClosed) {
+    _connectReader();
+  }
+  return _proxy.stream;
+}</code></pre>
 </section>
 
   </section>
@@ -112,7 +113,7 @@ will restart them. This provides natural flow control.</p>
 <footer>
   <span class="no-break">
     usb_gadget
-      0.5.0
+      0.6.0
   </span>
   
 </footer>

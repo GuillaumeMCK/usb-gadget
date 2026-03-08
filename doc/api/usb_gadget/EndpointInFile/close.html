@@ -80,10 +80,7 @@ Future&lt;void&gt; close() async {
   final fd = _fd;
   if (fd == null) return;
 
-  &#47;&#47; Release writer sink (draining queued operations)
-  await _sink.release();
-
-  &#47;&#47; Release AIO
+  await _aioSink.release();
   _aio?.release();
   _aio = null;
 
@@ -117,7 +114,7 @@ Future&lt;void&gt; close() async {
 <footer>
   <span class="no-break">
     usb_gadget
-      0.5.0
+      0.6.0
   </span>
   
 </footer>
