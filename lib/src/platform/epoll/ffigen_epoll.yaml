@@ -7,6 +7,8 @@ headers:
   entry-points:
     - "/usr/include/sys/epoll.h"
     - "/usr/include/sys/eventfd.h"
+    - "/usr/include/aarch64-linux-gnu/sys/epoll.h"
+    - "/usr/include/aarch64-linux-gnu/sys/eventfd.h"
 
 functions:
   include:

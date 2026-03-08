@@ -8,20 +8,20 @@ import 'epoll.ffi.dart' as epoll_ffi;
 
 export 'epoll.ffi.dart'
     show
-    EPOLL_CLOEXEC,
-    EPOLL_CTL_ADD,
-    EPOLL_CTL_DEL,
-    EPOLL_CTL_MOD,
-    EPOLLIN,
-    EPOLLOUT,
-    EPOLLERR,
-    EPOLLHUP,
-    EPOLLRDHUP,
-    EPOLLONESHOT,
-    EPOLLET,
-    EFD_SEMAPHORE,
-    EFD_CLOEXEC,
-    EFD_NONBLOCK;
+        EPOLL_CLOEXEC,
+        EPOLL_CTL_ADD,
+        EPOLL_CTL_DEL,
+        EPOLL_CTL_MOD,
+        EPOLLIN,
+        EPOLLOUT,
+        EPOLLERR,
+        EPOLLHUP,
+        EPOLLRDHUP,
+        EPOLLONESHOT,
+        EPOLLET,
+        EFD_SEMAPHORE,
+        EFD_CLOEXEC,
+        EFD_NONBLOCK;
 
 /// A ready event returned by [Epoll.wait].
 ///
@@ -47,7 +47,7 @@ abstract final class Epoll {
   /// Throws [OSError] on failure.
   static int create({bool closeOnExec = true}) {
     return Errno.call(
-          () => _epoll.epoll_create1(closeOnExec ? epoll_ffi.EPOLL_CLOEXEC : 0),
+      () => _epoll.epoll_create1(closeOnExec ? epoll_ffi.EPOLL_CLOEXEC : 0),
       isError: (r) => r < 0,
       message: 'epoll_create1',
     );
@@ -84,7 +84,7 @@ abstract final class Epoll {
       ev.ref.events = events;
       ev.ref.data.u64 = data;
       Errno.call(
-            () => _epoll.epoll_ctl(epfd, op, fd, ev),
+        () => _epoll.epoll_ctl(epfd, op, fd, ev),
         isError: (r) => r < 0,
         message: 'epoll_ctl',
       );
@@ -104,10 +104,10 @@ abstract final class Epoll {
   ///
   /// Throws [OSError] on failure (EINTR is retried internally).
   static List<EpollEvent> wait(
-      int epfd, {
-        int maxEvents = 64,
-        int timeoutMs = -1,
-      }) {
+    int epfd, {
+    int maxEvents = 64,
+    int timeoutMs = -1,
+  }) {
     assert(maxEvents > 0);
     final buf = calloc<epoll_ffi.epoll_event>(maxEvents);
     try {
@@ -115,7 +115,7 @@ abstract final class Epoll {
       // Retry on EINTR (e.g. signal delivery during wait).
       while (true) {
         final (ret, err) = Errno.capture(
-              () => _epoll.epoll_wait(epfd, buf, maxEvents, timeoutMs),
+          () => _epoll.epoll_wait(epfd, buf, maxEvents, timeoutMs),
         );
         if (ret >= 0) {
           n = ret;
@@ -129,7 +129,7 @@ abstract final class Epoll {
       // then free the buffer. Callers receive plain Dart records.
       return List<EpollEvent>.generate(
         n,
-            (i) => (events: buf[i].events, data: buf[i].data.u64),
+        (i) => (events: buf[i].events, data: buf[i].data.u64),
         growable: false,
       );
     } finally {
@@ -161,7 +161,7 @@ abstract final class Epoll {
     if (semaphore) flags |= epoll_ffi.EFD_SEMAPHORE;
 
     return Errno.call(
-          () => _epoll.eventfd(initialValue, flags),
+      () => _epoll.eventfd(initialValue, flags),
       isError: (r) => r < 0,
       message: 'eventfd',
     );
@@ -175,7 +175,7 @@ abstract final class Epoll {
     final val = calloc<ffi.Uint64>();
     try {
       Errno.call(
-            () => _epoll.eventfd_read(fd, val),
+        () => _epoll.eventfd_read(fd, val),
         isError: (r) => r < 0,
         message: 'eventfd_read',
       );
@@ -190,7 +190,7 @@ abstract final class Epoll {
   /// Throws [OSError] on failure.
   static void eventfdWrite(int fd, int value) {
     Errno.call(
-          () => _epoll.eventfd_write(fd, value),
+      () => _epoll.eventfd_write(fd, value),
       isError: (r) => r < 0,
       message: 'eventfd_write',
     );
