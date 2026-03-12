@@ -1,38 +1,5 @@
 import 'base.dart';
 
-/// Loopback function (for USB testing).
-///
-/// Data written to the OUT endpoint is looped back to the IN endpoint.
-class LoopbackFunction extends KernelFunction {
-  LoopbackFunction({required super.name, this.qlen = 32, this.buflen = 4096})
-    : super(kernelType: .loopback);
-
-  /// Request queue length
-  final int qlen;
-
-  /// Buffer size in bytes
-  final int buflen;
-
-  @override
-  bool validate() {
-    if (qlen <= 0 || qlen > 1000) {
-      log?.error('Invalid queue length: $qlen');
-      return false;
-    }
-    if (buflen <= 0 || buflen > 65536) {
-      log?.error('Invalid buffer length: $buflen');
-      return false;
-    }
-    return true;
-  }
-
-  @override
-  Map<String, String> getConfigAttributes() => {
-    'qlen': qlen.toString(),
-    'buflen': buflen.toString(),
-  };
-}
-
 /// Source/Sink function (for USB testing).
 ///
 /// Generates patterns on IN endpoint and validates patterns on OUT endpoint.
@@ -46,6 +13,7 @@ class SourceSinkFunction extends KernelFunction {
     this.isocMaxburst = 0,
     this.bulkBuflen = 4096,
     this.bulkQlen = 32,
+    this.isoQlen = 16,
   }) : super(kernelType: .sourceSink);
 
   /// Pattern type (0=all zeros, 1=mod63, 2=none)
@@ -68,6 +36,9 @@ class SourceSinkFunction extends KernelFunction {
 
   /// Bulk queue length
   final int bulkQlen;
+
+  /// Isochronous request queue length
+  final int isoQlen;
 
   @override
   bool validate() {
@@ -95,5 +66,6 @@ class SourceSinkFunction extends KernelFunction {
     'isoc_maxburst': isocMaxburst.toString(),
     'bulk_buflen': bulkBuflen.toString(),
     'bulk_qlen': bulkQlen.toString(),
+    'iso_qlen': isoQlen.toString(),
   };
 }
