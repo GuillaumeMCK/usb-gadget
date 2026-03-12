@@ -169,7 +169,7 @@ final class Gadget with USBGadgetLogger {
       Directory(configPath).createSync(recursive: true);
 
       _writeAttr('$configPath/bmAttributes', config.bmAttributes.toHex());
-      _writeAttr('$configPath/MaxPower', config.maxPower.toString());
+      _writeAttr('$configPath/MaxPower', config.maxPower.value.toString());
 
       // Write default description for default language, then any overrides.
       final allStrings = {
