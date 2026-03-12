@@ -67,5 +67,3 @@ enum Speed implements Comparable<Speed> {
   String toString() => value;
 }
 
-// Legacy alias for backwards compatibility
-typedef USBSpeed = Speed;
