@@ -70,7 +70,7 @@ Future<void> main() async {
   final reg = await gadget.register();
   try {
     await reg.bind(defaultUDC);
-    await reg.awaitState(.configured);
+    await reg.udc?.awaitState(.configured);
     // An additional delay here prevents the first few keypresses from
     // being missed on some hosts.
     await Future<void>.delayed(const .new(milliseconds: 100));
