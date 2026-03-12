@@ -40,8 +40,11 @@ enum DeviceState {
 }
 
 /// A USB Device Controller (UDC) discovered under `/sys/class/udc/`.
-class UDC {
-  UDC._(this._dir);
+final class UDC {
+  const UDC._(this._dir);
+
+  /// Creates an UDC from its kernel name (e.g. `dwc2`).
+  UDC.fromName(String name) : _dir = Directory('/sys/class/udc/$name');
 
   final Directory _dir;
 

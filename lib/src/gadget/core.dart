@@ -242,11 +242,13 @@ class RegGadget with USBGadgetLogger {
   String get path => _dir.path;
 
   /// Name of the UDC this gadget is bound to, or `null` if unbound.
-  String? get udc {
+  UDC? get udc {
     final f = File('${_dir.path}/UDC');
     if (!f.existsSync()) return null;
     final s = f.readAsStringSync().trim();
-    return s.isEmpty ? null : s;
+
+    if (s.isEmpty) return null;
+    return UDC.fromName(s);
   }
 
   /// Returns all USB gadgets currently present in configfs.
@@ -294,28 +296,6 @@ class RegGadget with USBGadgetLogger {
       try {
         await g.bind(null);
       } catch (_) {}
-    }
-  }
-
-  /// Waits for the gadget UDC to reach [target] state.
-  ///
-  /// [pollInterval] controls how often the state is sampled (default: 100 ms)
-  /// [timeout] sets the maximum wait (default: 5 s).
-  ///
-  /// Throws a [TimeoutException] if [target] is not reached within [timeout].
-  Future<void> awaitState(
-    DeviceState target, {
-    Duration pollInterval = const Duration(milliseconds: 100),
-    Duration timeout = const Duration(seconds: 5),
-  }) async {
-    if (udc case null) return;
-    {
-      final udc = UDCs.firstWhere((udc) => udc.name == this.udc);
-      return udc.awaitState(
-        target,
-        pollInterval: pollInterval,
-        timeout: timeout,
-      );
     }
   }
 
