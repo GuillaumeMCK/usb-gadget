@@ -4,7 +4,7 @@ import 'dart:typed_data';
 
 import 'package:using/using.dart';
 
-import '/src/functions/ffs/events.dart';
+import '/src/functions/functions.dart';
 import '/src/platform/platform.dart';
 import '/usb_gadget.dart';
 import 'aio/aio.dart';
@@ -421,14 +421,14 @@ final class EndpointOutFile extends EndpointFile {
     return _proxy.stream;
   }
 
-  /// Reprimes the endpoint to resume receiving data after a USB reset or 
+  /// Reprimes the endpoint to resume receiving data after a USB reset or
   /// re-configuration.
   ///
-  /// When the host de-configures the function (e.g., during a power cycle or 
+  /// When the host de-configures the function (e.g., during a power cycle or
   /// mode switch), the kernel terminates all in-flight asynchronous transfers.
   /// This causes the current [AioStream] to reach end-of-file and stop reading.
   ///
-  /// This method replaces the exhausted internal stream with a fresh one 
+  /// This method replaces the exhausted internal stream with a fresh one
   /// without disrupting existing subscribers to the public [stream].
   ///
   /// No-op if the endpoint is not currently open.
