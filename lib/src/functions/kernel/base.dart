@@ -68,7 +68,7 @@ abstract class KernelFunction extends GadgetFunction with USBGadgetLogger {
   KernelFunction({required super.name, required this.kernelType});
 
   @override
-  GadgetFunctionType get type => .kernel;
+  FunctionType get type => .kernel;
 
   /// The type of kernel function (mass_storage, acm, ecm, etc.)
   final KernelFunctionType kernelType;

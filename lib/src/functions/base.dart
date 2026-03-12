@@ -6,6 +6,14 @@ import 'package:using/using.dart';
 
 import '/usb_gadget.dart';
 
+/// Type of gadget function.
+///
+/// - **FFS (FunctionFs)**: Userspace-implemented functions that require
+///   descriptor setup and endpoint handling in userspace (e.g., ADB, MTP).
+/// - **Kernel**: Kernel-implemented functions that only require configuration
+///   attributes (e.g., mass storage, serial port).
+enum FunctionType { ffs, kernel }
+
 /// Core abstraction for all USB gadget functions.
 ///
 /// A function represents a specific USB capability that can be exposed to
@@ -39,7 +47,7 @@ abstract class GadgetFunction with Releasable {
   /// FunctionFs functions require userspace descriptors and endpoint handling.
   /// Kernel functions are implemented entirely in the kernel and only require
   /// configuration attribute setup.
-  GadgetFunctionType get type;
+  FunctionType get type;
 
   /// Returns the configfs instance name for this function.
   ///

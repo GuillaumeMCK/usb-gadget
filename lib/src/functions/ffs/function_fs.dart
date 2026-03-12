@@ -49,7 +49,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
        descriptors = [...?descriptors];
 
   @override
-  GadgetFunctionType get type => .ffs;
+  FunctionType get type => .ffs;
 
   /// Base descriptor templates that will be generated for each speed.
   final List<USBDescriptor> descriptors;
