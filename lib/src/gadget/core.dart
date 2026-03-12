@@ -1,46 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:using/using.dart';
+
 import '/src/logger/logger.dart';
 import '/usb_gadget.dart';
 
 part 'fs.dart';
-
-/// The lifecycle states of a USB device as reported by the Linux USB Gadget
-/// framework through sysfs (`/sys/class/udc/{udc}/state`).
-enum DeviceState {
-  /// No USB cable is connected.
-  notAttached('not-attached'),
-
-  /// A USB cable is connected but the device has not been enumerated by the host.
-  attached('attached'),
-
-  /// The host is providing power to the device.
-  powered('powered'),
-
-  /// The device is being enumerated by the host (initial handshake phase).
-  default_('default'),
-
-  /// The device has been assigned a USB address by the host.
-  addressed('addressed'),
-
-  /// The device is fully configured and ready for data transfer.
-  configured('configured'),
-
-  /// The device has been suspended by the host to save power.
-  suspended('suspended');
-
-  const DeviceState(this.value);
-
-  /// The string value as it appears in the UDC state file.
-  final String value;
-
-  /// Returns the [DeviceState] matching [state], or [defaultValue] if none match.
-  static DeviceState fromString(
-    String state, {
-    DeviceState defaultValue = .notAttached,
-  }) => values.firstWhere((e) => e.value == state, orElse: () => defaultValue);
-}
 
 /// A complete USB device definition.
 ///
@@ -136,24 +102,6 @@ final class Gadget with USBGadgetLogger {
     return _register(this, dir);
   }
 
-  /// Registers the gadget and immediately binds it to [udc].
-  ///
-  /// Equivalent to calling [register] then [RegGadget.bind]. If binding
-  /// fails, the partially registered gadget is cleaned up before rethrowing.
-  ///
-  /// Throws a [StateError] if [configs] is empty, or a [FileSystemException]
-  /// if any configfs operation fails.
-  Future<RegGadget> bind([Udc? udc]) async {
-    final reg = await register();
-    try {
-      await reg.bind(udc);
-    } catch (_) {
-      await reg.remove();
-      rethrow;
-    }
-    return reg;
-  }
-
   /// Finds or creates the configfs directory for this gadget.
   ///
   /// When [name] is null, increments a counter suffix until a free slot is
@@ -177,7 +125,7 @@ final class Gadget with USBGadgetLogger {
   }
 
   static Future<RegGadget> _register(Gadget gadget, Directory dir) async {
-    _writeAttr('${dir.path}/bDeviceClass', gadget.class_.classCode.toHex());
+    _writeAttr('${dir.path}/bDeviceClass', gadget.class_.code.toHex());
     _writeAttr('${dir.path}/bDeviceSubClass', gadget.class_.subClass.toHex());
     _writeAttr('${dir.path}/bDeviceProtocol', gadget.class_.protocol.toHex());
     _writeAttr('${dir.path}/idVendor', gadget.id.vendor.toHex());
@@ -324,7 +272,7 @@ class RegGadget with USBGadgetLogger {
   /// Binds this gadget to [udc], or unbinds it when [udc] is `null`.
   ///
   /// Throws a [FileSystemException] if writing to the UDC file fails.
-  Future<void> bind(Udc? udc) async {
+  Future<void> bind(UDC? udc) async {
     log?.debug(
       udc != null ? 'Binding to UDC: ${udc.name}' : 'Unbinding from UDC',
     );
@@ -351,78 +299,25 @@ class RegGadget with USBGadgetLogger {
     }
   }
 
-  /// Polls the UDC state file until the device reaches [target].
+  /// Waits for the gadget UDC to reach [target] state.
   ///
-  /// Useful for waiting until the host has fully enumerated the device
-  /// before starting data transfers. [pollInterval] controls how often the
-  /// state file is read (default: 100 ms) and [timeout] sets the maximum
-  /// wait (default: 5 s).
+  /// [pollInterval] controls how often the state is sampled (default: 100 ms)
+  /// [timeout] sets the maximum wait (default: 5 s).
   ///
-  /// Throws a [StateError] if the gadget is not bound to a UDC or the state
-  /// file is missing, and a [TimeoutException] if [target] is not reached
-  /// within [timeout].
-  ///
-  /// ```dart
-  /// await reg.awaitState(DeviceState.configured);
-  /// ```
+  /// Throws a [TimeoutException] if [target] is not reached within [timeout].
   Future<void> awaitState(
     DeviceState target, {
     Duration pollInterval = const Duration(milliseconds: 100),
     Duration timeout = const Duration(seconds: 5),
   }) async {
-    final boundUdc = udc;
-    if (boundUdc == null) throw StateError('Gadget is not bound to any UDC');
-
-    final stateFile = File('/sys/class/udc/$boundUdc/state');
-    if (!stateFile.existsSync()) {
-      throw StateError('UDC state file not found: ${stateFile.path}');
-    }
-
-    final deadline = DateTime.now().add(timeout);
-    while (true) {
-      final state = DeviceState.fromString(stateFile.readAsStringSync().trim());
-      if (state == target) return;
-      if (DateTime.now().isAfter(deadline)) {
-        throw TimeoutException(
-          'Timeout waiting for "${target.value}". Current: ${state.value}',
-          timeout,
-        );
-      }
-      await Future<void>.delayed(pollInterval);
-    }
-  }
-
-  /// The current USB device state.
-  ///
-  /// Returns [DeviceState.notAttached] when the gadget is unbound or
-  /// the state file cannot be read.
-  DeviceState get currentState {
-    if (udc == null) return .notAttached;
-    final f = File('/sys/class/udc/$udc/state');
-    if (!f.existsSync()) return .notAttached;
-    return .fromString(f.readAsStringSync().trim());
-  }
-
-  /// A stream that emits [DeviceState] values as the UDC state changes.
-  ///
-  /// The stream completes when the gadget is unbound from its UDC.
-  /// [pollInterval] controls how often the state file is sampled (default: 50 ms).
-  ///
-  /// ```dart
-  /// reg.stateStream().listen((state) {
-  ///   if (state == DeviceState.configured) {
-  ///     // Ready to transfer data.
-  ///   }
-  /// });
-  /// ```
-  Stream<DeviceState> stateStream({
-    Duration pollInterval = const Duration(milliseconds: 50),
-  }) async* {
-    DeviceState? last;
-    while (udc != null) {
-      final s = currentState;
-      if (s != last) yield last = s;
-      await Future<void>.delayed(pollInterval);
+    if (udc case null) return;
+    {
+      final udc = UDCs.firstWhere((udc) => udc.name == this.udc);
+      return udc.awaitState(
+        target,
+        pollInterval: pollInterval,
+        timeout: timeout,
+      );
     }
   }
 
