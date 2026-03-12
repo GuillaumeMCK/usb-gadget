@@ -79,6 +79,17 @@ class HIDFunction extends KernelFunction {
     return (major, minor);
   }
 
+  /// Device path in `/dev` (e.g. `/dev/hidg0`).
+  ///
+  /// Derives the path from the minor device number read from the `dev`
+  /// attribute. This is the file you open to send HID reports.
+  ///
+  /// Throws [StateError] if the function has not been prepared.
+  String devicePath() {
+    final (_, minor) = device();
+    return '/dev/hidg$minor';
+  }
+
   @override
   bool validate() {
     if (descriptor.isEmpty) {
