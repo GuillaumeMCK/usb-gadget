@@ -1,11 +1,12 @@
 import '/usb_gadget.dart';
+export '/src/usb/usb.dart' show UsbVersion;
 
 /// A USB Vendor ID and Product ID pair.
 ///
 /// Official VIDs are assigned by the USB Implementers Forum (USB-IF).
 /// Use vendor `0x1234` for testing.
-class Id {
-  const Id(this.vendor, this.product);
+final class Id {
+  const Id({required this.vendor, required this.product});
 
   /// USB Vendor ID (VID).
   final int vendor;
@@ -23,20 +24,24 @@ class Id {
 /// final cls = Class.interfaceSpecific();
 /// final cls = Class.vendorSpecific(0x00, 0x00);
 /// ```
-class Class {
-  const Class(this.classCode, this.subClass, this.protocol);
+final class Class {
+  const Class(this._code, this.subClass, this.protocol)
+    : assert(subClass >= 0 && subClass <= 0xFF),
+      assert(protocol >= 0 && protocol <= 0xFF);
 
   /// Defers class information to each interface descriptor.
   ///
   /// Can only be used as a device class, not an interface class.
-  const Class.interfaceSpecific() : this(0, 0, 0);
+  const Class.interfaceSpecific() : this(.none, 0, 0);
 
   /// Creates a vendor-specific class (code `0xFF`) with the given [subClass] and [protocol].
   const Class.vendorSpecific(int subClass, int protocol)
-    : this(0xFF, subClass, protocol);
+    : this(.vendorSpecific, subClass, protocol);
 
   /// USB class code.
-  final int classCode;
+  final ClassType _code;
+
+  int get code => _code.value;
 
   /// USB subclass code.
   final int subClass;
@@ -61,10 +66,6 @@ final class MaxPower {
   String toString() => 'MaxPower(value=$value, mA=$milliAmps)';
 }
 
-// ---------------------------------------------------------------------------
-// Config
-// ---------------------------------------------------------------------------
-
 /// USB gadget configuration containing functions and attributes.
 ///
 /// A configuration is a set of functions the USB host can select.
@@ -79,7 +80,7 @@ final class MaxPower {
 ///   selfPowered: false,
 /// );
 /// ```
-class Config {
+final class Config {
   /// Creates a gadget configuration.
   ///
   /// Parameters:
@@ -90,8 +91,8 @@ class Config {
   /// - [remoteWakeup]: Whether the device supports remote wakeup
   /// - [strings]: Per-language overrides for the configuration description
   /// - [index]: Configuration number (1-based)
-  Config(
-    this.description, {
+  Config({
+    this.description = '',
     this.functions = const [],
     this.maxPower = const MaxPower(500),
     this.selfPowered = false,
