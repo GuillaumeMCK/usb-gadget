@@ -13,7 +13,7 @@ import '/usb_gadget.dart';
 /// - Country code (for localization)
 /// - Number and types of subordinate descriptors
 /// - Lengths of subordinate descriptors
-class USBHIDDescriptor implements USBDescriptor {
+final class HIDDescriptor implements USBDescriptor {
   /// Creates a HID descriptor.
   ///
   /// Parameters:
@@ -21,7 +21,7 @@ class USBHIDDescriptor implements USBDescriptor {
   /// - [countryCode]: Hardware target country code (default: 0, not localized)
   /// - [reportLength]: Length of report descriptor in bytes (required)
   /// - [physicalDescriptorLength]: Length of physical descriptor (default: 0, not used)
-  const USBHIDDescriptor({
+  const HIDDescriptor({
     this.hidVersion = 0x0111,
     this.countryCode = 0x00,
     required this.reportLength,
@@ -103,6 +103,5 @@ class USBHIDDescriptor implements USBDescriptor {
 
   @override
   String toString() =>
-      'USBHIDDescriptor(HID $majorVersion.$minorVersion, '
-      'reportLen=$reportLength)';
+      'HIDDescriptor(HID $majorVersion.$minorVersion, reportLen=$reportLength)';
 }
