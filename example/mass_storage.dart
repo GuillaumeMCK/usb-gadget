@@ -32,12 +32,8 @@ Future<void> main(List<String> args) async {
 
   final gadget = Gadget(
     name: 'mass_storage_gadget',
-    idVendor: 0x1d6b,
-    idProduct: 0x0104,
-    deviceClass: .perInterface,
-    deviceSubClass: .none,
-    deviceProtocol: .none,
-    udc: udc,
+    id: .new(vendor: 0x1d6b, product: 0x0104),
+    class_: .interfaceSpecific(),
     strings: {
       .enUS: const .new(
         manufacturer: 'Evil Corp',
@@ -45,24 +41,25 @@ Future<void> main(List<String> args) async {
         serialnumber: 'MSD123456',
       ),
     },
-    config: .new(
-      maxPower: .fromMilliAmps(500),
-      attributes: .busPowered,
-      functions: [
-        MassStorageFunction(
-          name: 'storage',
-          luns: [...paths.map((p) => .new(path: p, removable: true))],
-        ),
-      ],
-      strings: const {.enUS: 'Mass Storage Configuration'},
-    ),
+    configs: [
+      .new(
+        description: 'Mass Storage Configuration',
+        maxPower: const MaxPower(500),
+        functions: [
+          MassStorageFunction(
+            name: 'storage',
+            luns: [...paths.map((p) => .new(path: p, removable: true))],
+          ),
+        ],
+      ),
+    ],
   );
-
+  final reg = await gadget.register();
   try {
-    await gadget.bind();
+    await reg.bind(defaultUDC);
     stdout.writeln('Ctrl+C to exit.');
     await ProcessSignal.sigint.watch().first;
   } finally {
-    await gadget.unbind();
+    reg.remove();
   }
 }

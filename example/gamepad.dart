@@ -182,8 +182,8 @@ class LogitechF310 extends HIDFunctionFs {
           0x81, 0x01, //   Input (Constant)
           0xC0, // End Collection
         ]),
-        subclass: .none,
-        protocol: .none,
+        subclass: 0,
+        protocol: 0,
         config: const .inputOnly(
           maxPacketSize: 7,
           reportInterval: .new(milliseconds: 10),
@@ -249,9 +249,8 @@ Future<void> main() async {
   final gamepad = LogitechF310();
   final gadget = Gadget(
     name: 'logitech_f310',
-    idVendor: 0x046D,
-    idProduct: 0xC216,
-    deviceClass: .perInterface,
+    id: Id(vendor: 0x046D, product: 0xC216),
+    class_: .interfaceSpecific(),
     strings: const {
       .enUS: .new(
         manufacturer: 'Logitech',
@@ -259,22 +258,26 @@ Future<void> main() async {
         serialnumber: 'DA000001',
       ),
     },
-    config: .new(
-      attributes: .busPowered,
-      maxPower: .fromMilliAmps(100),
-      strings: const {.enUS: 'Logitech Dual Action Configuration'},
-      functions: [gamepad],
-    ),
+    configs: [
+      .new(
+        selfPowered: true,
+        remoteWakeup: true,
+        maxPower: .new(100),
+        strings: const {.enUS: 'Logitech Dual Action Configuration'},
+        functions: [gamepad],
+      ),
+    ],
   );
 
+  final reg = await gadget.register();
   try {
-    await gadget.bind();
-    await gadget.awaitState(.configured);
+    await reg.bind(defaultUDC);
     stdout.writeln(
       'Logitech F310 (DirectInput) gadget active. Press Ctrl+C to stop.',
     );
     await ProcessSignal.sigint.watch().first;
   } finally {
-    await gadget.unbind();
+    await reg.bind(null);
+    await reg.remove();
   }
 }

@@ -10,9 +10,9 @@ class PongFunction extends FunctionFs {
         name: 'echo',
         descriptors: [
           const USBInterfaceDescriptor(
+            class_: .vendorSpecific,
             interfaceNumber: .interface0,
             numEndpoints: .two,
-            interfaceClass: .vendorSpecific,
           ),
           const EndpointTemplate(address: .in_(.ep1), config: .bulk()),
           const EndpointTemplate(address: .out(.ep2), config: .bulk()),
@@ -50,8 +50,7 @@ class PongFunction extends FunctionFs {
 Future<void> main() async {
   final gadget = Gadget(
     name: 'echo_gadget',
-    idVendor: 0x1d6b,
-    idProduct: 0x0104,
+    id: Id(vendor: 0x1d6b, product: 0x0104),
     strings: {
       .enUS: const .new(
         manufacturer: 'Dart USB',
@@ -59,19 +58,19 @@ Future<void> main() async {
         serialnumber: '123456',
       ),
     },
-    config: .new(
-      functions: [PongFunction()],
-      attributes: .busPowered,
-      strings: {.enUS: 'Pong Configuration'},
-    ),
+    configs: [
+      .new(functions: [PongFunction()]),
+    ],
   );
 
+  final reg = await gadget.register();
   try {
-    await gadget.bind();
-    await gadget.awaitState(.configured);
+    await reg.bind(defaultUDC);
+    await reg.awaitState(.configured);
     stdout.writeln('Pong Device ready. Press Ctrl+C to exit.');
     await ProcessSignal.sigint.watch().first;
   } finally {
-    await gadget.unbind();
+    await reg.bind(null);
+    await reg.remove();
   }
 }

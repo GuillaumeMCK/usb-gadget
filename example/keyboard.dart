@@ -35,8 +35,8 @@ class Keyboard extends HIDFunction {
     : super(
         name: 'keyboard',
         descriptor: _descriptor,
-        protocol: .keyboard,
-        subclass: .boot,
+        protocol: 1,
+        subClass: 1,
         reportLength: 8,
       );
 
@@ -53,11 +53,8 @@ Future<void> main() async {
   final keyboard = Keyboard();
   final gadget = Gadget(
     name: 'hid_keyboard',
-    idVendor: 0x1234,
-    idProduct: 0x5679,
-    deviceClass: .perInterface,
-    deviceSubClass: .none,
-    deviceProtocol: .none,
+    id: Id(vendor: 0x1234, product: 0x5679),
+    class_: .interfaceSpecific(),
     strings: {
       .enUS: const .new(
         manufacturer: 'ACME Corp',
@@ -65,12 +62,15 @@ Future<void> main() async {
         serialnumber: 'KB001',
       ),
     },
-    config: .new(functions: [keyboard]),
+    configs: [
+      .new(description: 'A Keyboard', functions: [keyboard]),
+    ],
   );
 
+  final reg = await gadget.register();
   try {
-    await gadget.bind();
-    await gadget.awaitState(.configured);
+    await reg.bind(defaultUDC);
+    await reg.awaitState(.configured);
     // An additional delay here prevents the first few keypresses from
     // being missed on some hosts.
     await Future<void>.delayed(const .new(milliseconds: 100));
@@ -80,6 +80,7 @@ Future<void> main() async {
     stdout.writeln('Ctrl+C to exit.');
     await ProcessSignal.sigint.watch().first;
   } finally {
-    await gadget.unbind();
+    await reg.bind(null);
+    await reg.remove();
   }
 }
