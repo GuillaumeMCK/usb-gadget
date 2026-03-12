@@ -1,5 +1,5 @@
 export 'src/endpoint/endpoint.dart';
-export 'src/functions/functions.dart';
+export 'src/function/function.dart';
 export 'src/gadget/gadget.dart';
 export 'src/logger/logger.dart' show USBGadgetLogger, ILogger, Logger;
 export 'src/platform/platform.dart' show Errno;
