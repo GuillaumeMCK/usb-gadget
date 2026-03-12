@@ -34,7 +34,7 @@ class PongFunction extends FunctionFs {
     super.onEnable();
     _dataSubscription = epOut.stream.listen((data) {
       log?.debug('Received data:\n${data.xxd()}');
-      epIn.write(data);
+      if (state == .enabled) epIn.write(data);
     }, cancelOnError: false);
   }
 
