@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:using/using.dart';
-
 import '/src/logger/logger.dart';
 import '/usb_gadget.dart';
 

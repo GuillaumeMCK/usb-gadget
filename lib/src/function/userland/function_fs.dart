@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:meta/meta.dart';
 
 import '/usb_gadget.dart';
-import 'events.dart';
 import 'descriptors.dart';
 
 /// FunctionFs lifecycle states

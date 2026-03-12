@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import '/src/usb/hid/types.dart';
 import 'base.dart';
 
 /// HID function (keyboard, mouse, gamepad, etc.).
