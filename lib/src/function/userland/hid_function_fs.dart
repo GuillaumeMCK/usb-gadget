@@ -8,9 +8,9 @@ import '/usb_gadget.dart';
 class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   HIDFunctionFs({
     required super.name,
-    required this.subclass,
-    required this.protocol,
     required this.config,
+    this.subclass = 0x00,
+    this.protocol = 0x00,
     this.reportDescriptor,
     int hidVersion = 0x0111,
     int countryCode = 0x00,
@@ -23,11 +23,11 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
       interface = USBInterfaceDescriptor(
         interfaceNumber: .interface0,
         numEndpoints: .new(config.numEndpoints),
-        interfaceClass: .hid,
-        interfaceSubClass: subclass.value,
-        interfaceProtocol: protocol.value,
+        class_: .hid,
+        subClass: subclass,
+        protocol: protocol,
       ),
-      hidDescriptor = USBHIDDescriptor(
+      hidDescriptor = HIDDescriptor(
         hidVersion: hidVersion,
         countryCode: countryCode,
         physicalDescriptorLength: physicalDescriptorLength,
@@ -45,17 +45,17 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
 
   /// HID class descriptor describing the HID interface version,
   /// country code, and report descriptor length.
-  late final USBHIDDescriptor hidDescriptor;
+  late final HIDDescriptor hidDescriptor;
 
-  /// HID report descriptor defining the format of reports sent to/from
+  /// Interface report descriptor defining the format of reports sent to/from
   /// the host.
   final Uint8List? reportDescriptor;
 
-  /// HID device subclass (boot device or none).
-  final HIDSubclass subclass;
+  /// Interface device subclass (boot device or none).
+  final int subclass;
 
-  /// HID protocol (keyboard, mouse, or none).
-  HIDProtocol protocol;
+  /// Interface protocol (keyboard, mouse, or none).
+  int protocol;
 
   /// Idle rates per report ID (in 4ms units).
   /// Key: Report ID (0 = all reports)
@@ -209,10 +209,10 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
           if (wLength != 1) {
             return ep0.halt();
           }
-          return ep0.write(Uint8List(1)..[0] = protocol.value);
+          return ep0.write(Uint8List(1)..[0] = protocol);
 
         case (.setProtocol, .out):
-          onSetProtocol(.fromByte(wValue.byte(0)));
+          onSetProtocol(wValue.byte(0));
           return ep0.ack();
 
         default:
@@ -248,7 +248,7 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
 
   /// Called when the host changes the protocol via SET_PROTOCOL.
   @protected
-  void onSetProtocol(HIDProtocol protocol) {
+  void onSetProtocol(int protocol) {
     this.protocol = protocol;
   }
 

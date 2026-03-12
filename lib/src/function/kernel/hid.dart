@@ -8,8 +8,8 @@ class HIDFunction extends KernelFunction {
   HIDFunction({
     required super.name,
     required this.descriptor,
-    this.protocol = HIDProtocol.none,
-    this.subclass = HIDSubclass.none,
+    this.protocol = 0x00,
+    this.subClass = 0x00,
     this.reportLength = 64,
     this.noOutEndpoint = false,
   }) : super(kernelType: .hid);
@@ -18,10 +18,10 @@ class HIDFunction extends KernelFunction {
   final List<int> descriptor;
 
   /// HID protocol (0=none, 1=keyboard, 2=mouse)
-  final HIDProtocol protocol;
+  final int protocol;
 
   /// HID subclass (0=none, 1=boot)
-  final HIDSubclass subclass;
+  final int subClass;
 
   /// Maximum report length in bytes
   final int reportLength;
@@ -103,8 +103,8 @@ class HIDFunction extends KernelFunction {
 
   @override
   Map<String, String> getConfigAttributes() => {
-    'protocol': protocol.value.toString(),
-    'subclass': subclass.value.toString(),
+    'protocol': protocol.toString(),
+    'subclass': subClass.toString(),
     'report_length': reportLength.toString(),
     'no_out_endpoint': noOutEndpoint ? '1' : '0',
   };
