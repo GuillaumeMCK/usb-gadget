@@ -4,7 +4,6 @@ import 'dart:typed_data';
 
 import 'package:using/using.dart';
 
-import '/src/functions/functions.dart';
 import '/src/platform/platform.dart';
 import '/usb_gadget.dart';
 import 'aio/aio.dart';
