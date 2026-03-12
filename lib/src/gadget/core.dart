@@ -4,40 +4,30 @@ import 'dart:io';
 import '/src/logger/logger.dart';
 import '/usb_gadget.dart';
 
-/// USB Device Controller (UDC) states.
-///
-/// Represents the lifecycle states of a USB device as reported by the
-/// Linux USB Gadget framework through sysfs (`/sys/class/udc/{udc}/state`).
-///
-/// Common lifecycle:
-/// - [notAttached]: No USB cable connected.
-/// - [attached]: USB cable connected, but not enumerated.
-/// - [powered]: Host is providing power.
-/// - [default_]: Device is being enumerated (handshake phase).
-/// - [addressed]: Device has been assigned a USB address.
-/// - [configured]: Device is fully configured and ready for data transfer.
-/// - [suspended]: Device has been suspended by the host to save power.
+part 'fs.dart';
+
+/// The lifecycle states of a USB device as reported by the Linux USB Gadget
+/// framework through sysfs (`/sys/class/udc/{udc}/state`).
 enum DeviceState {
-  /// No USB cable connected to the device.
+  /// No USB cable is connected.
   notAttached('not-attached'),
 
-  /// USB cable is connected but device has not been enumerated by the host.
+  /// A USB cable is connected but the device has not been enumerated by the host.
   attached('attached'),
 
-  /// Host is providing power to the device.
+  /// The host is providing power to the device.
   powered('powered'),
 
-  /// Device is being enumerated by the host (initial handshake phase).
+  /// The device is being enumerated by the host (initial handshake phase).
   default_('default'),
 
-  /// Device has been assigned a USB address by the host.
+  /// The device has been assigned a USB address by the host.
   addressed('addressed'),
 
-  /// Device is fully configured and ready for data transfer.
-  /// This is the state you typically wait for before sending/receiving data.
+  /// The device is fully configured and ready for data transfer.
   configured('configured'),
 
-  /// Device has been suspended by the host to save power.
+  /// The device has been suspended by the host to save power.
   suspended('suspended');
 
   const DeviceState(this.value);
@@ -45,817 +35,442 @@ enum DeviceState {
   /// The string value as it appears in the UDC state file.
   final String value;
 
-  /// Parses a string value into a [DeviceState].
-  /// If the string does not match any state, returns [defaultValue].
+  /// Returns the [DeviceState] matching [state], or [defaultValue] if none match.
   static DeviceState fromString(
     String state, {
     DeviceState defaultValue = .notAttached,
-  }) => DeviceState.values.firstWhere(
-    (e) => e.value == state,
-    orElse: () => defaultValue,
-  );
+  }) => values.firstWhere((e) => e.value == state, orElse: () => defaultValue);
 }
 
-/// Creates and manages a USB gadget with the specified configuration.
+/// A complete USB device definition.
 ///
-/// A Gadget represents a complete USB device that can be bound to a USB Device
-/// Controller (UDC) to emulate a physical USB device. It handles:
-///
-/// - Creating the configfs directory structure
-/// - Writing device descriptors (vendor/product IDs, strings, etc.)
-/// - Preparing and linking functions
-/// - Binding to the UDC hardware
-/// - Cleanup and unbinding
-///
-/// ## Lifecycle
-///
-/// 1. Create the gadget with configuration
-/// 2. Call [bind] to activate the device
-/// 3. Device is now visible to USB hosts
-/// 4. Call [unbind] to deactivate and clean up
-///
-/// ## Example
+/// Call [register] to create the configfs structure, or [bind] to register
+/// and immediately attach to a UDC. Fields left at their defaults use the
+/// kernel's built-in values.
 ///
 /// ```dart
 /// final gadget = Gadget(
-///   name: 'my_device',
-///   idVendor: 0x1234,
-///   idProduct: 0x5678,
-///   bcdDevice: 0x0100,  // Device version 1.0
-///   bcdUSB: 0x0200,     // USB 2.0
+///   id: Id(0x1234, 0x5678),
+///   class_: .interfaceSpecific(),
 ///   strings: {
-///     USBLanguageId.en_US: GadgetStrings(
+///     .enUS: GadgetStrings(
 ///       manufacturer: 'My Company',
 ///       product: 'My Device',
 ///       serialnumber: '123456',
 ///     ),
 ///   },
-///   config: GadgetConfiguration(
-///     functions: [myFunction],
-///     attributes: GadgetAttributes.selfPowered,
-///     maxPower: GadgetMaxPower.fromMilliAmps(500),
-///   ),
+///   configs: [
+///     Config('My config', functions: [myFunction]),
+///   ],
 /// );
 ///
+/// final reg = await gadget.bind(udc);
 /// try {
-///   await gadget.bind();
-///   // Device is active
+///   // Device is active.
 /// } finally {
-///   gadget.unbind();
+///   await reg.remove();
 /// }
 /// ```
-class Gadget with USBGadgetLogger {
-  /// Creates a new USB gadget with the specified configuration.
+final class Gadget with USBGadgetLogger {
+  /// Creates a USB gadget definition.
   ///
-  /// Parameters:
-  /// - [name]: Unique name for this gadget (used in configfs path)
-  /// - [idVendor]: USB Vendor ID (assigned by USB-IF)
-  /// - [idProduct]: USB Product ID (assigned by vendor)
-  /// - [config]: Configuration containing functions and attributes
-  /// - [bcdDevice]: Device version in BCD format (default: 0x0100 = v1.0)
-  /// - [bcdUSB]: USB version in BCD format (default: 0x0200 = USB 2.0)
-  /// - [deviceClass]: USB device class (null = composite device)
-  /// - [deviceSubClass]: USB device subclass
-  /// - [deviceProtocol]: USB device protocol
-  /// - [udc]: Specific UDC to bind to (null = auto-detect)
-  /// - [logLevel]: Logging verbosity level
-  /// - [strings]: String descriptors per language
+  /// At least one entry in [configs] is required before calling [register]
+  /// or [bind]. If [name] is omitted, one is auto-generated (e.g.
+  /// `usb-gadget0`). [logLevel] controls verbosity of the internal logger.
   Gadget({
-    required this.name,
-    required this.idVendor,
-    required this.idProduct,
-    required this.config,
-    this.bcdDevice = 0x0100,
-    this.bcdUSB = 0x0200,
-    this.deviceClass,
-    this.deviceSubClass,
-    this.deviceProtocol,
-    this.udc,
-    LogLevel? logLevel,
+    required this.id,
+    this.class_ = const Class.interfaceSpecific(),
+    this.configs = const [],
     Map<USBLanguageId, GadgetStrings>? strings,
+    this.name,
+    this.deviceRelease = 0x0000,
+    this.usbVersion = .v20,
+    LogLevel? logLevel,
   }) : strings = {...?strings},
-       assert(name.isNotEmpty, 'Gadget name cannot be empty'),
-       _gadgetPath = '/sys/kernel/config/usb_gadget/$name' {
+       assert(name == null || name.isNotEmpty, 'name cannot be empty') {
     Logger.init(level: logLevel);
   }
 
-  /// Unique name for this gadget instance.
-  final String name;
-
-  /// USB Vendor ID (VID) - identifies the device manufacturer.
+  /// Optional fixed name for this gadget in configfs.
   ///
-  /// Official VIDs are assigned by the USB Implementers Forum (USB-IF).
-  /// For testing, use 0x1234 (reserved for vendor-specific use).
-  final int idVendor;
+  /// When `null`, a unique name is generated during [register].
+  final String? name;
 
-  /// USB Product ID (PID) - identifies the specific device.
-  ///
-  /// Assigned by the vendor. Should be unique within the vendor's product line.
-  final int idProduct;
+  /// USB Vendor and Product ID.
+  final Id id;
 
-  /// Device version in Binary Coded Decimal format.
+  /// USB device class.
   ///
-  /// Format: 0xJJMN where JJ=major, M=minor, N=sub-minor
-  /// Examples: 0x0100 = v1.0, 0x0210 = v2.1.0
-  final int bcdDevice;
+  /// Use [Class.interfaceSpecific] for composite devices where each interface
+  /// defines its own class.
+  final Class class_;
 
-  /// USB specification version in Binary Coded Decimal format.
+  /// Device release number in BCD format (`0xJJMN`: major, minor, sub-minor).
   ///
-  /// Common values:
-  /// - 0x0200: USB 2.0
-  /// - 0x0210: USB 2.1
-  /// - 0x0300: USB 3.0
-  final int bcdUSB;
+  /// For example, `0x0100` is v1.0 and `0x0210` is v2.1.0.
+  final int deviceRelease;
 
-  /// USB device class code.
-  ///
-  /// Defines the general device category. If null, the device is a composite
-  /// device where each interface defines its own class.
-  final DeviceClass? deviceClass;
+  /// USB specification version.
+  final UsbVersion usbVersion;
 
-  /// USB device subclass code.
-  ///
-  /// Further categorizes the device within its class.
-  final DeviceSubClass? deviceSubClass;
-
-  /// USB device protocol code.
-  ///
-  /// Specifies the protocol used by the device.
-  final DeviceProtocol? deviceProtocol;
-
-  /// String descriptors for various languages.
-  ///
-  /// Maps language IDs to gadget strings (manufacturer, product, serial).
+  /// String descriptors indexed by language ID.
   final Map<USBLanguageId, GadgetStrings> strings;
 
-  /// Configuration containing functions and attributes.
-  final GadgetConfiguration config;
+  /// USB configurations. At least one is required before calling [register] or [bind].
+  final List<Config> configs;
 
-  /// Full path to the gadget in configfs.
-  final String _gadgetPath;
-
-  /// Specific UDC to bind to, or null for auto-detection.
-  String? udc;
-
-  /// The UDC this gadget is currently bound to, or null if unbound.
-  String? _boundUdc;
-
-  /// Track created directories in order for proper cleanup.
+  /// Creates the configfs directory structure and writes all descriptors,
+  /// without binding to a UDC.
   ///
-  /// Directories are removed in reverse order during unbind to avoid
-  /// "directory not empty" errors.
-  final List<String> _createdDirs = [];
-
-  /// Track created symlinks in order for proper cleanup.
+  /// Returns a [RegGadget] that owns the created structure. Call
+  /// [RegGadget.remove] to unbind and tear it down.
   ///
-  /// Symlinks are removed before directories during unbind.
-  final List<String> _createdSymlinks = [];
-
-  /// Whether this gadget is currently bound to a UDC.
-  bool get isBound => _boundUdc != null;
-
-  /// Binds the gadget to an available UDC, activating the USB device.
-  ///
-  /// This method performs the complete gadget setup sequence:
-  /// 1. Create configfs directory structure
-  /// 2. Write device descriptors and attributes
-  /// 3. Prepare all functions
-  /// 4. Wait for all functions to be ready
-  /// 5. Bind to the UDC hardware
-  ///
-  /// If [udc] is specified, binds to that specific UDC. Otherwise, auto-selects
-  /// the only available UDC (throws if multiple UDCs are present).
-  ///
-  /// After successful binding, the device is visible to USB hosts and will
-  /// respond to enumeration.
-  ///
-  /// Example:
-  /// ```dart
-  /// final gadget = Gadget(...);
-  /// await gadget.bind();  // Device is now active
-  /// ```
-  ///
-  /// Throws:
-  /// - [StateError] if already bound or no UDC available
-  /// - [FileSystemException] if configfs operations fail
-  /// - [TimeoutException] if functions don't become ready
-  Future<void> bind() async {
-    if (isBound) {
-      throw StateError('Gadget is already bound to UDC $_boundUdc');
+  /// Throws a [StateError] if [configs] is empty, or a [FileSystemException]
+  /// if any configfs operation fails.
+  Future<RegGadget> register() async {
+    if (configs.isEmpty) {
+      throw StateError('USB gadget must have at least one configuration');
     }
+    final dir = _resolveGadgetDir(name);
+    log?.info('Registering gadget at ${dir.path}');
+    return _register(this, dir);
+  }
 
-    String? effectiveUdc;
+  /// Registers the gadget and immediately binds it to [udc].
+  ///
+  /// Equivalent to calling [register] then [RegGadget.bind]. If binding
+  /// fails, the partially registered gadget is cleaned up before rethrowing.
+  ///
+  /// Throws a [StateError] if [configs] is empty, or a [FileSystemException]
+  /// if any configfs operation fails.
+  Future<RegGadget> bind([Udc? udc]) async {
+    final reg = await register();
     try {
-      effectiveUdc = udc ?? _findUdc();
-      _createGadget();
-      await _setupFunctions();
-      _bindToUdc(effectiveUdc);
-      log?.success('Gadget bound to UDC: $_boundUdc');
-    } catch (err, st) {
-      log?.error('Failed to bind gadget (UDC: $effectiveUdc):', err, st);
-      await unbind();
+      await reg.bind(udc);
+    } catch (_) {
+      await reg.remove();
       rethrow;
     }
+    return reg;
   }
 
-  /// Unbinds the gadget from the UDC and cleans up resources.
+  /// Finds or creates the configfs directory for this gadget.
   ///
-  /// This method safely tears down the gadget in reverse order:
-  /// 1. Unbind from UDC (deactivate hardware)
-  /// 2. Dispose all functions (close files, unmount filesystems)
-  /// 3. Remove symlinks (configuration links)
-  /// 4. Remove directories (functions, configs, gadget)
+  /// When [name] is null, increments a counter suffix until a free slot is
+  /// found (e.g. `usb-gadget0`, `usb-gadget1`, …).
+  static Directory _resolveGadgetDir(String? name) {
+    const base = '/sys/kernel/config/usb_gadget';
+    if (name != null) {
+      final dir = Directory('$base/$name');
+      dir.createSync();
+      return dir;
+    }
+    for (var i = 0; ; i++) {
+      final dir = Directory('$base/usb-gadget$i');
+      try {
+        dir.createSync();
+        return dir;
+      } on FileSystemException catch (e) {
+        if (e.osError?.errorCode != Errno.eexist) rethrow;
+      }
+    }
+  }
+
+  static Future<RegGadget> _register(Gadget gadget, Directory dir) async {
+    _writeAttr('${dir.path}/bDeviceClass', gadget.class_.classCode.toHex());
+    _writeAttr('${dir.path}/bDeviceSubClass', gadget.class_.subClass.toHex());
+    _writeAttr('${dir.path}/bDeviceProtocol', gadget.class_.protocol.toHex());
+    _writeAttr('${dir.path}/idVendor', gadget.id.vendor.toHex());
+    _writeAttr('${dir.path}/idProduct', gadget.id.product.toHex());
+    _writeAttr('${dir.path}/bcdDevice', gadget.deviceRelease.toHex());
+    _writeAttr('${dir.path}/bcdUSB', gadget.usbVersion.value.toHex());
+
+    for (final MapEntry(:key, :value) in gadget.strings.entries) {
+      final langPath = '${dir.path}/strings/${key.value.toHex()}';
+      Directory(langPath).createSync();
+      _writeAttr('$langPath/serialnumber', value.serialnumber);
+      _writeAttr('$langPath/manufacturer', value.manufacturer);
+      _writeAttr('$langPath/product', value.product);
+    }
+
+    final reg = RegGadget._(dir);
+
+    // Deduplicate functions across configs, preserving order.
+    final uniqueFns = <GadgetFunction>[];
+    for (final fn in gadget.configs.expand((c) => c.functions)) {
+      if (!uniqueFns.contains(fn)) uniqueFns.add(fn);
+    }
+
+    // Create and prepare function directories.
+    // configfsName is the full directory name, e.g. "ffs.adb" or "mass_storage.storage".
+    final fnPaths = <GadgetFunction, String>{};
+    for (final fn in uniqueFns) {
+      final fnPath = '${dir.path}/functions/${fn.configfsName}';
+      Directory(fnPath).createSync();
+      try {
+        fn.prepare(fnPath);
+      } catch (_) {
+        await reg._doRemove();
+        rethrow;
+      }
+      fnPaths[fn] = fnPath;
+      reg._functions.add(fn);
+    }
+
+    // Create configurations and symlink functions.
+    for (final config in gadget.configs) {
+      final configPath = '${dir.path}/configs/c.${config.index}';
+      Directory(configPath).createSync(recursive: true);
+
+      _writeAttr('$configPath/bmAttributes', config.bmAttributes.toHex());
+      _writeAttr('$configPath/MaxPower', config.maxPower.toString());
+
+      // Write default description for default language, then any overrides.
+      final allStrings = {
+        USBLanguageId.enUS: config.description,
+        ...config.strings,
+      };
+      for (final MapEntry(:key, :value) in allStrings.entries) {
+        final langPath = '$configPath/strings/${key.value.toHex()}';
+        Directory(langPath).createSync(recursive: true);
+        _writeAttr('$langPath/configuration', value);
+      }
+
+      for (final fn in config.functions) {
+        final link = Link('$configPath/${fn.configfsName}');
+        if (link.existsSync()) link.deleteSync();
+        link.createSync(fnPaths[fn]!);
+      }
+    }
+
+    // Wait for FFS functions to become ready.
+    for (final fn in reg._functions) {
+      if (fn.type == .ffs) {
+        await fn.awaitState(.ready);
+      }
+    }
+    return reg;
+  }
+}
+
+/// A registered function instance within a USB gadget.
+///
+/// Returned by [RegGadget.functions] to describe each entry inside
+/// the `functions/` directory in configfs.
+class RegFunction {
+  const RegFunction({required this.driver, required this.instance});
+
+  /// Function driver name (e.g. `acm`, `ecm`, `mass_storage`).
+  final String driver;
+
+  /// Instance name (e.g. `usb-gadget0-0`).
+  final String instance;
+
+  @override
+  String toString() => '$driver.$instance';
+}
+
+/// A USB gadget registered with the system.
+///
+/// Obtained via [Gadget.register] or [Gadget.bind]. This object owns the
+/// configfs structure: call [remove] to unbind and clean up, or [detach] to
+/// relinquish ownership and keep the gadget active after this handle is
+/// discarded.
+///
+/// Use [RegGadget.all] to enumerate all gadgets currently on the system.
+class RegGadget with USBGadgetLogger {
+  RegGadget._(this._dir);
+
+  final Directory _dir;
+
+  /// Whether [remove] will tear down the gadget.
   ///
-  /// If the gadget is not bound, this is a no-op. This method never throws;
-  /// errors are logged as warnings.
+  /// Starts as `true`; set to `false` by [detach] to keep the gadget alive
+  /// after this object is no longer used.
+  bool isAttached = true;
+
+  /// Name of this gadget in configfs.
+  String get name => _dir.path.split('/').last;
+
+  /// Absolute configfs path of this gadget.
+  String get path => _dir.path;
+
+  /// Name of the UDC this gadget is bound to, or `null` if unbound.
+  String? get udc {
+    final f = File('${_dir.path}/UDC');
+    if (!f.existsSync()) return null;
+    final s = f.readAsStringSync().trim();
+    return s.isEmpty ? null : s;
+  }
+
+  /// Returns all USB gadgets currently present in configfs.
   ///
-  /// Example:
+  /// Includes gadgets created outside of this program.
+  ///
   /// ```dart
-  /// gadget.unbind();  // Safe to call even if not bound
+  /// for (final g in RegGadget.all()) {
+  ///   print('${g.name}  udc: ${g.udc ?? "(unbound)"}');
+  /// }
   /// ```
-  Future<void> unbind() async {
-    if (_boundUdc != null) {
-      log?.debug('Unbinding from UDC: $_boundUdc');
-      try {
-        _writeAttr('$_gadgetPath/UDC', '');
-      } catch (err) {
-        log?.warn('Failed to unbind from UDC:', err);
-      }
-      _boundUdc = null;
-    }
-
-    for (final function in config.functions) {
-      try {
-        await function.release();
-        log?.debug('Released function: ${function.name}');
-      } catch (err) {
-        log?.warn('Failed to release function ${function.name}:', err);
-      }
-    }
-
-    for (final link in _createdSymlinks.reversed) {
-      try {
-        Link(link).deleteSync();
-      } catch (err) {
-        log?.warn('Failed to remove symlink $link:', err);
-      }
-    }
-    _createdSymlinks.clear();
-
-    for (final dir in _createdDirs.reversed) {
-      try {
-        Directory(dir).deleteSync();
-      } catch (err) {
-        log?.warn('Failed to remove directory $dir:', err);
-      }
-    }
-    _createdDirs.clear();
+  static List<RegGadget> all() {
+    final dir = Directory('/sys/kernel/config/usb_gadget');
+    if (!dir.existsSync()) return [];
+    return [
+      for (final e in dir.listSync())
+        if (e is Directory) RegGadget._(e),
+    ];
   }
 
-  /// Waits for the USB device to reach the specified state.
+  /// Binds this gadget to [udc], or unbinds it when [udc] is `null`.
   ///
-  /// This method monitors the UDC (USB Device Controller) state file to
-  /// determine when the device has reached the target state. This is useful
-  /// for knowing when the host has fully enumerated and configured the device
-  /// before starting data transfers.
+  /// Throws a [FileSystemException] if writing to the UDC file fails.
+  Future<void> bind(Udc? udc) async {
+    log?.debug(
+      udc != null ? 'Binding to UDC: ${udc.name}' : 'Unbinding from UDC',
+    );
+    try {
+      File('${_dir.path}/UDC').writeAsStringSync(udc?.name ?? '');
+    } catch (err) {
+      throw FileSystemException('Failed to bind gadget to UDC: $err');
+    }
+  }
+
+  /// Unbinds every gadget currently present in configfs.
   ///
-  /// Parameters:
-  /// - [target]: The USB state to wait for (typically [DeviceState.configured])
-  /// - [pollInterval]: How often to check the state (default: 100ms)
-  /// - [timeout]: Maximum time to wait (default: 5 seconds)
+  /// The configfs structure is left intact; gadgets can be re-bound
+  /// afterwards by calling [bind].
   ///
-  /// Returns a Future that completes when the target state is reached.
-  ///
-  /// Throws:
-  /// - [StateError] if the gadget is not bound to a UDC or state file doesn't exist
-  /// - [TimeoutException] if the target state is not reached within the timeout
-  ///
-  /// Example:
   /// ```dart
-  /// await gadget.bind();
-  /// await gadget.awaitState(DeviceState.configured);
-  /// // Device is now ready to send/receive data
+  /// await RegGadget.unbindAll();
+  /// ```
+  static Future<void> unbindAll() async {
+    for (final g in all()) {
+      try {
+        await g.bind(null);
+      } catch (_) {}
+    }
+  }
+
+  /// Polls the UDC state file until the device reaches [target].
+  ///
+  /// Useful for waiting until the host has fully enumerated the device
+  /// before starting data transfers. [pollInterval] controls how often the
+  /// state file is read (default: 100 ms) and [timeout] sets the maximum
+  /// wait (default: 5 s).
+  ///
+  /// Throws a [StateError] if the gadget is not bound to a UDC or the state
+  /// file is missing, and a [TimeoutException] if [target] is not reached
+  /// within [timeout].
+  ///
+  /// ```dart
+  /// await reg.awaitState(DeviceState.configured);
   /// ```
   Future<void> awaitState(
     DeviceState target, {
     Duration pollInterval = const Duration(milliseconds: 100),
     Duration timeout = const Duration(seconds: 5),
   }) async {
-    if (_boundUdc == null) {
-      throw StateError('Gadget is not bound to any UDC');
-    }
+    final boundUdc = udc;
+    if (boundUdc == null) throw StateError('Gadget is not bound to any UDC');
 
-    final stateFile = File('/sys/class/udc/$_boundUdc/state');
+    final stateFile = File('/sys/class/udc/$boundUdc/state');
     if (!stateFile.existsSync()) {
       throw StateError('UDC state file not found: ${stateFile.path}');
     }
 
-    final startTime = DateTime.now();
-
+    final deadline = DateTime.now().add(timeout);
     while (true) {
-      if (DateTime.now().difference(startTime) > timeout) {
-        final currentState = getCurrentUsbState();
+      final state = DeviceState.fromString(stateFile.readAsStringSync().trim());
+      if (state == target) return;
+      if (DateTime.now().isAfter(deadline)) {
         throw TimeoutException(
-          'Timeout waiting for USB state "${target.value}". '
-          'Current state: ${currentState.value}',
+          'Timeout waiting for "${target.value}". Current: ${state.value}',
           timeout,
         );
       }
-
-      // Read current state
-      final stateStr = stateFile.readAsStringSync().trim();
-      final state = DeviceState.fromString(stateStr);
-
-      if (state == target) {
-        return;
-      }
-
-      // Wait before next poll
       await Future<void>.delayed(pollInterval);
     }
   }
 
-  /// Gets the current USB device state.
+  /// The current USB device state.
   ///
-  /// Returns the current state or null if the gadget is not bound or
-  /// the state cannot be determined.
-  DeviceState getCurrentUsbState() {
-    if (_boundUdc == null) return .notAttached;
-
-    final stateFile = File('/sys/class/udc/$_boundUdc/state');
-    if (!stateFile.existsSync()) return .notAttached;
-
-    final stateStr = stateFile.readAsStringSync().trim();
-    return DeviceState.fromString(stateStr);
+  /// Returns [DeviceState.notAttached] when the gadget is unbound or
+  /// the state file cannot be read.
+  DeviceState get currentState {
+    if (udc == null) return .notAttached;
+    final f = File('/sys/class/udc/$udc/state');
+    if (!f.existsSync()) return .notAttached;
+    return .fromString(f.readAsStringSync().trim());
   }
 
-  /// Stream of USB device state changes.
+  /// A stream that emits [DeviceState] values as the UDC state changes.
   ///
-  /// Monitors the UDC state file and emits new states as they change.
-  /// The stream completes when the gadget is unbound.
+  /// The stream completes when the gadget is unbound from its UDC.
+  /// [pollInterval] controls how often the state file is sampled (default: 50 ms).
   ///
-  /// Parameters:
-  /// - [pollInterval]: How often to check for state changes (default: 100ms)
-  ///
-  /// Example:
   /// ```dart
-  /// gadget.stateStream().listen((state) {
-  ///   print('USB state changed to: ${state.value}');
-  ///   if (state.isConfigured) {
-  ///     // Ready to transfer data
+  /// reg.stateStream().listen((state) {
+  ///   if (state == DeviceState.configured) {
+  ///     // Ready to transfer data.
   ///   }
   /// });
   /// ```
   Stream<DeviceState> stateStream({
     Duration pollInterval = const Duration(milliseconds: 50),
   }) async* {
-    if (_boundUdc == null) {
-      throw StateError('Gadget is not bound to any UDC');
-    }
-
-    DeviceState? lastState;
-
-    while (_boundUdc != null) {
-      final currentState = getCurrentUsbState();
-      if (currentState != lastState) {
-        yield lastState = currentState;
-      }
-
+    DeviceState? last;
+    while (udc != null) {
+      final s = currentState;
+      if (s != last) yield last = s;
       await Future<void>.delayed(pollInterval);
     }
   }
 
-  /// Waits for all functions to reach the specified state.
+  /// All function instances registered in this gadget.
   ///
-  /// This ensures synchronized initialization - no function is left behind.
-  Future<void> _setupFunctions() async {
-    for (final function in config.functions) {
-      if (function.type == .ffs) {
-        await function.awaitState(.ready);
-        log?.info('Function "${function.name}" is ready');
-      }
-    }
+  /// Scans the `functions/` directory in configfs and parses each entry as
+  /// `driver.instance` (e.g. `hid.usb-gadget0-0`).
+  List<RegFunction> functions() {
+    final dir = Directory('${_dir.path}/functions');
+    if (!dir.existsSync()) return [];
+    return [
+      for (final e in dir.listSync())
+        if (e is Directory) ?_parseFunction(e.path.split('/').last),
+    ];
   }
 
-  /// Creates the complete configfs gadget structure.
+  /// Relinquishes ownership of the gadget, making [remove] a no-op.
   ///
-  /// This method builds the entire gadget hierarchy:
-  /// - Device descriptors (VID/PID, class codes, version numbers)
-  /// - String descriptors (manufacturer, product, serial per language)
-  /// - Configuration (attributes, max power)
-  /// - Functions (create directories, prepare, and link)
+  /// The gadget remains registered in configfs until removed by other
+  /// means (e.g. [unbindAll]).
+  void detach() => isAttached = false;
+
+  /// Unbinds and removes this gadget from configfs.
   ///
-  /// Functions are prepared before linking to avoid "Device or resource busy"
-  /// errors that occur when trying to write attributes after linking.
-  void _createGadget() {
-    log?.info('Creating gadget structure at $_gadgetPath');
-    _mkdir(_gadgetPath);
+  /// Releases all functions, deletes all symlinks, subdirectories, and the
+  /// gadget directory itself. Does nothing if [isAttached] is `false`.
+  Future<void> remove() async {
+    if (!isAttached) return;
+    await _doRemove();
+  }
 
-    // Write device descriptor attributes
-    if (deviceClass case DeviceClass(:final int value)) {
-      _writeAttr('$_gadgetPath/bDeviceClass', value.toHex());
-    }
-    if (deviceSubClass case DeviceSubClass(:final int value)) {
-      _writeAttr('$_gadgetPath/bDeviceSubClass', value.toHex());
-    }
-    if (deviceProtocol case DeviceProtocol(:final int value)) {
-      _writeAttr('$_gadgetPath/bDeviceProtocol', value.toHex());
-    }
-    _writeAttr('$_gadgetPath/idVendor', idVendor.toHex());
-    _writeAttr('$_gadgetPath/idProduct', idProduct.toHex());
-    _writeAttr('$_gadgetPath/bcdDevice', bcdDevice.toHex());
-    _writeAttr('$_gadgetPath/bcdUSB', bcdUSB.toHex());
+  final List<GadgetFunction> _functions = [];
 
-    // Create gadget-level string descriptors
-    for (final MapEntry(:key, :value) in strings.entries) {
-      final langPath = '$_gadgetPath/strings/${key.value.toHex()}';
-      _mkdir(langPath);
-      if (value case GadgetStrings(serialnumber: final String serialnumber)) {
-        _writeAttr('$langPath/serialnumber', serialnumber);
-      }
-      if (value.manufacturer case final String manufacturer) {
-        _writeAttr('$langPath/manufacturer', manufacturer);
-      }
-      if (value.product case final String product) {
-        _writeAttr('$langPath/product', product);
-      }
-    }
-
-    // Create config and link functions
-    final configPath = '$_gadgetPath/configs/c.${config.index}';
-    _mkdir(configPath);
-
-    // Write configuration attributes
-    if (config.attributes case GadgetAttributes(:final int value)) {
-      _writeAttr('$configPath/bmAttributes', value.toHex());
-    }
-    if (config.maxPower case GadgetMaxPower(:final int value)) {
-      _writeAttr('$configPath/MaxPower', value.toString());
-    }
-
-    // Create configuration string descriptors
-    for (final MapEntry(:key, :value) in config.strings.entries) {
-      final langPath = '$configPath/strings/${key.value.toHex()}';
-      _mkdir(langPath);
-      _writeAttr('$langPath/configuration', value);
-    }
-
-    // Create function directories and prepare them (before linking)
-    // Attributes must be written before symlinking to avoid "Device or resource busy" errors
-    for (final function in config.functions) {
-      log?.info('Preparing function: ${function.name}');
-      final configfsName = function.configfsName;
-      final functionPath = '$_gadgetPath/functions/$configfsName';
-      _mkdir(functionPath);
+  Future<void> _doRemove() async {
+    for (final fn in _functions) {
       try {
-        function.prepare(functionPath);
-      } catch (err, st) {
-        log?.error('Function preparation failed: ', err, st);
-        function.release();
-        rethrow;
-      }
-    }
-
-    // Create symlinks after all functions are prepared
-    for (final function in config.functions) {
-      final functionPath = '$_gadgetPath/functions/${function.configfsName}';
-      // Link function to configuration (after preparation)
-      _symlink(functionPath, '$configPath/${function.configfsName}');
-    }
-  }
-
-  /// Binds the gadget to the specified UDC.
-  ///
-  /// This tells the kernel to activate the USB device controller and
-  /// start responding to USB host enumeration.
-  void _bindToUdc(String udcName) {
-    _ensureUdcAvailable(udcName);
-    _writeAttr('$_gadgetPath/UDC', udcName);
-    _boundUdc = udcName;
-  }
-
-  /// Ensures the UDC is available by unbinding any existing gadget using it.
-  ///
-  /// Scans all gadgets in configfs and unbinds any that are using the target
-  /// UDC. This prevents "device or resource busy" errors.
-  void _ensureUdcAvailable(String udcName) {
-    final gadgetsDir = Directory('/sys/kernel/config/usb_gadget');
-    if (!gadgetsDir.existsSync()) return;
-
-    for (final gadgetEntity in gadgetsDir.listSync()) {
-      if (gadgetEntity is! Directory) continue;
-
-      final gadgetPath = gadgetEntity.path;
-      final gadgetName = gadgetPath.split('/').last;
-
-      // Skip our own gadget
-      if (gadgetName == name) continue;
-
-      final udcFile = File('$gadgetPath/UDC');
-      if (!udcFile.existsSync()) continue;
-
-      try {
-        final currentUdc = udcFile.readAsStringSync().trim();
-        if (currentUdc == udcName) {
-          log?.debug(
-            'UDC $udcName is bound to gadget "$gadgetName", unbinding...',
-          );
-          udcFile.writeAsStringSync('');
-        }
+        await fn.release();
       } catch (err) {
-        log?.warn('Could not check/unbind gadget "$gadgetName":', err);
+        log?.warn('Failed to release ${fn.name}:', err);
       }
     }
-  }
-
-  /// Finds an available UDC by scanning /sys/class/udc.
-  ///
-  /// Returns the UDC name if exactly one is found. Throws if zero or
-  /// multiple UDCs are available (ambiguous case requires explicit selection).
-  String _findUdc() {
-    final udcDir = Directory('/sys/class/udc');
-    if (!udcDir.existsSync()) {
-      throw StateError(
-        'UDC directory not found. Is USB gadget support enabled?',
-      );
-    }
-
-    final udcs = <String>[];
-    for (final entity in udcDir.listSync()) {
-      udcs.add(entity.path.split('/').last);
-    }
-
-    if (udcs.isEmpty) {
-      throw StateError('No UDC available. Is USB device controller enabled?');
-    }
-    if (udcs.length > 1) {
-      throw StateError(
-        'Multiple UDCs available, please specify one using setUdc()',
-      );
-    }
-    return udcs.first;
-  }
-
-  /// Creates a directory and tracks it for cleanup.
-  void _mkdir(String path) {
-    Directory(path).createSync(recursive: true);
-    _createdDirs.add(path);
-  }
-
-  /// Writes a value to a configfs attribute file.
-  ///
-  /// Provides helpful error messages for common failures (e.g., UDC busy).
-  void _writeAttr(String path, String value) {
     try {
-      File(path).writeAsStringSync(value);
-    } catch (err) {
-      throw FileSystemException(
-        'Failed to write attribute at $path with value "$value": $err',
-      );
-    }
-  }
-
-  /// Creates a symbolic link and tracks it for cleanup.
-  void _symlink(String target, String link) {
-    final linkFile = Link(link);
-    if (linkFile.existsSync()) {
-      linkFile.deleteSync();
-    }
-    linkFile.createSync(target);
-    _createdSymlinks.add(link);
-  }
-
-  // Static gadget management methods
-
-  /// Get all USB gadgets registered on the system.
-  ///
-  /// This returns all USB gadgets in configfs, including gadgets not created
-  /// by the running program or registered by other means.
-  ///
-  /// Example:
-  /// ```dart
-  /// final gadgets = Gadget.queryRegistered();
-  /// for (final gadget in gadgets) {
-  ///   print('Gadget: ${gadget.name}');
-  ///   print('  Path: ${gadget.path}');
-  ///   print('  UDC: ${gadget.udc ?? "(unbound)"}');
-  /// }
-  /// ```
-  static List<RegisteredGadget> queryRegistered() {
-    const gadgetDir = '/sys/kernel/config/usb_gadget';
-    final dir = Directory(gadgetDir);
-    if (!dir.existsSync()) {
-      return [];
-    }
-
-    final gadgets = <RegisteredGadget>[];
-    for (final entry in dir.listSync()) {
-      if (entry is Directory) {
-        gadgets.add(RegisteredGadget._fromDirectory(entry));
-      }
-    }
-
-    return gadgets;
-  }
-
-  /// Remove all USB gadgets defined on the system.
-  ///
-  /// This unbinds and removes all USB gadgets in configfs, including gadgets
-  /// not created by the running program or registered by other means.
-  ///
-  /// Useful for cleanup between tests or resetting the USB gadget state.
-  ///
-  /// Example:
-  /// ```dart
-  /// Gadget.removeAll();  // Clean slate
-  /// ```
-  static void removeAll() {
-    final gadgets = queryRegistered();
-    for (final gadget in gadgets) {
-      try {
-        gadget.remove();
-      } catch (err) {
-        // Continue with other gadgets even if one fails
-      }
-    }
-  }
-
-  /// Unbind all USB gadgets defined on the system.
-  ///
-  /// This unbinds all gadgets from their UDCs but leaves the configfs
-  /// structure intact. Gadgets can be re-bound by writing to their UDC file.
-  ///
-  /// Example:
-  /// ```dart
-  /// Gadget.unbindAll();  // Disconnect all but keep configuration
-  /// ```
-  static void unbindAll() {
-    final gadgets = queryRegistered();
-    for (final gadget in gadgets) {
-      try {
-        gadget.unbind();
-      } catch (err) {
-        // Continue with other gadgets even if one fails
-      }
-    }
-  }
-}
-
-/// Lightweight representation of a registered USB gadget.
-///
-/// This class represents a gadget that exists in configfs, whether it was
-/// created by the current program or by other means. It provides read-only
-/// access to gadget properties and methods to unbind or remove the gadget.
-///
-/// Use [Gadget.queryRegistered] to get all registered gadgets.
-class RegisteredGadget {
-  RegisteredGadget._fromDirectory(this._directory);
-
-  /// The configfs directory for this gadget.
-  final Directory _directory;
-
-  /// Name of this USB gadget in configfs (directory name).
-  String get name => _directory.path.split('/').last;
-
-  /// Full path of this USB gadget in configfs.
-  String get path => _directory.path;
-
-  /// The name of the USB device controller (UDC) this gadget is bound to.
-  ///
-  /// Returns null if the gadget is not bound to any UDC.
-  String? get udc {
-    final udcFile = File('${_directory.path}/UDC');
-    if (!udcFile.existsSync()) {
-      return null;
-    }
-
-    final content = udcFile.readAsStringSync().trim();
-    return content.isEmpty ? null : content;
-  }
-
-  /// Unbinds the gadget from its UDC.
-  ///
-  /// After unbinding, the gadget structure remains in configfs but is not
-  /// active on any USB device controller.
-  void unbind() {
-    final udcFile = File('${_directory.path}/UDC');
-    if (udcFile.existsSync()) {
-      try {
-        udcFile.writeAsStringSync('');
-      } catch (err) {
-        throw FileSystemException(
-          'Failed to unbind gadget $name from UDC: $err',
-        );
-      }
-    }
-  }
-
-  /// Removes the gadget from configfs.
-  ///
-  /// This method:
-  /// 1. Unbinds the gadget from any UDC
-  /// 2. Removes all symlinks (function links in configs)
-  /// 3. Removes all subdirectories (strings, configs, functions)
-  /// 4. Removes the gadget directory
-  ///
-  /// The gadget must be unbound before removal. If already unbound,
-  /// this is handled automatically.
-  void remove() {
-    // Unbind first
-    unbind();
-
-    // Remove OS descriptor symlinks
-    final osDescDir = Directory('${_directory.path}/os_desc');
-    if (osDescDir.existsSync()) {
-      for (final entry in osDescDir.listSync()) {
-        if (entry is Link) {
-          try {
-            entry.deleteSync();
-          } catch (err) {
-            // Continue even if symlink removal fails
-          }
-        }
-      }
-    }
-
-    // Remove function symlinks from configs
-    final configsDir = Directory('${_directory.path}/configs');
-    if (configsDir.existsSync()) {
-      for (final configEntry in configsDir.listSync()) {
-        if (configEntry is! Directory) continue;
-
-        // Remove function symlinks
-        for (final entry in configEntry.listSync()) {
-          if (entry is Link) {
-            try {
-              entry.deleteSync();
-            } catch (err) {
-              // Continue
-            }
-          }
-        }
-
-        // Remove string directories
-        final stringsDir = Directory('${configEntry.path}/strings');
-        if (stringsDir.existsSync()) {
-          for (final langEntry in stringsDir.listSync()) {
-            if (langEntry is Directory) {
-              try {
-                langEntry.deleteSync();
-              } catch (err) {
-                // Continue
-              }
-            }
-          }
-        }
-
-        // Remove config directory
-        try {
-          configEntry.delete();
-        } catch (err) {
-          // Continue
-        }
-      }
-    }
-
-    // Remove function directories
-    final functionsDir = Directory('${_directory.path}/functions');
-    if (functionsDir.existsSync()) {
-      for (final funcEntry in functionsDir.listSync()) {
-        if (funcEntry is Directory) {
-          try {
-            funcEntry.deleteSync();
-          } catch (err) {
-            // Continue
-          }
-        }
-      }
-    }
-
-    // Remove string directories
-    final stringsDir = Directory('${_directory.path}/strings');
-    if (stringsDir.existsSync()) {
-      for (final langEntry in stringsDir.listSync()) {
-        if (langEntry is Directory) {
-          try {
-            langEntry.deleteSync();
-          } catch (err) {
-            // Continue
-          }
-        }
-      }
-    }
-
-    // Remove gadget directory
-    try {
-      _directory.deleteSync();
-    } catch (err) {
-      throw FileSystemException(
-        'Failed to remove gadget directory $path: $err',
-      );
-    }
+      File('${_dir.path}/UDC').writeAsStringSync('');
+    } catch (_) {}
+    _removeAt(_dir);
+    detach();
   }
 
   @override
-  String toString() => 'RegisteredGadget(name: $name, udc: $udc)';
+  String toString() => 'RegGadget($name, udc: $udc)';
 }

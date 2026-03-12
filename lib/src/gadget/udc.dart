@@ -2,192 +2,80 @@ import 'dart:io';
 
 import '/usb_gadget.dart';
 
-/// USB Device Controller (UDC).
-///
-/// Represents a USB device controller available on the system. UDCs are
-/// discovered by scanning `/sys/class/udc/` and their properties are read
-/// from sysfs attribute files.
-///
-/// Example:
-/// ```dart
-/// final udcs = await listUdcs();
-/// for (final udc in udcs) {
-///   print('UDC: ${udc.name}');
-///   print('Max speed: ${udc.maxSpeed}');
-///   print('Current speed: ${udc.currentSpeed}');
-///   print('State: ${udc.state}');
-/// }
-/// ```
+/// A USB Device Controller (UDC) discovered under `/sys/class/udc/`.
 class Udc {
-  Udc._(this._directory);
+  Udc._(this._dir);
 
-  /// The sysfs directory path for this UDC.
-  final Directory _directory;
+  final Directory _dir;
 
-  /// The name of the USB device controller.
-  String get name => _directory.uri.pathSegments.lastWhere((s) => s.isNotEmpty);
+  String get name => _dir.uri.pathSegments.lastWhere((s) => s.isNotEmpty);
 
-  /// Indicates if an OTG A-Host supports HNP at an alternate port.
-  Future<bool> get aAltHnpSupport async {
-    final content = await _readAttribute('a_alt_hnp_support');
-    return content.trim() != '0';
-  }
+  Future<bool> get aAltHnpSupport => _readBool('a_alt_hnp_support');
 
-  /// Indicates if an OTG A-Host supports HNP at this port.
-  Future<bool> get aHnpSupport async {
-    final content = await _readAttribute('a_hnp_support');
-    return content.trim() != '0';
-  }
+  Future<bool> get aHnpSupport => _readBool('a_hnp_support');
 
-  /// Indicates if an OTG A-Host enabled HNP support.
-  Future<bool> get bHnpEnable async {
-    final content = await _readAttribute('b_hnp_enable');
-    return content.trim() != '0';
-  }
+  Future<bool> get bHnpEnable => _readBool('b_hnp_enable');
 
-  /// Indicates the current negotiated speed at this port.
-  Future<Speed> get currentSpeed async {
-    final content = await _readAttribute('current_speed');
-    return Speed.fromString(content.trim());
-  }
+  Future<bool> get isAPeripheral => _readBool('is_a_peripheral');
 
-  /// Indicates the maximum USB speed supported by this port.
-  Future<Speed> get maxSpeed async {
-    final content = await _readAttribute('maximum_speed');
-    return Speed.fromString(content.trim());
-  }
+  Future<bool> get isOtg => _readBool('is_otg');
 
-  /// Indicates that this port is the default Host on an OTG session but HNP
-  /// was used to switch roles.
-  Future<bool> get isAPeripheral async {
-    final content = await _readAttribute('is_a_peripheral');
-    return content.trim() != '0';
-  }
+  Future<Speed> get currentSpeed =>
+      _read('current_speed').then((s) => Speed.fromString(s));
 
-  /// Indicates that this port supports OTG.
-  Future<bool> get isOtg async {
-    final content = await _readAttribute('is_otg');
-    return content.trim() != '0';
-  }
+  Future<Speed> get maxSpeed =>
+      _read('maximum_speed').then((s) => Speed.fromString(s));
 
-  /// Indicates current state of the USB Device Controller.
-  ///
-  /// However not all USB Device Controllers support reporting all states.
-  Future<DeviceState> get state async {
-    final content = await _readAttribute('state');
-    return DeviceState.fromString(content.trim());
-  }
+  Future<DeviceState> get state =>
+      _read('state').then((s) => DeviceState.fromString(s));
 
-  /// Name of currently running USB Gadget Driver.
-  ///
-  /// Returns null if no gadget is bound.
+  /// Returns null if no gadget driver is bound.
   Future<String?> get function async {
-    final content = await _readAttribute('function');
-    final trimmed = _trimString(content);
-    return trimmed.isEmpty ? null : trimmed;
+    final s = await _read('function');
+    return s.isEmpty ? null : s;
   }
 
-  /// Manually start Session Request Protocol (SRP).
-  Future<void> startSrp() async {
-    await _writeAttribute('srp', '1');
-  }
-
-  /// Connect or disconnect data pull-up resistors thus causing a logical
-  /// connection to or disconnection from the USB host.
-  Future<void> setSoftConnect(bool connect) async {
-    await _writeAttribute('soft_connect', connect ? 'connect' : 'disconnect');
-  }
-
-  /// Reads a sysfs attribute file for this UDC.
-  Future<String> _readAttribute(String name) {
-    final file = File('${_directory.path}/$name');
-    return file.readAsString();
-  }
-
-  /// Writes to a sysfs attribute file for this UDC.
-  Future<void> _writeAttribute(String name, String value) async {
-    final file = File('${_directory.path}/$name');
-    await file.writeAsString(value);
-  }
-
-  @override
-  String toString() => 'Udc(name: $name)';
-}
-
-/// Gets the available USB device controllers (UDCs) in the system.
-///
-/// Scans `/sys/class/udc/` and returns a list of all available UDCs.
-/// Returns an empty list if no UDCs are found or sysfs is not available.
-///
-/// Example:
-/// ```dart
-/// final udcs = listUdcs();
-/// if (udcs.isEmpty) {
-///   print('No UDCs available');
-/// }
-/// ```
-List<Udc> listUdcs() {
-  const classDir = '/sys/class';
-  if (!Directory(classDir).existsSync()) {
-    return [];
-  }
-
-  const udcDir = '$classDir/udc';
-  final dir = Directory(udcDir);
-  if (!dir.existsSync()) {
-    return [];
-  }
-
-  final udcs = <Udc>[];
-  for (final entry in dir.listSync()) {
-    if (entry is Directory) {
-      udcs.add(Udc._(entry));
+  /// Kernel driver name (e.g. `dwc2`), or null if unresolvable.
+  String? get driver {
+    try {
+      final target = Link(
+        '${_dir.path}/device/driver',
+      ).resolveSymbolicLinksSync();
+      return target.split('/').lastWhere((s) => s.isNotEmpty, orElse: () => '');
+    } catch (_) {
+      return null;
     }
   }
 
-  return udcs;
+  Future<void> startSrp() => _write('srp', '1');
+
+  Future<void> setSoftConnect(bool connect) =>
+      _write('soft_connect', connect ? 'connect' : 'disconnect');
+
+  Future<String> _read(String attr) =>
+      File('${_dir.path}/$attr').readAsString().then((s) => s.trim());
+
+  Future<bool> _readBool(String attr) => _read(attr).then((s) => s != '0');
+
+  Future<void> _write(String attr, String value) =>
+      File('${_dir.path}/$attr').writeAsString(value);
+
+  @override
+  String toString() => 'Udc($name)';
 }
 
-/// The default USB device controller (UDC) in the system by alphabetical sorting.
-///
-/// Returns null if no UDC is present.
-///
-/// Example:
-/// ```dart
-/// final udc = getDefaultUdc();
-/// if (udc != null) {
-///   print('Using UDC: ${udc.name}');
-/// }
-/// ```
+/// All UDCs available under `/sys/class/udc/`.
+List<Udc> listUdcs() {
+  final dir = Directory('/sys/class/udc');
+  if (!dir.existsSync()) return [];
+  return [
+    for (final e in dir.listSync())
+      if (e is Directory) Udc._(e),
+  ];
+}
+
+/// The alphabetically first UDC, or null if none exist.
 Udc? getDefaultUdc() {
-  final udcs = listUdcs();
-  if (udcs.isEmpty) {
-    return null;
-  }
-
-  udcs.sort((a, b) => a.name.compareTo(b.name));
-  return udcs.first;
-}
-
-/// Trims whitespace, newlines, and null bytes from a string.
-///
-/// Files in sysfs/configfs often have trailing newlines or null bytes.
-String _trimString(String value) {
-  var result = value;
-
-  // Trim from start
-  while (result.isNotEmpty &&
-      (result[0] == '\n' || result[0] == ' ' || result[0] == '\x00')) {
-    result = result.substring(1);
-  }
-
-  // Trim from end
-  while (result.isNotEmpty &&
-      (result[result.length - 1] == '\n' ||
-          result[result.length - 1] == ' ' ||
-          result[result.length - 1] == '\x00')) {
-    result = result.substring(0, result.length - 1);
-  }
-
-  return result;
+  final udcs = listUdcs()..sort((a, b) => a.name.compareTo(b.name));
+  return udcs.firstOrNull;
 }
