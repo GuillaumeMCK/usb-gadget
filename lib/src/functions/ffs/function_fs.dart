@@ -55,7 +55,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
   final List<USBDescriptor> descriptors;
 
   /// USB speeds to generate descriptors for.
-  final Set<USBSpeed> speeds;
+  final Set<Speed> speeds;
 
   /// String descriptors indexed by language ID (e.g., 0x0409 for en-US)
   final Map<USBLanguageId, List<String>> strings;
@@ -234,7 +234,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
   }
 
   /// Generates descriptors for a specific speed if enabled.
-  DescriptorSet? _generateDescriptorsForSpeed(USBSpeed speed) {
+  DescriptorSet? _generateDescriptorsForSpeed(Speed speed) {
     if (descriptors.isEmpty || !speeds.contains(speed)) return null;
     return DescriptorGenerator.generateForSpeed(descriptors, speed);
   }

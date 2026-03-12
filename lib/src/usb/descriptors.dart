@@ -178,7 +178,7 @@ abstract class DescriptorGenerator {
   /// Returns a DescriptorSet ready for use at the specified speed.
   static DescriptorSet generateForSpeed(
     List<USBDescriptor> baseDescriptors,
-    USBSpeed speed,
+    Speed speed,
   ) {
     final result = <USBDescriptor>[];
 
@@ -676,10 +676,10 @@ sealed class EndpointConfig {
   ///
   /// Applies [maxPacketSize] override when set; otherwise uses the
   /// USB-spec default for this transfer type and speed.
-  MaxPacketSize getMaxPacketSize(USBSpeed speed);
+  MaxPacketSize getMaxPacketSize(Speed speed);
 
   /// Returns the [PollingInterval] for [speed].
-  PollingInterval getPollingInterval(USBSpeed speed);
+  PollingInterval getPollingInterval(Speed speed);
 }
 
 /// Bulk transfer endpoint configuration.
@@ -697,14 +697,14 @@ final class BulkEndpointConfig extends EndpointConfig {
   TransferType get transferType => TransferType.bulk;
 
   @override
-  MaxPacketSize getMaxPacketSize(USBSpeed speed) => switch (speed) {
+  MaxPacketSize getMaxPacketSize(Speed speed) => switch (speed) {
     .fullSpeed => .fullSpeedBulk(maxPacketSize ?? 64),
     .highSpeed => const .highSpeedBulk(),
     _ => .superSpeed(maxPacketSize ?? 512),
   };
 
   @override
-  PollingInterval getPollingInterval(USBSpeed speed) => const .none();
+  PollingInterval getPollingInterval(Speed speed) => const .none();
 }
 
 /// Control transfer endpoint configuration.
@@ -722,14 +722,14 @@ final class ControlEndpointConfig extends EndpointConfig {
   TransferType get transferType => TransferType.control;
 
   @override
-  MaxPacketSize getMaxPacketSize(USBSpeed speed) => switch (speed) {
+  MaxPacketSize getMaxPacketSize(Speed speed) => switch (speed) {
     .fullSpeed => .fullSpeedControl(maxPacketSize ?? 64),
     .highSpeed => const .highSpeedControl(),
     _ => .superSpeed(maxPacketSize ?? 512),
   };
 
   @override
-  PollingInterval getPollingInterval(USBSpeed speed) => const .none();
+  PollingInterval getPollingInterval(Speed speed) => const .none();
 }
 
 /// Interrupt transfer endpoint configuration.
@@ -751,14 +751,14 @@ final class InterruptEndpointConfig extends EndpointConfig {
   TransferType get transferType => TransferType.interrupt;
 
   @override
-  MaxPacketSize getMaxPacketSize(USBSpeed speed) => switch (speed) {
+  MaxPacketSize getMaxPacketSize(Speed speed) => switch (speed) {
     .fullSpeed => .fullSpeedInterrupt(maxPacketSize ?? 64),
     .highSpeed => .highSpeedInterrupt(maxPacketSize ?? 1024),
     _ => .superSpeed(maxPacketSize ?? 1024),
   };
 
   @override
-  PollingInterval getPollingInterval(USBSpeed speed) {
+  PollingInterval getPollingInterval(Speed speed) {
     final ms = interval.inMilliseconds.clamp(1, 255);
     return switch (speed) {
       .fullSpeed => .fullSpeed(ms),
@@ -808,7 +808,7 @@ final class IsochronousEndpointConfig extends EndpointConfig {
   TransferType get transferType => TransferType.isochronous;
 
   @override
-  MaxPacketSize getMaxPacketSize(USBSpeed speed) => switch (speed) {
+  MaxPacketSize getMaxPacketSize(Speed speed) => switch (speed) {
     .fullSpeed => .fullSpeedIsochronous(maxPacketSize ?? 1023),
     .highSpeed => .highSpeedIsochronous(
       size: maxPacketSize ?? 1024,
@@ -818,7 +818,7 @@ final class IsochronousEndpointConfig extends EndpointConfig {
   };
 
   @override
-  PollingInterval getPollingInterval(USBSpeed speed) => switch (speed) {
+  PollingInterval getPollingInterval(Speed speed) => switch (speed) {
     .fullSpeed => const PollingInterval.fullSpeed(1),
     .highSpeed => const PollingInterval.highSpeedIsochronous(),
     _ => const PollingInterval.superSpeed(1),

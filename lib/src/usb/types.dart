@@ -509,7 +509,7 @@ final class MaxPacketSize {
       _extraBits = 0;
 
   /// From USB Speed and Transfer Type, determine the default max packet size.
-  factory MaxPacketSize.from(USBSpeed speed, TransferType type) {
+  factory MaxPacketSize.from(Speed speed, TransferType type) {
     return switch ((speed, type)) {
       (.fullSpeed, .control) => const .fullSpeedControl(64),
       (.fullSpeed, .bulk) => const .fullSpeedBulk(64),
@@ -622,7 +622,7 @@ final class PollingInterval {
     : assert(value >= 0 && value <= 255, 'Interval must be 0-255');
 
   /// From USB Speed and Transfer Type, determine the default polling interval.
-  factory PollingInterval.from(USBSpeed speed, TransferType type) =>
+  factory PollingInterval.from(Speed speed, TransferType type) =>
       switch ((speed, type)) {
         (.fullSpeed, .control) => const .none(),
         (.fullSpeed, .bulk) => const .none(),
