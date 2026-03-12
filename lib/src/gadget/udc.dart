@@ -73,9 +73,9 @@ class Udc {
   /// Indicates current state of the USB Device Controller.
   ///
   /// However not all USB Device Controllers support reporting all states.
-  Future<USBDeviceState> get state async {
+  Future<DeviceState> get state async {
     final content = await _readAttribute('state');
-    return USBDeviceState.fromString(content.trim());
+    return DeviceState.fromString(content.trim());
   }
 
   /// Name of currently running USB Gadget Driver.

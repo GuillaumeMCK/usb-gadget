@@ -17,7 +17,7 @@ import '/usb_gadget.dart';
 /// - [addressed]: Device has been assigned a USB address.
 /// - [configured]: Device is fully configured and ready for data transfer.
 /// - [suspended]: Device has been suspended by the host to save power.
-enum USBDeviceState {
+enum DeviceState {
   /// No USB cable connected to the device.
   notAttached('not-attached'),
 
@@ -40,17 +40,17 @@ enum USBDeviceState {
   /// Device has been suspended by the host to save power.
   suspended('suspended');
 
-  const USBDeviceState(this.value);
+  const DeviceState(this.value);
 
   /// The string value as it appears in the UDC state file.
   final String value;
 
-  /// Parses a string value into a [USBDeviceState].
+  /// Parses a string value into a [DeviceState].
   /// If the string does not match any state, returns [defaultValue].
-  static USBDeviceState fromString(
+  static DeviceState fromString(
     String state, {
-    USBDeviceState defaultValue = .notAttached,
-  }) => USBDeviceState.values.firstWhere(
+    DeviceState defaultValue = .notAttached,
+  }) => DeviceState.values.firstWhere(
     (e) => e.value == state,
     orElse: () => defaultValue,
   );
@@ -320,7 +320,7 @@ class Gadget with USBGadgetLogger {
   /// before starting data transfers.
   ///
   /// Parameters:
-  /// - [target]: The USB state to wait for (typically [USBDeviceState.configured])
+  /// - [target]: The USB state to wait for (typically [DeviceState.configured])
   /// - [pollInterval]: How often to check the state (default: 100ms)
   /// - [timeout]: Maximum time to wait (default: 5 seconds)
   ///
@@ -333,11 +333,11 @@ class Gadget with USBGadgetLogger {
   /// Example:
   /// ```dart
   /// await gadget.bind();
-  /// await gadget.awaitState(USBDeviceState.configured);
+  /// await gadget.awaitState(DeviceState.configured);
   /// // Device is now ready to send/receive data
   /// ```
   Future<void> awaitState(
-    USBDeviceState target, {
+    DeviceState target, {
     Duration pollInterval = const Duration(milliseconds: 100),
     Duration timeout = const Duration(seconds: 5),
   }) async {
@@ -364,7 +364,7 @@ class Gadget with USBGadgetLogger {
 
       // Read current state
       final stateStr = stateFile.readAsStringSync().trim();
-      final state = USBDeviceState.fromString(stateStr);
+      final state = DeviceState.fromString(stateStr);
 
       if (state == target) {
         return;
@@ -379,14 +379,14 @@ class Gadget with USBGadgetLogger {
   ///
   /// Returns the current state or null if the gadget is not bound or
   /// the state cannot be determined.
-  USBDeviceState getCurrentUsbState() {
+  DeviceState getCurrentUsbState() {
     if (_boundUdc == null) return .notAttached;
 
     final stateFile = File('/sys/class/udc/$_boundUdc/state');
     if (!stateFile.existsSync()) return .notAttached;
 
     final stateStr = stateFile.readAsStringSync().trim();
-    return USBDeviceState.fromString(stateStr);
+    return DeviceState.fromString(stateStr);
   }
 
   /// Stream of USB device state changes.
@@ -406,14 +406,14 @@ class Gadget with USBGadgetLogger {
   ///   }
   /// });
   /// ```
-  Stream<USBDeviceState> stateStream({
+  Stream<DeviceState> stateStream({
     Duration pollInterval = const Duration(milliseconds: 50),
   }) async* {
     if (_boundUdc == null) {
       throw StateError('Gadget is not bound to any UDC');
     }
 
-    USBDeviceState? lastState;
+    DeviceState? lastState;
 
     while (_boundUdc != null) {
       final currentState = getCurrentUsbState();
