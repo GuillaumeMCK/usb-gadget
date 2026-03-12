@@ -3,6 +3,35 @@ import 'dart:typed_data';
 
 import '/usb_gadget.dart';
 
+/// USB specification version.
+///
+/// Used to specify the USB version in the `bcdUSB` field of the device
+/// descriptor. The BCD (Binary Coded Decimal) format encodes the version
+/// as four hexadecimal digits (e.g., `0x0200` for USB 2.0).
+enum UsbVersion {
+  /// USB 1.1 (bcdUSB = 0x0110)
+  v11(0x0110),
+
+  /// USB 2.0 (bcdUSB = 0x0200)
+  v20(0x0200),
+
+  /// USB 2.0 with BOS descriptor support (bcdUSB = 0x0201).
+  ///
+  /// Needed for WinUSB and other BOS-based features.
+  v21(0x0201),
+
+  /// USB 3.0 (bcdUSB = 0x0300)
+  v30(0x0300),
+
+  /// USB 3.1 (bcdUSB = 0x0310)
+  v31(0x0310);
+
+  const UsbVersion(this.value);
+
+  /// The BCD value for this USB version.
+  final int value;
+}
+
 /// USB Language IDs for string descriptors.
 ///
 /// String descriptors can be localized to different languages. The language
@@ -285,17 +314,17 @@ class USBInterfaceDescriptor implements USBDescriptor {
   /// - [interfaceNumber]: Interface index within the configuration (required)
   /// - [alternateSetting]: Alternate setting index (default: 0)
   /// - [numEndpoints]: Number of endpoints excluding EP0 (required)
-  /// - [interfaceClass]: Class code (required, use [USBClass] enum)
-  /// - [interfaceSubClass]: Subclass code (default: 0)
-  /// - [interfaceProtocol]: Protocol code (default: 0)
+  /// - [class_]: Class code (required, use [ClassType] enum)
+  /// - [subClass]: Subclass code (default: 0)
+  /// - [protocol]: Protocol code (default: 0)
   /// - [stringIndex]: String descriptor index (default: none)
   const USBInterfaceDescriptor({
     required this.interfaceNumber,
     this.alternateSetting = AlternateSetting.default_,
     required this.numEndpoints,
-    required this.interfaceClass,
-    this.interfaceSubClass = 0,
-    this.interfaceProtocol = 0,
+    required this.class_,
+    this.subClass = 0x00,
+    this.protocol = 0x00,
     this.stringIndex = StringIndex.none,
   });
 
@@ -325,18 +354,24 @@ class USBInterfaceDescriptor implements USBDescriptor {
   /// Interface class code.
   ///
   /// Identifies the class specification this interface adheres to.
-  final USBClass interfaceClass;
+  final ClassType class_;
 
-  /// Interface subclass code.
+  /// The specific sub-category of this interface.
   ///
-  /// Further qualifies the class. Interpretation depends on [interfaceClass].
-  final int interfaceSubClass;
+  /// This further qualifies the [class_]. The interpretation of this value
+  /// is context-dependent based on the interface [class_]:
+  /// * `0x00` -> `.none`
+  /// * `0x01` -> `.boot`
+  final int subClass;
 
-  /// Interface protocol code.
+  /// The specific communication protocol used by this interface.
   ///
-  /// Protocol within the class and subclass. Interpretation depends on
-  /// [interfaceClass] and [interfaceSubClass].
-  final int interfaceProtocol;
+  /// Defines the behavior within the [class_] and [subClass].
+  /// Common mappings include:
+  /// * `0x00` -> `.none`
+  /// * `0x01` -> `.keyboard`
+  /// * `0x02` -> `.mouse`
+  final int protocol;
 
   /// Index of string descriptor describing this interface.
   final StringIndex stringIndex;
@@ -349,9 +384,9 @@ class USBInterfaceDescriptor implements USBDescriptor {
       interfaceNumber.value,
       alternateSetting.value,
       numEndpoints.value,
-      interfaceClass.value,
-      interfaceSubClass,
-      interfaceProtocol,
+      class_.value,
+      subClass,
+      protocol,
       stringIndex.value,
     ]);
   }

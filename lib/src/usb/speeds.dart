@@ -66,4 +66,3 @@ enum Speed implements Comparable<Speed> {
   @override
   String toString() => value;
 }
-

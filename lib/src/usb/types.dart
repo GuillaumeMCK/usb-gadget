@@ -669,7 +669,7 @@ final class PollingInterval {
 ///
 /// Bursts allow more efficient use of SuperSpeed links by sending multiple
 /// packets back-to-back without waiting for individual acknowledgments.
-class BurstSize {
+final class BurstSize {
   const BurstSize(this.value)
     : assert(value >= 0 && value <= 15, 'Burst size must be 0-15');
 
@@ -705,7 +705,7 @@ class BurstSize {
 /// - Bulk endpoints: Bits 0-4 specify max streams (0-31)
 /// - Isochronous endpoints: Bits 0-1 specify mult (0-2)
 /// - Interrupt/Control endpoints: Reserved, must be 0
-class SSEndpointAttributes {
+final class SSEndpointAttributes {
   /// Bulk endpoint attributes.
   ///
   /// [streams] specifies the maximum number of bulk streams supported.
@@ -804,51 +804,6 @@ class ExtendedBytesPerInterval {
 
   @override
   String toString() => '$value bytes/interval';
-}
-
-/// Type-safe device class code.
-///
-/// Specifies the functional category when used at the device descriptor level
-/// (bDeviceClass field). A value of 0x00 indicates that class information
-/// is specified at the interface level instead.
-class DeviceClass {
-  const DeviceClass(this.value)
-    : assert(value >= 0 && value <= 255, 'Device class must be 0-255');
-
-  /// Creates from a USBClass enum value.
-  factory DeviceClass.fromUSBClass(USBClass usbClass) => .new(usbClass.value);
-
-  /// The raw device class value (0-255).
-  final int value;
-
-  /// Class information is defined at the interface level (0x00).
-  ///
-  /// Use this when each interface specifies its own class code.
-  /// This is the correct value for HID-only devices like the DS3.
-  static const DeviceClass perInterface = .new(0x00);
-
-  /// Miscellaneous device class (0xEF).
-  ///
-  /// Often used with Interface Association Descriptors for
-  /// multi-function devices.
-  static const DeviceClass miscellaneous = .new(0xEF);
-
-  /// Vendor-specific device class (0xFF).
-  ///
-  /// For devices with vendor-defined functionality requiring
-  /// custom drivers.
-  static const DeviceClass vendorSpecific = .new(0xFF);
-
-  @override
-  bool operator ==(Object other) =>
-      other is DeviceClass && other.value == value;
-
-  @override
-  int get hashCode => value.hashCode;
-
-  @override
-  String toString() =>
-      'DeviceClass(0x${value.toRadixString(16).padLeft(2, '0')})';
 }
 
 /// Type-safe device subclass code.
@@ -975,13 +930,13 @@ enum TransferType {
 ///
 /// Each device or interface specifies a class, subclass, and protocol
 /// that together define its functionality.
-enum USBClass {
+enum ClassType {
   /// Class defined at interface level (bDeviceClass = 0x00).
   ///
   /// When used at device level, indicates that class information is
   /// specified in interface descriptors rather than at the device level.
   /// This is common for composite devices with multiple functions.
-  interface(0x00),
+  none(0x00),
 
   /// Audio device class (0x01).
   ///
@@ -1110,7 +1065,7 @@ enum USBClass {
   /// standard USB classes. Requires vendor-specific drivers.
   vendorSpecific(0xFF);
 
-  const USBClass(this.value);
+  const ClassType(this.value);
 
   /// Raw class code value.
   final int value;
