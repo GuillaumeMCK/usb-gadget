@@ -8,9 +8,8 @@ part 'fs.dart';
 
 /// A complete USB device definition.
 ///
-/// Call [register] to create the configfs structure, or [bind] to register
-/// and immediately attach to a UDC. Fields left at their defaults use the
-/// kernel's built-in values.
+/// Call [register] to create the configfs structure, then [RegGadget.bind] to
+/// attach to a UDC. Fields left at their defaults use the kernel's built-in values.
 ///
 /// ```dart
 /// final gadget = Gadget(
@@ -39,7 +38,7 @@ final class Gadget with USBGadgetLogger {
   /// Creates a USB gadget definition.
   ///
   /// At least one entry in [configs] is required before calling [register]
-  /// or [bind]. If [name] is omitted, one is auto-generated (e.g.
+  /// or [RegGadget.bind]. If [name] is omitted, one is auto-generated (e.g.
   /// `usb-gadget0`). [logLevel] controls verbosity of the internal logger.
   Gadget({
     required this.id,
@@ -80,7 +79,7 @@ final class Gadget with USBGadgetLogger {
   /// String descriptors indexed by language ID.
   final Map<USBLanguageId, GadgetStrings> strings;
 
-  /// USB configurations. At least one is required before calling [register] or [bind].
+  /// USB configurations. At least one is required before calling [register] or [RegGadget.bind].
   final List<Config> configs;
 
   /// Creates the configfs directory structure and writes all descriptors,
@@ -218,7 +217,7 @@ class RegFunction {
 
 /// A USB gadget registered with the system.
 ///
-/// Obtained via [Gadget.register] or [Gadget.bind]. This object owns the
+/// Obtained via [Gadget.register] or [RegGadget.bind]. This object owns the
 /// configfs structure: call [remove] to unbind and clean up, or [detach] to
 /// relinquish ownership and keep the gadget active after this handle is
 /// discarded.
