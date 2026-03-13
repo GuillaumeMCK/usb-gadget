@@ -1,9 +1,8 @@
 /// USB speed levels.
 ///
 /// Defines the different USB speed modes that affect endpoint configuration,
-/// packet sizes, and polling intervals. Implements [Comparable] to allow
-/// speed comparisons (faster > slower).
-enum Speed implements Comparable<Speed> {
+/// packet sizes, and polling intervals.
+enum Speed {
   /// USB 3.1: 10 Gbit/s.
   superSpeedPlus('super-speed-plus', 6),
 
@@ -60,9 +59,11 @@ enum Speed implements Comparable<Speed> {
   /// True if speed is unknown.
   bool get isUnknown => this == unknown;
 
-  @override
-  int compareTo(Speed other) => _priority.compareTo(other._priority);
+  bool operator >(Speed other) => _priority > other._priority;
 
-  @override
-  String toString() => value;
+  bool operator <(Speed other) => _priority < other._priority;
+
+  bool operator >=(Speed other) => _priority >= other._priority;
+
+  bool operator <=(Speed other) => _priority <= other._priority;
 }
