@@ -204,7 +204,7 @@ class LogitechF310 extends HIDFunctionFs {
     super.onEnable();
     _timer = .periodic(config.reportInterval, (_) {
       _animateFrame();
-      epIn.write(report.toBytes());
+      if (state == .enabled) epIn.write(report.toBytes());
     });
   }
 
