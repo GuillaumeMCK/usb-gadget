@@ -292,6 +292,7 @@ final class EndpointInFile extends EndpointFile {
   ///
   /// Throws [StateError] if endpoint is not open.
   void write(Uint8List data) {
+    if (_fd == null) throw StateError('write: Endpoint is not open');
     _aioSink.add(data);
   }
 
@@ -302,6 +303,7 @@ final class EndpointInFile extends EndpointFile {
   /// Returns a future that completes when all queued data has been
   /// transmitted to the host.
   Future<void> flush() async {
+    if (_fd == null) return; // No-op before open().
     await _aioSink.release();
     _aioSink = _aio!.sink;
   }
