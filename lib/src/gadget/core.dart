@@ -112,6 +112,7 @@ final class Gadget with USBGadgetLogger {
     }
     for (var i = 0; ; i++) {
       final dir = Directory('$base/usb-gadget$i');
+      if (dir.existsSync()) continue; // skip occupied auto-numbered slots
       try {
         dir.createSync();
         return dir;
@@ -151,8 +152,8 @@ final class Gadget with USBGadgetLogger {
     final fnPaths = <GadgetFunction, String>{};
     for (final fn in uniqueFns) {
       final fnPath = '${dir.path}/functions/${fn.configfsName}';
-      Directory(fnPath).createSync();
       try {
+        Directory(fnPath).createSync();
         fn.prepare(fnPath);
       } catch (_) {
         await reg._doRemove();
@@ -163,29 +164,34 @@ final class Gadget with USBGadgetLogger {
     }
 
     // Create configurations and symlink functions.
-    for (final config in gadget.configs) {
-      final configPath = '${dir.path}/configs/c.${config.index}';
-      Directory(configPath).createSync(recursive: true);
+    try {
+      for (final config in gadget.configs) {
+        final configPath = '${dir.path}/configs/c.${config.index}';
+        Directory(configPath).createSync(recursive: true);
 
-      _writeAttr('$configPath/bmAttributes', config.bmAttributes.toHex());
-      _writeAttr('$configPath/MaxPower', config.maxPower.value.toString());
+        _writeAttr('$configPath/bmAttributes', config.bmAttributes.toHex());
+        _writeAttr('$configPath/MaxPower', config.maxPower.value.toString());
 
-      // Write default description for default language, then any overrides.
-      final allStrings = {
-        USBLanguageId.enUS: config.description,
-        ...config.strings,
-      };
-      for (final MapEntry(:key, :value) in allStrings.entries) {
-        final langPath = '$configPath/strings/${key.value.toHex()}';
-        Directory(langPath).createSync(recursive: true);
-        _writeAttr('$langPath/configuration', value);
+        // Write default description for default language, then any overrides.
+        final allStrings = {
+          USBLanguageId.enUS: config.description,
+          ...config.strings,
+        };
+        for (final MapEntry(:key, :value) in allStrings.entries) {
+          final langPath = '$configPath/strings/${key.value.toHex()}';
+          Directory(langPath).createSync(recursive: true);
+          _writeAttr('$langPath/configuration', value);
+        }
+
+        for (final fn in config.functions) {
+          final link = Link('$configPath/${fn.configfsName}');
+          if (link.existsSync()) link.deleteSync();
+          link.createSync(fnPaths[fn]!);
+        }
       }
-
-      for (final fn in config.functions) {
-        final link = Link('$configPath/${fn.configfsName}');
-        if (link.existsSync()) link.deleteSync();
-        link.createSync(fnPaths[fn]!);
-      }
+    } catch (_) {
+      await reg._doRemove();
+      rethrow;
     }
 
     // Wait for FFS functions to become ready.
@@ -329,6 +335,9 @@ class RegGadget with USBGadgetLogger {
   final List<GadgetFunction> _functions = [];
 
   Future<void> _doRemove() async {
+    try {
+      File('${_dir.path}/UDC').writeAsStringSync('');
+    } catch (_) {}
     for (final fn in _functions) {
       try {
         await fn.release();
@@ -336,9 +345,6 @@ class RegGadget with USBGadgetLogger {
         log?.warn('Failed to release ${fn.name}:', err);
       }
     }
-    try {
-      File('${_dir.path}/UDC').writeAsStringSync('');
-    } catch (_) {}
     _removeAt(_dir);
     detach();
   }

@@ -4,6 +4,7 @@ part of 'core.dart';
 // File system utilities (private to the library)
 // ---------------------------------------------------------------------------
 
+/// Writes [value] to the configfs attribute at [path].
 void _writeAttr(String path, String? value) {
   if (value == null) return;
   try {
@@ -13,45 +14,87 @@ void _writeAttr(String path, String? value) {
   }
 }
 
+/// Tears down a gadget's configfs tree.
+///
+/// Deletion order satisfies configfs constraints:
+///   1. Symlinks in `os_desc/` and each `configs/c.X/`.
+///   2. Each `configs/c.X/` directory (strings/ swept first).
+///   3. All `functions/` subdirectories, depth-first.
+///   4. All `strings/` subdirectories.
+///   5. The gadget directory itself.
+///
+/// The kernel auto-removes top-level groups (functions/, configs/, strings/,
+/// os_desc/) once their contents are gone — no explicit rmdir needed.
 void _removeAt(Directory dir) {
-  _deleteLinks(Directory('${dir.path}/os_desc'));
+  _sweep(Directory('${dir.path}/os_desc'));
 
-  final configsDir = Directory('${dir.path}/configs');
-  if (configsDir.existsSync()) {
-    for (final e in configsDir.listSync()) {
+  final configs = Directory('${dir.path}/configs');
+  if (configs.existsSync()) {
+    for (final e in configs.listSync(followLinks: false)) {
       if (e is! Directory) continue;
-      _deleteLinks(e);
-      _deleteDirs(Directory('${e.path}/strings'));
-      try {
-        e.deleteSync();
-      } catch (_) {}
+      _sweep(e);
+      _rmdir(e, strict: true);
     }
   }
 
-  _deleteDirs(Directory('${dir.path}/functions'));
-  _deleteDirs(Directory('${dir.path}/strings'));
-  try {
-    dir.deleteSync();
-  } catch (_) {}
+  _sweep(Directory('${dir.path}/functions'));
+  _sweep(Directory('${dir.path}/strings'));
+  _rmdir(dir, strict: true);
 }
 
-void _deleteLinks(Directory dir) {
+/// Depth-first sweep of [dir]: unlinks symlinks, recurses into sub-directories.
+///
+/// A single pass replaces the former _deleteLinks / _deleteDirs /
+/// _deleteDirRecursive trio. Kernel-managed pseudo-files are skipped — they
+/// vanish automatically when their parent directory is rmdir'd.
+///
+/// `followLinks: false` is mandatory so that config→function symlinks are
+/// surfaced as [Link] entities rather than followed as [Directory].
+void _sweep(Directory dir) {
   if (!dir.existsSync()) return;
-  for (final e in dir.listSync()) {
-    if (e is Link)
-      try {
-        e.deleteSync();
-      } catch (_) {}
+  for (final e in dir.listSync(followLinks: false)) {
+    switch (e) {
+      case Link():
+        _unlink(e);
+      case Directory():
+        _sweep(e);
+        _rmdir(e);
+    }
   }
 }
 
-void _deleteDirs(Directory parent) {
-  if (!parent.existsSync()) return;
-  for (final e in parent.listSync()) {
-    if (e is Directory)
-      try {
-        e.deleteSync();
-      } catch (_) {}
+void _unlink(Link link) {
+  try {
+    link.deleteSync();
+  } on FileSystemException catch (err) {
+    throw FileSystemException(
+      'Failed to delete symlink "${link.path}": ${err.message}',
+      link.path,
+      err.osError,
+    );
+  }
+}
+
+/// Removes [dir], with optional strict error handling.
+///
+/// When [strict] is `false` (default), EPERM / EBUSY / ENOTEMPTY are silently
+/// ignored — useful deep inside function subtrees where configfs pseudo-files
+/// can transiently block rmdir. Pass `strict: true` for top-level dirs where
+/// failure is always unexpected.
+void _rmdir(Directory dir, {bool strict = false}) {
+  try {
+    dir.deleteSync();
+  } on FileSystemException catch (err) {
+    if (!strict) {
+      if (err.osError?.errorCode
+          case Errno.eperm || Errno.ebusy || Errno.enotempty)
+        return;
+    }
+    throw FileSystemException(
+      'Failed to remove dir "${dir.path}": ${err.message}',
+      dir.path,
+      err.osError,
+    );
   }
 }
 
