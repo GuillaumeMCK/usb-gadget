@@ -189,12 +189,12 @@ abstract final class Unistd {
 
       if (bytesRead < 0) {
         // Non-blocking read would block
-        if (errnoCode == Errno.eagain) {
+        if (errnoCode == eagain) {
           return Uint8List(0);
         }
 
         // Interrupted by signal - retry handled by caller
-        if (errnoCode == Errno.eintr) {
+        if (errnoCode == eintr) {
           return Uint8List(0);
         }
 
@@ -295,7 +295,7 @@ abstract final class Unistd {
         offset += written;
       } on OSError catch (e) {
         // Retry on interrupted system call
-        if (e.errorCode == Errno.eintr) {
+        if (e.errorCode == eintr) {
           continue;
         }
         rethrow;

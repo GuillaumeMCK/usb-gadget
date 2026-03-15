@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import '/src/platform/errno/errno.dart';
 import '/src/logger/logger.dart';
 import '/usb_gadget.dart';
 
@@ -117,7 +118,7 @@ final class Gadget with USBGadgetLogger {
         dir.createSync();
         return dir;
       } on FileSystemException catch (e) {
-        if (e.osError?.errorCode != Errno.eexist) rethrow;
+        if (e.osError?.errorCode != eexist) rethrow;
       }
     }
   }

@@ -195,11 +195,11 @@ final class AioContext with Releasable {
 
   /// O(1) membership test — a [Set] instead of a [List].
   static const _usbDisconnectErrnos = {
-    Errno.enxio,
-    Errno.enodev,
-    Errno.epipe,
-    Errno.econnreset,
-    Errno.eshutdown,
+    enxio,
+    enodev,
+    epipe,
+    econnreset,
+    eshutdown,
   };
 
   // ---------------------------------------------------------------------------
@@ -272,7 +272,7 @@ final class AioContext with Releasable {
     } else {
       // Partial submission: fail only the tail the kernel rejected.
       for (var i = submitted; i < n; i++) {
-        _failOp(batch[i], Errno.eagain, 'io_submit: partial submission');
+        _failOp(batch[i], eagain, 'io_submit: partial submission');
       }
     }
   }

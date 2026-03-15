@@ -121,7 +121,7 @@ abstract final class Epoll {
           n = ret;
           break;
         }
-        if (err == Errno.eintr) continue;
+        if (err == eintr) continue;
         throw Errno.toOSError(err, 'epoll_wait');
       }
 

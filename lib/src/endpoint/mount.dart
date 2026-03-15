@@ -99,13 +99,13 @@ class FunctionFsMount with USBGadgetLogger {
       );
     } on OSError catch (e) {
       final reason = switch (e.errorCode) {
-        Errno.eperm => 'Permission denied (need root or CAP_SYS_ADMIN)',
-        Errno.enodev =>
+        eperm => 'Permission denied (need root or CAP_SYS_ADMIN)',
+        enodev =>
           'FunctionFS not available in kernel (check CONFIG_USB_FUNCTIONFS)',
-        Errno.enoent =>
+        enoent =>
           'Mount source "$mountSource" not found (check configfs setup)',
-        Errno.ebusy => 'Already mounted or device busy',
-        Errno.enotdir => 'Mount point "$mountPoint" is not a directory',
+        ebusy => 'Already mounted or device busy',
+        enotdir => 'Mount point "$mountPoint" is not a directory',
         _ => e.message,
       };
 

@@ -456,13 +456,13 @@ abstract final class Mount {
         umount(target);
         return true;
       } on OSError catch (e) {
-        if (e.errorCode == Errno.ebusy && i < maxRetries - 1) {
+        if (e.errorCode == ebusy && i < maxRetries - 1) {
           // Wait a bit and retry
           sleep(Duration(milliseconds: 100 * (i + 1)));
           continue;
         }
 
-        if (e.errorCode == Errno.ebusy) {
+        if (e.errorCode == ebusy) {
           // Last retry - try lazy unmount
           try {
             umount2(target, [UnmountFlag.detach]);

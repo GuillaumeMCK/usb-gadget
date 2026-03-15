@@ -164,7 +164,7 @@ final class EndpointControlFile extends EndpointFile {
       Unistd.read(fd, 0);
     } on OSError catch (e) {
       final code = e.errorCode;
-      if (const {Errno.epipe, Errno.eshutdown, Errno.enotconn}.contains(code)) {
+      if (const {epipe, eshutdown, enotconn}.contains(code)) {
         log?.warn('Halt ignored: Host disconnected (${e.errorCode})');
       } else {
         rethrow;
@@ -182,7 +182,7 @@ final class EndpointControlFile extends EndpointFile {
       try {
         offset += Unistd.write(fd, data.sublist(offset));
       } on OSError catch (e) {
-        if (e.errorCode == Errno.eagain) continue;
+        if (e.errorCode == eagain) continue;
         rethrow;
       }
     }
@@ -227,7 +227,7 @@ final class EndpointControlFile extends EndpointFile {
           _streamController?.add(.fromBytes(data.sublist(i, i + offset)));
         }
       } on OSError catch (err) {
-        if (err.errorCode != Errno.eagain) {
+        if (err.errorCode != eagain) {
           _streamController?.addError(err);
         }
       }
@@ -323,7 +323,7 @@ final class EndpointInFile extends EndpointFile {
     try {
       Ioctl.call(fd, .clearHalt);
     } on OSError catch (e) {
-      if (e.errorCode == Errno.einval) {
+      if (e.errorCode == einval) {
         // Endpoint not halted, this is not an error
         return;
       }
