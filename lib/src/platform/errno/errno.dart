@@ -29,260 +29,256 @@ import 'errno.ffi.dart' as errno_ffi;
 ///
 /// Linux only. Errno values mirror `asm-generic/errno-base.h` and
 /// `asm-generic/errno.h`.
+// ---------------------------------------------------------------------------
+// Standard POSIX / Generic Errors (1–40)
+// ---------------------------------------------------------------------------
+
+/// Operation not permitted (EPERM) — 1
+const int eperm = 1;
+
+/// No such file or directory (ENOENT) — 2
+const int enoent = 2;
+
+/// No such process (ESRCH) — 3
+const int esrch = 3;
+
+/// Interrupted system call (EINTR) — 4
+///
+/// Most blocking syscalls return EINTR when a signal is delivered.
+const int eintr = 4;
+
+/// I/O error (EIO) — 5
+const int eio = 5;
+
+/// No such device or address (ENXIO) — 6
+const int enxio = 6;
+
+/// Argument list too long (E2BIG) — 7
+const int e2big = 7;
+
+/// Exec format error (ENOEXEC) — 8
+const int enoexec = 8;
+
+/// Bad file descriptor (EBADF) — 9
+const int ebadf = 9;
+
+/// No child processes (ECHILD) — 10
+const int echild = 10;
+
+/// Resource temporarily unavailable (EAGAIN / EWOULDBLOCK) — 11
+///
+/// On Linux, EWOULDBLOCK is an alias for EAGAIN (both equal 11).
+const int eagain = 11;
+
+/// EWOULDBLOCK is an alias for [eagain] on Linux.
+const int ewouldblock = eagain;
+
+/// Out of memory (ENOMEM) — 12
+const int enomem = 12;
+
+/// Permission denied (EACCES) — 13
+const int eacces = 13;
+
+/// Bad address (EFAULT) — 14
+const int efault = 14;
+
+/// Block device required (ENOTBLK) — 15
+const int enotblk = 15;
+
+/// Device or resource busy (EBUSY) — 16
+const int ebusy = 16;
+
+/// File exists (EEXIST) — 17
+const int eexist = 17;
+
+/// Cross-device link (EXDEV) — 18
+const int exdev = 18;
+
+/// No such device (ENODEV) — 19
+const int enodev = 19;
+
+/// Not a directory (ENOTDIR) — 20
+const int enotdir = 20;
+
+/// Is a directory (EISDIR) — 21
+const int eisdir = 21;
+
+/// Invalid argument (EINVAL) — 22
+const int einval = 22;
+
+/// File table overflow (ENFILE) — 23
+const int enfile = 23;
+
+/// Too many open files (EMFILE) — 24
+const int emfile = 24;
+
+/// Inappropriate ioctl for device (ENOTTY) — 25
+const int enotty = 25;
+
+/// Text file busy (ETXTBSY) — 26
+const int etxtbsy = 26;
+
+/// File too large (EFBIG) — 27
+const int efbig = 27;
+
+/// No space left on device (ENOSPC) — 28
+const int enospc = 28;
+
+/// Illegal seek (ESPIPE) — 29
+const int espipe = 29;
+
+/// Read-only file system (EROFS) — 30
+const int erofs = 30;
+
+/// Too many links (EMLINK) — 31
+const int emlink = 31;
+
+/// Broken pipe (EPIPE) — 32
+const int epipe = 32;
+
+/// Math argument out of domain (EDOM) — 33
+const int edom = 33;
+
+/// Math result not representable (ERANGE) — 34
+const int erange = 34;
+
+/// Resource deadlock avoided (EDEADLK) — 35
+const int edeadlk = 35;
+
+/// File name too long (ENAMETOOLONG) — 36
+const int enametoolong = 36;
+
+/// No locks available (ENOLCK) — 37
+const int enolck = 37;
+
+/// Function not implemented (ENOSYS) — 38
+const int enosys = 38;
+
+/// Directory not empty (ENOTEMPTY) — 39
+const int enotempty = 39;
+
+/// Too many symbolic links (ELOOP) — 40
+const int eloop = 40;
+
+// ---------------------------------------------------------------------------
+// Linux-specific / Legacy STREAMS Errors (45–57)
+// ---------------------------------------------------------------------------
+
+/// Level 2 not synchronized (EL2NSYNC) — 45
+const int el2nsync = 45;
+
+/// Level 3 halted (EL3HLT) — 46
+const int el3hlt = 46;
+
+/// Level 3 reset (EL3RST) — 47
+const int el3rst = 47;
+
+/// Link number out of range (ELNRNG) — 48
+const int elnrng = 48;
+
+/// Protocol driver not attached (EUNATCH) — 49
+const int eunatch = 49;
+
+/// No CSI structure available (ENOCSI) — 50
+const int enocsi = 50;
+
+/// Level 2 halted (EL2HLT) — 51
+const int el2hlt = 51;
+
+/// Invalid request code (EBADRQC) — 56
+const int ebadrqc = 56;
+
+/// Invalid slot (EBADSLT) — 57
+const int ebadslt = 57;
+
+// ---------------------------------------------------------------------------
+// Network / Socket Errors (88–116)
+// ---------------------------------------------------------------------------
+
+/// Socket operation on non-socket (ENOTSOCK) — 88
+const int enotsock = 88;
+
+/// Destination address required (EDESTADDRREQ) — 89
+const int edestaddrreq = 89;
+
+/// Message too long (EMSGSIZE) — 90
+const int emsgsize = 90;
+
+/// Protocol wrong type for socket (EPROTOTYPE) — 91
+const int eprototype = 91;
+
+/// Protocol not available (ENOPROTOOPT) — 92
+const int enoprotoopt = 92;
+
+/// Protocol not supported (EPROTONOSUPPORT) — 93
+const int eprotonosupport = 93;
+
+/// Socket type not supported (ESOCKTNOSUPPORT) — 94
+const int esocktnosupport = 94;
+
+/// Operation not supported on transport endpoint (EOPNOTSUPP) — 95
+const int eopnotsupp = 95;
+
+/// Address family not supported by protocol (EAFNOSUPPORT) — 97
+const int eafnosupport = 97;
+
+/// Address already in use (EADDRINUSE) — 98
+const int eaddrinuse = 98;
+
+/// Cannot assign requested address (EADDRNOTAVAIL) — 99
+const int eaddrnotavail = 99;
+
+/// Network is down (ENETDOWN) — 100
+const int enetdown = 100;
+
+/// Network is unreachable (ENETUNREACH) — 101
+const int enetunreach = 101;
+
+/// Network dropped connection on reset (ENETRESET) — 102
+const int enetreset = 102;
+
+/// Software caused connection abort (ECONNABORTED) — 103
+const int econnaborted = 103;
+
+/// Connection reset by peer (ECONNRESET) — 104
+const int econnreset = 104;
+
+/// No buffer space available (ENOBUFS) — 105
+const int enobufs = 105;
+
+/// Transport endpoint is already connected (EISCONN) — 106
+const int eisconn = 106;
+
+/// Transport endpoint is not connected (ENOTCONN) — 107
+const int enotconn = 107;
+
+/// Cannot send after transport endpoint shutdown (ESHUTDOWN) — 108
+const int eshutdown = 108;
+
+/// Connection timed out (ETIMEDOUT) — 110
+const int etimedout = 110;
+
+/// Connection refused (ECONNREFUSED) — 111
+const int econnrefused = 111;
+
+/// Host is down (EHOSTDOWN) — 112
+const int ehostdown = 112;
+
+/// No route to host (EHOSTUNREACH) — 113
+const int ehostunreach = 113;
+
+/// Operation already in progress (EALREADY) — 114
+const int ealready = 114;
+
+/// Operation now in progress (EINPROGRESS) — 115
+const int einprogress = 115;
+
+/// Stale file handle (ESTALE) — 116
+///
+/// Common with NFS mounts; the file handle is no longer valid.
+const int estale = 116;
+
 abstract final class Errno {
-  // ---------------------------------------------------------------------------
-  // Standard POSIX / Generic Errors (1–40)
-  // ---------------------------------------------------------------------------
-
-  /// Operation not permitted (EPERM) — 1
-  static const int eperm = 1;
-
-  /// No such file or directory (ENOENT) — 2
-  static const int enoent = 2;
-
-  /// No such process (ESRCH) — 3
-  static const int esrch = 3;
-
-  /// Interrupted system call (EINTR) — 4
-  ///
-  /// Most blocking syscalls return EINTR when a signal is delivered.
-  static const int eintr = 4;
-
-  /// I/O error (EIO) — 5
-  static const int eio = 5;
-
-  /// No such device or address (ENXIO) — 6
-  static const int enxio = 6;
-
-  /// Argument list too long (E2BIG) — 7
-  static const int e2big = 7;
-
-  /// Exec format error (ENOEXEC) — 8
-  static const int enoexec = 8;
-
-  /// Bad file descriptor (EBADF) — 9
-  static const int ebadf = 9;
-
-  /// No child processes (ECHILD) — 10
-  static const int echild = 10;
-
-  /// Resource temporarily unavailable (EAGAIN / EWOULDBLOCK) — 11
-  ///
-  /// On Linux, EWOULDBLOCK is an alias for EAGAIN (both equal 11).
-  static const int eagain = 11;
-
-  /// EWOULDBLOCK is an alias for [eagain] on Linux.
-  static const int ewouldblock = eagain;
-
-  /// Out of memory (ENOMEM) — 12
-  static const int enomem = 12;
-
-  /// Permission denied (EACCES) — 13
-  static const int eacces = 13;
-
-  /// Bad address (EFAULT) — 14
-  static const int efault = 14;
-
-  /// Block device required (ENOTBLK) — 15
-  static const int enotblk = 15;
-
-  /// Device or resource busy (EBUSY) — 16
-  static const int ebusy = 16;
-
-  /// File exists (EEXIST) — 17
-  static const int eexist = 17;
-
-  /// Cross-device link (EXDEV) — 18
-  static const int exdev = 18;
-
-  /// No such device (ENODEV) — 19
-  static const int enodev = 19;
-
-  /// Not a directory (ENOTDIR) — 20
-  static const int enotdir = 20;
-
-  /// Is a directory (EISDIR) — 21
-  static const int eisdir = 21;
-
-  /// Invalid argument (EINVAL) — 22
-  static const int einval = 22;
-
-  /// File table overflow (ENFILE) — 23
-  static const int enfile = 23;
-
-  /// Too many open files (EMFILE) — 24
-  static const int emfile = 24;
-
-  /// Inappropriate ioctl for device (ENOTTY) — 25
-  static const int enotty = 25;
-
-  /// Text file busy (ETXTBSY) — 26
-  static const int etxtbsy = 26;
-
-  /// File too large (EFBIG) — 27
-  static const int efbig = 27;
-
-  /// No space left on device (ENOSPC) — 28
-  static const int enospc = 28;
-
-  /// Illegal seek (ESPIPE) — 29
-  static const int espipe = 29;
-
-  /// Read-only file system (EROFS) — 30
-  static const int erofs = 30;
-
-  /// Too many links (EMLINK) — 31
-  static const int emlink = 31;
-
-  /// Broken pipe (EPIPE) — 32
-  static const int epipe = 32;
-
-  /// Math argument out of domain (EDOM) — 33
-  static const int edom = 33;
-
-  /// Math result not representable (ERANGE) — 34
-  static const int erange = 34;
-
-  /// Resource deadlock avoided (EDEADLK) — 35
-  static const int edeadlk = 35;
-
-  /// File name too long (ENAMETOOLONG) — 36
-  static const int enametoolong = 36;
-
-  /// No locks available (ENOLCK) — 37
-  static const int enolck = 37;
-
-  /// Function not implemented (ENOSYS) — 38
-  static const int enosys = 38;
-
-  /// Directory not empty (ENOTEMPTY) — 39
-  static const int enotempty = 39;
-
-  /// Too many symbolic links (ELOOP) — 40
-  static const int eloop = 40;
-
-  // ---------------------------------------------------------------------------
-  // Linux-specific / Legacy STREAMS Errors (45–57)
-  // ---------------------------------------------------------------------------
-
-  /// Level 2 not synchronized (EL2NSYNC) — 45
-  static const int el2nsync = 45;
-
-  /// Level 3 halted (EL3HLT) — 46
-  static const int el3hlt = 46;
-
-  /// Level 3 reset (EL3RST) — 47
-  static const int el3rst = 47;
-
-  /// Link number out of range (ELNRNG) — 48
-  static const int elnrng = 48;
-
-  /// Protocol driver not attached (EUNATCH) — 49
-  static const int eunatch = 49;
-
-  /// No CSI structure available (ENOCSI) — 50
-  static const int enocsi = 50;
-
-  /// Level 2 halted (EL2HLT) — 51
-  static const int el2hlt = 51;
-
-  /// Invalid request code (EBADRQC) — 56
-  static const int ebadrqc = 56;
-
-  /// Invalid slot (EBADSLT) — 57
-  static const int ebadslt = 57;
-
-  // ---------------------------------------------------------------------------
-  // Network / Socket Errors (88–116)
-  // ---------------------------------------------------------------------------
-
-  /// Socket operation on non-socket (ENOTSOCK) — 88
-  static const int enotsock = 88;
-
-  /// Destination address required (EDESTADDRREQ) — 89
-  static const int edestaddrreq = 89;
-
-  /// Message too long (EMSGSIZE) — 90
-  static const int emsgsize = 90;
-
-  /// Protocol wrong type for socket (EPROTOTYPE) — 91
-  static const int eprototype = 91;
-
-  /// Protocol not available (ENOPROTOOPT) — 92
-  static const int enoprotoopt = 92;
-
-  /// Protocol not supported (EPROTONOSUPPORT) — 93
-  static const int eprotonosupport = 93;
-
-  /// Socket type not supported (ESOCKTNOSUPPORT) — 94
-  static const int esocktnosupport = 94;
-
-  /// Operation not supported on transport endpoint (EOPNOTSUPP) — 95
-  static const int eopnotsupp = 95;
-
-  /// Address family not supported by protocol (EAFNOSUPPORT) — 97
-  static const int eafnosupport = 97;
-
-  /// Address already in use (EADDRINUSE) — 98
-  static const int eaddrinuse = 98;
-
-  /// Cannot assign requested address (EADDRNOTAVAIL) — 99
-  static const int eaddrnotavail = 99;
-
-  /// Network is down (ENETDOWN) — 100
-  static const int enetdown = 100;
-
-  /// Network is unreachable (ENETUNREACH) — 101
-  static const int enetunreach = 101;
-
-  /// Network dropped connection on reset (ENETRESET) — 102
-  static const int enetreset = 102;
-
-  /// Software caused connection abort (ECONNABORTED) — 103
-  static const int econnaborted = 103;
-
-  /// Connection reset by peer (ECONNRESET) — 104
-  static const int econnreset = 104;
-
-  /// No buffer space available (ENOBUFS) — 105
-  static const int enobufs = 105;
-
-  /// Transport endpoint is already connected (EISCONN) — 106
-  static const int eisconn = 106;
-
-  /// Transport endpoint is not connected (ENOTCONN) — 107
-  static const int enotconn = 107;
-
-  /// Cannot send after transport endpoint shutdown (ESHUTDOWN) — 108
-  static const int eshutdown = 108;
-
-  /// Connection timed out (ETIMEDOUT) — 110
-  static const int etimedout = 110;
-
-  /// Connection refused (ECONNREFUSED) — 111
-  static const int econnrefused = 111;
-
-  /// Host is down (EHOSTDOWN) — 112
-  static const int ehostdown = 112;
-
-  /// No route to host (EHOSTUNREACH) — 113
-  static const int ehostunreach = 113;
-
-  /// Operation already in progress (EALREADY) — 114
-  static const int ealready = 114;
-
-  /// Operation now in progress (EINPROGRESS) — 115
-  static const int einprogress = 115;
-
-  /// Stale file handle (ESTALE) — 116
-  ///
-  /// Common with NFS mounts; the file handle is no longer valid.
-  static const int estale = 116;
-
-  // ---------------------------------------------------------------------------
-  // Description map
-  // ---------------------------------------------------------------------------
-
   static const Map<int, String> _descriptions = {
     eperm: 'Operation not permitted',
     enoent: 'No such file or directory',
