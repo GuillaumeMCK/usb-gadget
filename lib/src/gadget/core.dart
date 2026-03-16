@@ -4,8 +4,7 @@ import 'dart:io';
 import '/src/platform/errno/errno.dart';
 import '/src/logger/logger.dart';
 import '/usb_gadget.dart';
-
-part 'fs.dart';
+import 'fs.dart';
 
 /// A complete USB device definition.
 ///
@@ -124,20 +123,20 @@ final class Gadget with USBGadgetLogger {
   }
 
   static Future<RegGadget> _register(Gadget gadget, Directory dir) async {
-    _writeAttr('${dir.path}/bDeviceClass', gadget.class_.code.toHex());
-    _writeAttr('${dir.path}/bDeviceSubClass', gadget.class_.subClass.toHex());
-    _writeAttr('${dir.path}/bDeviceProtocol', gadget.class_.protocol.toHex());
-    _writeAttr('${dir.path}/idVendor', gadget.id.vendor.toHex());
-    _writeAttr('${dir.path}/idProduct', gadget.id.product.toHex());
-    _writeAttr('${dir.path}/bcdDevice', gadget.deviceRelease.toHex());
-    _writeAttr('${dir.path}/bcdUSB', gadget.usbVersion.value.toHex());
+    writeAttr('${dir.path}/bDeviceClass', gadget.class_.code.toHex());
+    writeAttr('${dir.path}/bDeviceSubClass', gadget.class_.subClass.toHex());
+    writeAttr('${dir.path}/bDeviceProtocol', gadget.class_.protocol.toHex());
+    writeAttr('${dir.path}/idVendor', gadget.id.vendor.toHex());
+    writeAttr('${dir.path}/idProduct', gadget.id.product.toHex());
+    writeAttr('${dir.path}/bcdDevice', gadget.deviceRelease.toHex());
+    writeAttr('${dir.path}/bcdUSB', gadget.usbVersion.value.toHex());
 
     for (final MapEntry(:key, :value) in gadget.strings.entries) {
       final langPath = '${dir.path}/strings/${key.value.toHex()}';
       Directory(langPath).createSync();
-      _writeAttr('$langPath/serialnumber', value.serialnumber);
-      _writeAttr('$langPath/manufacturer', value.manufacturer);
-      _writeAttr('$langPath/product', value.product);
+      writeAttr('$langPath/serialnumber', value.serialnumber);
+      writeAttr('$langPath/manufacturer', value.manufacturer);
+      writeAttr('$langPath/product', value.product);
     }
 
     final reg = RegGadget._(dir);
@@ -155,7 +154,7 @@ final class Gadget with USBGadgetLogger {
       final fnPath = '${dir.path}/functions/${fn.configfsName}';
       try {
         Directory(fnPath).createSync();
-        fn.prepare(fnPath);
+        await fn.prepare(fnPath);
       } catch (_) {
         await reg._doRemove();
         rethrow;
@@ -170,8 +169,8 @@ final class Gadget with USBGadgetLogger {
         final configPath = '${dir.path}/configs/c.${config.index}';
         Directory(configPath).createSync(recursive: true);
 
-        _writeAttr('$configPath/bmAttributes', config.bmAttributes.toHex());
-        _writeAttr('$configPath/MaxPower', config.maxPower.value.toString());
+        writeAttr('$configPath/bmAttributes', config.bmAttributes.toHex());
+        writeAttr('$configPath/MaxPower', config.maxPower.value.toString());
 
         // Write default description for default language, then any overrides.
         final allStrings = {
@@ -181,7 +180,7 @@ final class Gadget with USBGadgetLogger {
         for (final MapEntry(:key, :value) in allStrings.entries) {
           final langPath = '$configPath/strings/${key.value.toHex()}';
           Directory(langPath).createSync(recursive: true);
-          _writeAttr('$langPath/configuration', value);
+          writeAttr('$langPath/configuration', value);
         }
 
         for (final fn in config.functions) {
@@ -211,6 +210,15 @@ final class Gadget with USBGadgetLogger {
 /// the `functions/` directory in configfs.
 class RegFunction {
   const RegFunction({required this.driver, required this.instance});
+
+  factory RegFunction.fromName(String name) {
+    final list = name.split('.');
+    if (list.length != 2) {
+      throw Exception('Invalid function name: $name');
+    }
+    final [driver, instance] = list;
+    return RegFunction(driver: driver, instance: instance);
+  }
 
   /// Function driver name (e.g. `acm`, `ecm`, `mass_storage`).
   final String driver;
@@ -314,7 +322,7 @@ class RegGadget with USBGadgetLogger {
     if (!dir.existsSync()) return [];
     return [
       for (final e in dir.listSync())
-        if (e is Directory) ?_parseFunction(e.path.split('/').last),
+        if (e case Directory(:final path)) .fromName(path.split('/').last),
     ];
   }
 
@@ -346,7 +354,14 @@ class RegGadget with USBGadgetLogger {
         log?.warn('Failed to release ${fn.name}:', err);
       }
     }
-    _removeAt(_dir);
+    // The kernel may still be cleaning up pseudo-dirs (e.g. os_desc, lun.0)
+    // asynchronously after UDC unbind. Retry removeAt a few times with a
+    // short delay so those entries disappear before we attempt rmdir.
+    for (var attempt = 0; attempt < 5; attempt++) {
+      removeAt(_dir);
+      if (!_dir.existsSync()) break;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
     detach();
   }
 

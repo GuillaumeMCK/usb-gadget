@@ -1,11 +1,8 @@
-part of 'core.dart';
+import 'dart:io';
 
-// ---------------------------------------------------------------------------
-// File system utilities (private to the library)
-// ---------------------------------------------------------------------------
+import '/src/platform/errno/errno.dart';
 
-/// Writes [value] to the configfs attribute at [path].
-void _writeAttr(String path, String? value) {
+void writeAttr(String path, String? value) {
   if (value == null) return;
   try {
     File(path).writeAsStringSync(value);
@@ -14,93 +11,101 @@ void _writeAttr(String path, String? value) {
   }
 }
 
-/// Tears down a gadget's configfs tree.
+/// Tracks directories and symlinks created under a configfs subtree so they
+/// can be torn down in safe bottom-up order without a hand-written mirror of
+/// the setup logic.
 ///
-/// Deletion order satisfies configfs constraints:
-///   1. Symlinks in `os_desc/` and each `configs/c.X/`.
-///   2. Each `configs/c.X/` directory (strings/ swept first).
-///   3. All `functions/` subdirectories, depth-first.
-///   4. All `strings/` subdirectories.
-///   5. The gadget directory itself.
-///
-/// The kernel auto-removes top-level groups (functions/, configs/, strings/,
-/// os_desc/) once their contents are gone — no explicit rmdir needed.
-void _removeAt(Directory dir) {
-  _sweep(Directory('${dir.path}/os_desc'));
+/// ## Usage
+/// ```dart
+/// final tree = ConfigfsTree();
+/// tree.mkdirp('$base/streaming/class/fs');
+/// tree.symlink('$base/streaming/class/fs/h', '$base/streaming/header/h');
+/// // ... later:
+/// tree.sweep();
+/// ```
+final class ConfigfsTree {
+  final _dirs = <String>[];
+  final _links = <String>[];
 
-  final configs = Directory('${dir.path}/configs');
-  if (configs.existsSync()) {
-    for (final e in configs.listSync(followLinks: false)) {
-      if (e is! Directory) continue;
-      _sweep(e);
-      _rmdir(e, strict: true);
+  /// Creates [path] and all missing ancestors, recording only new dirs.
+  ///
+  /// Parents are always recorded before children, so [sweep] can reverse the
+  /// list to get guaranteed bottom-up deletion order.
+  void mkdirp(String path) {
+    final parts = path.split('/');
+    for (var i = 1; i <= parts.length; i++) {
+      final partial = parts.sublist(0, i).join('/');
+      if (partial.isEmpty) continue;
+      final d = Directory(partial);
+      if (!d.existsSync()) {
+        d.createSync();
+        _dirs.add(partial);
+      }
     }
   }
 
-  _sweep(Directory('${dir.path}/functions'));
-  _sweep(Directory('${dir.path}/strings'));
-  _rmdir(dir, strict: true);
-}
+  /// Creates a symlink at [path] → [target] and records it.
+  ///
+  /// No-ops if [path] already exists (idempotent).
+  void symlink(String path, String target) {
+    if (Link(path).existsSync()) return;
+    Link(path).createSync(target);
+    _links.add(path);
+  }
 
-/// Depth-first sweep of [dir]: unlinks symlinks, recurses into sub-directories.
-///
-/// A single pass replaces the former _deleteLinks / _deleteDirs /
-/// _deleteDirRecursive trio. Kernel-managed pseudo-files are skipped — they
-/// vanish automatically when their parent directory is rmdir'd.
-///
-/// `followLinks: false` is mandatory so that config→function symlinks are
-/// surfaced as [Link] entities rather than followed as [Directory].
-void _sweep(Directory dir) {
-  if (!dir.existsSync()) return;
-  for (final e in dir.listSync(followLinks: false)) {
-    switch (e) {
-      case Link():
-        _unlink(e);
-      case Directory():
-        _sweep(e);
-        _rmdir(e);
+  /// Scans [dir] depth-first and absorbs any pre-existing entries into the
+  /// tracker so that [sweep] will clean them up too.
+  ///
+  /// Useful for dirs created outside of [mkdirp] (e.g. by the kernel on
+  /// function creation) that still need to be removed during teardown.
+  void absorb(Directory dir) {
+    if (!dir.existsSync()) return;
+    for (final e in dir.listSync(followLinks: false)) {
+      switch (e) {
+        case Link():
+          _links.add(e.path);
+        case Directory():
+          absorb(e);
+          _dirs.add(e.path);
+      }
     }
   }
-}
 
-void _unlink(Link link) {
-  try {
-    link.deleteSync();
-  } on FileSystemException catch (err) {
-    throw FileSystemException(
-      'Failed to delete symlink "${link.path}": ${err.message}',
-      link.path,
-      err.osError,
-    );
-  }
-}
-
-/// Removes [dir], with optional strict error handling.
-///
-/// When [strict] is `false` (default), EPERM / EBUSY / ENOTEMPTY are silently
-/// ignored — useful deep inside function subtrees where configfs pseudo-files
-/// can transiently block rmdir. Pass `strict: true` for top-level dirs where
-/// failure is always unexpected.
-void _rmdir(Directory dir, {bool strict = false}) {
-  try {
-    dir.deleteSync();
-  } on FileSystemException catch (err) {
-    if (!strict) {
-      if (err.osError?.errorCode case eperm || ebusy || enotempty) return;
+  /// Deletes all recorded symlinks, then all recorded directories in reverse
+  /// creation order (children before parents).
+  ///
+  /// EPERM / EBUSY / ENOTEMPTY on rmdir are silently ignored — a dir blocked
+  /// by kernel pseudo-files will be cleaned up by the kernel once its parent
+  /// is gone.
+  void sweep() {
+    for (final p in _links) {
+      try {
+        Link(p).deleteSync();
+      } catch (_) {}
     }
-    throw FileSystemException(
-      'Failed to remove dir "${dir.path}": ${err.message}',
-      dir.path,
-      err.osError,
-    );
+    _links.clear();
+
+    for (final p in _dirs.reversed) {
+      try {
+        Directory(p).deleteSync();
+      } on FileSystemException catch (e) {
+        if (e.osError?.errorCode case eperm || ebusy || enotempty || enoent) {
+          continue;
+        }
+        rethrow;
+      }
+    }
+    _dirs.clear();
   }
 }
 
-RegFunction? _parseFunction(String name) {
-  final dot = name.indexOf('.');
-  if (dot < 0) return null;
-  return RegFunction(
-    driver: name.substring(0, dot),
-    instance: name.substring(dot + 1),
-  );
+/// Tears down a gadget's configfs tree using [ConfigfsTree.absorb].
+void removeAt(Directory dir) {
+  final tree = ConfigfsTree();
+  // Insert the root dir BEFORE absorbing children, so it sits at index 0
+  // in _dirs. sweep() iterates _dirs.reversed, meaning the root is visited
+  // last — after all its children have already been deleted.
+  tree._dirs.add(dir.path);
+  tree.absorb(dir);
+  tree.sweep();
 }
