@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import '/src/gadget/fs.dart';
+
 import 'base.dart';
 
 /// USB Video Class (UVC) frame format.
@@ -18,17 +20,17 @@ enum UvcFormat {
 
   String get _groupDir {
     return switch (this) {
-      UvcFormat.yuyv => 'uncompressed',
-      UvcFormat.mjpeg => 'mjpeg',
-      UvcFormat.framebased => 'framebased',
+      .yuyv => 'uncompressed',
+      .mjpeg => 'mjpeg',
+      .framebased => 'framebased',
     };
   }
 
   String get _name {
     return switch (this) {
-      UvcFormat.yuyv => 'yuyv',
-      UvcFormat.mjpeg => 'mjpeg',
-      UvcFormat.framebased => 'framebased',
+      .yuyv => 'yuyv',
+      .mjpeg => 'mjpeg',
+      .framebased => 'framebased',
     };
   }
 }
@@ -57,9 +59,6 @@ class UvcColorMatching {
 /// A UVC video frame configuration.
 ///
 /// Describes a single width × height resolution with one or more frame rates.
-///
-/// Use [UvcFrameDescriptor] for advanced control over frame intervals and
-/// color matching.
 class UvcFrame {
   const UvcFrame({
     required this.width,
@@ -74,18 +73,18 @@ class UvcFrame {
 
   /// Creates a YUYV frame at the given resolution and frame rates.
   factory UvcFrame.yuyv(int width, int height, List<int> fps) =>
-      UvcFrame(width: width, height: height, fps: fps, format: UvcFormat.yuyv);
+      UvcFrame(width: width, height: height, fps: fps, format: .yuyv);
 
   /// Creates an MJPEG frame at the given resolution and frame rates.
   factory UvcFrame.mjpeg(int width, int height, List<int> fps) =>
-      UvcFrame(width: width, height: height, fps: fps, format: UvcFormat.mjpeg);
+      UvcFrame(width: width, height: height, fps: fps, format: .mjpeg);
 
   /// Creates an NV12 framebased frame at the given resolution and frame rates.
   factory UvcFrame.nv12(int width, int height, List<int> fps) => UvcFrame(
     width: width,
     height: height,
     fps: fps,
-    format: UvcFormat.framebased,
+    format: .framebased,
     guid: [
       0x4E, 0x56, 0x31, 0x32, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, //
       0xaa, 0x00, 0x38, 0x9b, 0x71, //
@@ -99,7 +98,7 @@ class UvcFrame {
     width: width,
     height: height,
     fps: fps,
-    format: UvcFormat.framebased,
+    format: .framebased,
     guid: [
       0x48, 0x32, 0x36, 0x34, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, //
       0xaa, 0x00, 0x38, 0x9b, 0x71, //
@@ -133,8 +132,7 @@ class UvcFrame {
   final UvcColorMatching? colorMatching;
 
   String get _effectiveName {
-    if (format == UvcFormat.framebased && formatName != null)
-      return formatName!;
+    if (format == .framebased && formatName != null) return formatName!;
     return format._name;
   }
 
@@ -220,15 +218,23 @@ class UvcFunction extends KernelFunction {
 
   // When frames are provided we must build the configfs directory structure
   // manually instead of just writing attributes.
+  ConfigfsTree? _tree;
+
   @override
   Future<void> prepare(String path) async {
+    await super.prepare(path);
     if (frames.isNotEmpty) {
-      await super.prepare(path);
-      _writeFrameDescriptors(path);
-    } else {
-      // legacy: no frames, just write basic attributes
-      await super.prepare(path);
+      _tree = ConfigfsTree();
+      _writeFrameDescriptors(path, _tree!);
     }
+  }
+
+  @override
+  Future<void> release() async {
+    if (isReleased) return;
+    _tree?.sweep();
+    _tree = null;
+    await super.release();
   }
 
   @override
@@ -242,102 +248,85 @@ class UvcFunction extends KernelFunction {
     return attrs;
   }
 
-  void _writeFrameDescriptors(String basePath) {
-    for (final frame in frames) {
-      // Create the frame resolution sub-directory.
-      final frameDir = Directory('$basePath/${frame.framePath}');
-      frameDir.createSync(recursive: true);
+  void _writeFrameDescriptors(String base, ConfigfsTree tree) {
+    final seenColorMatching = <String>{};
+    final seenGroups = <String>{};
 
-      // For framebased formats write the GUID.
-      if (frame.format == UvcFormat.framebased && frame.guid != null) {
+    tree.mkdirp('$base/streaming/header/h');
+    tree.mkdirp('$base/control/header/h');
+
+    for (final frame in frames) {
+      tree.mkdirp('$base/${frame.framePath}');
+
+      if (frame.format == .framebased && frame.guid != null) {
         File(
-          '$basePath/${frame.groupPath}/guidFormat',
+          '$base/${frame.groupPath}/guidFormat',
         ).writeAsBytesSync(frame.guid!);
       }
 
       File(
-        '$basePath/${frame.framePath}/wWidth',
+        '$base/${frame.framePath}/wWidth',
       ).writeAsStringSync(frame.width.toString());
       File(
-        '$basePath/${frame.framePath}/wHeight',
+        '$base/${frame.framePath}/wHeight',
       ).writeAsStringSync(frame.height.toString());
 
-      if (frame.format == UvcFormat.framebased) {
-        final bpl = frame.width * frame.bpp ~/ 8;
+      if (frame.format == .framebased) {
         File(
-          '$basePath/${frame.framePath}/dwBytesPerLine',
-        ).writeAsStringSync(bpl.toString());
+          '$base/${frame.framePath}/dwBytesPerLine',
+        ).writeAsStringSync((frame.width * frame.bpp ~/ 8).toString());
       } else {
-        final bufSize = frame.width * frame.height * 2;
         File(
-          '$basePath/${frame.framePath}/dwMaxVideoFrameBufferSize',
-        ).writeAsStringSync(bufSize.toString());
+          '$base/${frame.framePath}/dwMaxVideoFrameBufferSize',
+        ).writeAsStringSync((frame.width * frame.height * 2).toString());
       }
 
       File(
-        '$basePath/${frame.framePath}/dwFrameInterval',
+        '$base/${frame.framePath}/dwFrameInterval',
       ).writeAsStringSync(frame.intervals.join('\n'));
 
-      // Color matching (at most one per format).
       final cm = frame.colorMatching;
-      if (cm != null) {
-        final cmDir = Directory('$basePath/${frame._colorMatchingPath}');
-        if (!cmDir.existsSync()) {
-          cmDir.createSync(recursive: true);
-          File(
-            '$basePath/${frame._colorMatchingPath}/bColorPrimaries',
-          ).writeAsStringSync(cm.colorPrimaries.toString());
-          File(
-            '$basePath/${frame._colorMatchingPath}/bTransferCharacteristics',
-          ).writeAsStringSync(cm.transferCharacteristics.toString());
-          File(
-            '$basePath/${frame._colorMatchingPath}/bMatrixCoefficients',
-          ).writeAsStringSync(cm.matrixCoefficients.toString());
-          // Link color_matching into the format group dir.
-          Link(
-            '$basePath/${frame._colorMatchingLinkPath}',
-          ).createSync('$basePath/${frame._colorMatchingPath}');
-        }
+      if (cm != null && seenColorMatching.add(frame._colorMatchingPath)) {
+        tree.mkdirp('$base/${frame._colorMatchingPath}');
+        File(
+          '$base/${frame._colorMatchingPath}/bColorPrimaries',
+        ).writeAsStringSync(cm.colorPrimaries.toString());
+        File(
+          '$base/${frame._colorMatchingPath}/bTransferCharacteristics',
+        ).writeAsStringSync(cm.transferCharacteristics.toString());
+        File(
+          '$base/${frame._colorMatchingPath}/bMatrixCoefficients',
+        ).writeAsStringSync(cm.matrixCoefficients.toString());
+        tree.symlink(
+          '$base/${frame._colorMatchingLinkPath}',
+          '$base/${frame._colorMatchingPath}',
+        );
+      }
+
+      if (seenGroups.add(frame.groupPath)) {
+        tree.symlink(
+          '$base/${frame.headerLinkPath}',
+          '$base/${frame.groupPath}',
+        );
       }
     }
 
-    // Create streaming/control headers.
-    Directory('$basePath/streaming/header/h').createSync(recursive: true);
-    Directory('$basePath/control/header/h').createSync(recursive: true);
-
-    // Link each format group into streaming/header/h.
-    for (final frame in frames) {
-      final linkPath = '$basePath/${frame.headerLinkPath}';
-      if (!Link(linkPath).existsSync()) {
-        Link(linkPath).createSync('$basePath/${frame.groupPath}');
-      }
-    }
-
-    // Link headers into all speed classes.
     for (final cls in ['fs', 'hs', 'ss']) {
-      final d = Directory('$basePath/streaming/class/$cls');
-      d.createSync(recursive: true);
-      final lk = Link('$basePath/streaming/class/$cls/h');
-      if (!lk.existsSync()) lk.createSync('$basePath/streaming/header/h');
+      tree.mkdirp('$base/streaming/class/$cls');
+      tree.symlink('$base/streaming/class/$cls/h', '$base/streaming/header/h');
     }
     for (final cls in ['fs', 'ss']) {
-      final d = Directory('$basePath/control/class/$cls');
-      d.createSync(recursive: true);
-      final lk = Link('$basePath/control/class/$cls/h');
-      if (!lk.existsSync()) lk.createSync('$basePath/control/header/h');
+      tree.mkdirp('$base/control/class/$cls');
+      tree.symlink('$base/control/class/$cls/h', '$base/control/header/h');
     }
-
-    // Processing Unit controls.
     if (processingControls != null) {
       File(
-        '$basePath/control/processing/default/bmControls',
+        '$base/control/processing/default/bmControls',
       ).writeAsStringSync(processingControls.toString());
     }
-
-    // Camera Terminal controls.
     if (cameraControls != null) {
       File(
-        '$basePath/control/terminal/camera/default/bmControls',
+        '$base/control/terminal/camera/default/bmControls',
       ).writeAsStringSync(cameraControls.toString());
     }
   }
@@ -360,9 +349,7 @@ class UvcFunction extends KernelFunction {
           }
         }
       }
-    } catch (_) {
-      // Ignore errors
-    }
+    } catch (_) {}
 
     return null;
   }

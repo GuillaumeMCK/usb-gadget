@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import '/src/gadget/fs.dart';
 import 'base.dart';
 
 /// Base class for ethernet functions.
@@ -18,8 +21,7 @@ abstract class EthernetFunction extends KernelFunction {
   /// Validates MAC address format.
   static bool isValidMacAddress(String? addr) {
     if (addr == null) return true;
-    final regex = RegExp(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$');
-    return regex.hasMatch(addr);
+    return RegExp(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$').hasMatch(addr);
   }
 
   @override
@@ -36,12 +38,10 @@ abstract class EthernetFunction extends KernelFunction {
   }
 
   @override
-  Map<String, String> getConfigAttributes() {
-    final attrs = <String, String>{};
-    if (hostAddr != null) attrs['host_addr'] = hostAddr!;
-    if (devAddr != null) attrs['dev_addr'] = devAddr!;
-    return attrs;
-  }
+  Map<String, String> getConfigAttributes() => {
+    if (hostAddr != null) 'host_addr': hostAddr!,
+    if (devAddr != null) 'dev_addr': devAddr!,
+  };
 
   /// Gets the network interface name (e.g., "usb0").
   String? getInterfaceName() => readAttribute('ifname');
@@ -54,17 +54,15 @@ abstract class EthernetFunction extends KernelFunction {
 
   /// Updates the host MAC address.
   void setHostAddr(String addr) {
-    if (!isValidMacAddress(addr)) {
+    if (!isValidMacAddress(addr))
       throw ArgumentError('Invalid MAC address: $addr');
-    }
     writeAttribute('host_addr', addr);
   }
 
   /// Updates the device MAC address.
   void setDevAddr(String addr) {
-    if (!isValidMacAddress(addr)) {
+    if (!isValidMacAddress(addr))
       throw ArgumentError('Invalid MAC address: $addr');
-    }
     writeAttribute('dev_addr', addr);
   }
 }
@@ -87,12 +85,6 @@ class EemFunction extends EthernetFunction {
     : super(kernelType: .eem);
 }
 
-/// Ethernet (CDC NCM) function.
-class NcmFunction extends EthernetFunction {
-  NcmFunction({required super.name, super.hostAddr, super.devAddr})
-    : super(kernelType: .ncm);
-}
-
 /// RNDIS function (Windows ethernet).
 class RndisFunction extends EthernetFunction {
   RndisFunction({
@@ -102,13 +94,43 @@ class RndisFunction extends EthernetFunction {
     this.wceis = true,
   }) : super(kernelType: .rndis);
 
-  /// Whether to use Windows CE Internet Sharing (WCEIS)
+  /// Whether to use Windows CE Internet Sharing (WCEIS).
   final bool wceis;
 
   @override
-  Map<String, String> getConfigAttributes() {
-    final attrs = super.getConfigAttributes();
-    attrs['wceis'] = wceis ? '1' : '0';
-    return attrs;
+  Future<void> prepare(String path) async {
+    await super.prepare(path);
+    // wceis is read-only on some kernels (open() returns EPERM).
+    try {
+      writeAttribute('wceis', wceis ? '1' : '0');
+    } catch (_) {}
+  }
+
+  @override
+  Future<void> release() async {
+    if (isReleased) return;
+    if (prepared) {
+      ConfigfsTree()
+        ..absorb(Directory('$functionPath/os_desc'))
+        ..sweep();
+    }
+    await super.release();
+  }
+}
+
+/// Ethernet (CDC NCM) function.
+class NcmFunction extends EthernetFunction {
+  NcmFunction({required super.name, super.hostAddr, super.devAddr})
+    : super(kernelType: .ncm);
+
+  @override
+  Future<void> release() async {
+    if (isReleased) return;
+    if (prepared) {
+      ConfigfsTree()
+        ..absorb(Directory('$functionPath/os_desc'))
+        ..sweep();
+    }
+    await super.release();
   }
 }

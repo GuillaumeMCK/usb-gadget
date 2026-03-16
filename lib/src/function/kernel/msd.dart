@@ -1,5 +1,4 @@
-import 'dart:io';
-
+import '/src/gadget/fs.dart';
 import 'base.dart';
 
 /// Mass storage function (USB flash drive emulation).
@@ -10,11 +9,15 @@ class MassStorageFunction extends KernelFunction {
     this.stall = true,
   }) : super(kernelType: .massStorage);
 
-  /// Logical Unit Numbers (LUNs) configuration
+  /// Logical Unit Numbers (LUNs) configuration.
   final List<LunConfig> luns;
 
-  /// Whether to support STALL (halt bulk endpoints on errors)
+  /// Whether to support STALL (halt bulk endpoints on errors).
   final bool stall;
+
+  /// Tracks lun.1+ dirs created in [prepare] so [release] can sweep them.
+  /// lun.0 is kernel-default and must not be removed.
+  ConfigfsTree? _lunTree;
 
   @override
   bool validate() {
@@ -31,79 +34,51 @@ class MassStorageFunction extends KernelFunction {
   @override
   Future<void> prepare(String path) async {
     await super.prepare(path);
+    _lunTree = ConfigfsTree();
     for (var i = 0; i < luns.length; i++) {
       final lun = luns[i];
       final lunPath = '$functionPath/lun.$i';
       log?.info('Configuring LUN $i');
-      Directory(lunPath).createSync(recursive: true);
-      if (lun.path != null) {
-        _writeLunAttribute(lunPath, 'file', lun.path!);
-      }
-      if (lun.cdrom) {
-        _writeLunAttribute(lunPath, 'cdrom', '1');
-      }
-      if (lun.ro) {
-        _writeLunAttribute(lunPath, 'ro', '1');
-      }
-      if (lun.removable) {
-        _writeLunAttribute(lunPath, 'removable', '1');
-      }
-      if (lun.nofua) {
-        _writeLunAttribute(lunPath, 'nofua', '1');
-      }
-    }
-  }
-
-  void _writeLunAttribute(String lunPath, String name, String value) {
-    final attrPath = '$lunPath/$name';
-    log?.debug('Setting LUN attribute: $name=$value');
-    try {
-      File(attrPath).writeAsStringSync(value);
-    } on FileSystemException catch (e) {
-      throw FileSystemException(
-        'Failed to write LUN attribute "$name": ${e.message}',
-        attrPath,
-        e.osError,
-      );
+      // lun.0 is kernel-default; only track dirs we actually create.
+      if (i > 0) _lunTree!.mkdirp(lunPath);
+      if (lun.path != null) writeAttribute('file', lun.path!, path: lunPath);
+      if (lun.cdrom) writeAttribute('cdrom', '1', path: lunPath);
+      if (lun.ro) writeAttribute('ro', '1', path: lunPath);
+      if (lun.removable) writeAttribute('removable', '1', path: lunPath);
+      if (lun.nofua) writeAttribute('nofua', '1', path: lunPath);
     }
   }
 
   /// Updates the backing file for a specific LUN.
   void updateLunFile(int lunIndex, String? filePath) {
-    if (!prepared) {
-      log?.error('Function not prepared');
-      throw StateError('Function not prepared yet');
-    }
-    if (lunIndex >= luns.length) {
-      log?.error('LUN index out of range: $lunIndex');
-      throw RangeError('LUN index out of range: $lunIndex >= ${luns.length}');
-    }
-    final lunPath = '$functionPath/lun.$lunIndex';
-    _writeLunAttribute(lunPath, 'file', filePath ?? '');
+    _assertPrepared(lunIndex);
+    writeAttribute('file', filePath ?? '', path: '$functionPath/lun.$lunIndex');
   }
 
   /// Forces ejection of a LUN (simulates media removal).
   void ejectLun(int lunIndex) {
-    if (!prepared) {
-      throw StateError('Function not prepared yet');
-    }
-    if (lunIndex >= luns.length) {
-      throw RangeError('LUN index out of range: $lunIndex >= ${luns.length}');
-    }
-    final lunPath = '$functionPath/lun.$lunIndex';
-    _writeLunAttribute(lunPath, 'forced_eject', '');
+    _assertPrepared(lunIndex);
+    writeAttribute('forced_eject', '', path: '$functionPath/lun.$lunIndex');
   }
 
-  /// Gets the current file path for a LUN.
+  /// Gets the current backing file path for a LUN.
   String? getLunFile(int lunIndex) {
-    if (!prepared || lunIndex >= luns.length) {
-      return null;
-    }
-    try {
-      final lunPath = '$functionPath/lun.$lunIndex';
-      return File('$lunPath/file').readAsStringSync().trim();
-    } catch (_) {
-      return null;
+    if (!prepared || lunIndex >= luns.length) return null;
+    return readAttribute('file', path: '$functionPath/lun.$lunIndex');
+  }
+
+  @override
+  Future<void> release() async {
+    if (isReleased) return;
+    _lunTree?.sweep();
+    _lunTree = null;
+    await super.release();
+  }
+
+  void _assertPrepared(int lunIndex) {
+    if (!prepared) throw StateError('Function not prepared yet');
+    if (lunIndex >= luns.length) {
+      throw RangeError('LUN index out of range: $lunIndex >= ${luns.length}');
     }
   }
 }
@@ -118,18 +93,18 @@ class LunConfig {
     this.nofua = false,
   });
 
-  /// Path to the backing file or block device (e.g., /dev/sda, disk.img)
+  /// Path to the backing file or block device (e.g., /dev/sda, disk.img).
   final String? path;
 
-  /// Whether this LUN should appear as a CD-ROM drive
+  /// Whether this LUN should appear as a CD-ROM drive.
   final bool cdrom;
 
-  /// Whether this LUN is read-only
+  /// Whether this LUN is read-only.
   final bool ro;
 
-  /// Whether this LUN should report as removable media
+  /// Whether this LUN should report as removable media.
   final bool removable;
 
-  /// Whether to disable Force Unit Access (improves performance but may risk data loss)
+  /// Whether to disable Force Unit Access (improves performance but may risk data loss).
   final bool nofua;
 }

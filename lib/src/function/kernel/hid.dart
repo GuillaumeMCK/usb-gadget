@@ -111,9 +111,7 @@ class HIDFunction extends KernelFunction {
   @override
   Future<void> prepare(String path) async {
     log?.info('Writing HID report descriptor (${descriptor.length} bytes)');
-    File(
-      '$path/report_desc',
-    ).writeAsBytesSync(descriptor, mode: FileMode.writeOnlyAppend);
+    File('$path/report_desc').writeAsBytesSync(descriptor, mode: .writeOnly);
     await super.prepare(path);
   }
 

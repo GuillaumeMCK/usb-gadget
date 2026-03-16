@@ -49,10 +49,10 @@ enum KernelFunctionType {
   printer('printer'),
 
   /// Loopback function (for testing)
-  loopback('loopback'),
+  loopback('Loopback'),
 
   /// Source/Sink function (for testing)
-  sourceSink('sourcesink');
+  sourceSink('SourceSink');
 
   const KernelFunctionType(this._configfsName);
 
@@ -93,6 +93,29 @@ abstract class KernelFunction extends GadgetFunction with USBGadgetLogger {
   @protected
   bool validate() => true;
 
+  /// Verifies that the configfs function directory already exists.
+  ///
+  /// Called from [prepare] after [validate] succeeds. The default
+  /// implementation performs a real filesystem check and throws a
+  /// [FileSystemException] when the directory is absent (which typically
+  /// means the required kernel module is not loaded).
+  ///
+  /// Override this method in test doubles to skip the filesystem check:
+  /// ```dart
+  /// @override
+  /// void checkDirectoryExists(String path) {} // no-op in tests
+  /// ```
+  @protected
+  void checkDirectoryExists(String path) {
+    if (!Directory(path).existsSync()) {
+      throw FileSystemException(
+        'Function directory does not exist. Kernel module for '
+        '${kernelType._configfsName} may not be loaded.',
+        path,
+      );
+    }
+  }
+
   @override
   Future<void> prepare(String path) async {
     if (prepared) {
@@ -103,14 +126,7 @@ abstract class KernelFunction extends GadgetFunction with USBGadgetLogger {
       throw StateError('Function configuration validation failed');
     }
     log?.info('Preparing kernel function: $path');
-    final functionDir = Directory(functionPath);
-    if (!functionDir.existsSync()) {
-      throw FileSystemException(
-        'Function directory does not exist. Kernel module for '
-        '${kernelType._configfsName} may not be loaded.',
-        _functionPath,
-      );
-    }
+    checkDirectoryExists(path);
     final attributes = getConfigAttributes();
     if (attributes.isNotEmpty) {
       log?.debug('Writing ${attributes.length} attributes...');

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'base.dart';
 
 /// Printer function (USB printer class).
@@ -61,5 +63,27 @@ class PrinterFunction extends KernelFunction {
     }
 
     return null;
+  }
+
+  @override
+  Future<void> release() async {
+    if (isReleased) return;
+    // The f_printer driver holds the function directory open until it has
+    // fully deregistered its character device. Close the /dev/g_printerN
+    // device file if we have it open, giving the driver a chance to release.
+    if (prepared) {
+      try {
+        final devPath = getPrinterDevice();
+        if (devPath != null) {
+          final f = File(devPath);
+          if (f.existsSync()) {
+            // Opening and immediately closing flushes any pending I/O and
+            // lets the driver know the last handle is gone.
+            await f.open(mode: .read).then((h) => h.close());
+          }
+        }
+      } catch (_) {}
+    }
+    await super.release();
   }
 }

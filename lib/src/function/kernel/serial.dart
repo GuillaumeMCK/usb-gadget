@@ -11,9 +11,17 @@ class AcmFunction extends KernelFunction {
   final bool? console;
 
   @override
-  Map<String, String> getConfigAttributes() => {
-    if (console != null) 'console': console! ? '1' : '0',
-  };
+  Map<String, String> getConfigAttributes() => {};
+
+  @override
+  Future<void> prepare(String path) async {
+    await super.prepare(path);
+    if (console != null) {
+      try {
+        writeAttribute('console', console! ? '1' : '0');
+      } catch (_) {}
+    }
+  }
 
   /// Gets the TTY device path on the device side (e.g., /dev/ttyGS0).
   String? getTtyDevice() {
@@ -39,9 +47,17 @@ class GenericSerialFunction extends KernelFunction {
   final bool? console;
 
   @override
-  Map<String, String> getConfigAttributes() => {
-    if (console != null) 'console': console! ? '1' : '0',
-  };
+  Map<String, String> getConfigAttributes() => {};
+
+  @override
+  Future<void> prepare(String path) async {
+    await super.prepare(path);
+    if (console != null) {
+      try {
+        writeAttribute('console', console! ? '1' : '0');
+      } catch (_) {}
+    }
+  }
 
   /// Gets the TTY device path on the device side.
   String? getTtyDevice() {
