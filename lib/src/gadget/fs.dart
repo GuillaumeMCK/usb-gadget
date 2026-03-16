@@ -86,9 +86,7 @@ void _rmdir(Directory dir, {bool strict = false}) {
     dir.deleteSync();
   } on FileSystemException catch (err) {
     if (!strict) {
-      if (err.osError?.errorCode
-          case Errno.eperm || Errno.ebusy || Errno.enotempty)
-        return;
+      if (err.osError?.errorCode case eperm || ebusy || enotempty) return;
     }
     throw FileSystemException(
       'Failed to remove dir "${dir.path}": ${err.message}',
