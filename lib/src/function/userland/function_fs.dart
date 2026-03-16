@@ -90,10 +90,60 @@ enum FunctionFsState {
   disposed,
 }
 
-/// User Space FunctionFs Gadget Function.
+/// User-space USB gadget function implemented via the Linux FunctionFs API.
 ///
-/// Implements USB functions in userspace using the Linux FunctionFs API.
-/// This allows full control over USB endpoints and protocol handling from Dart.
+/// [FunctionFs] manages the full lifecycle of a FunctionFs-backed USB function:
+/// mounting the filesystem, writing descriptors, opening endpoint files, and
+/// dispatching kernel events to subclass hooks.
+///
+/// ## Defining the function
+///
+/// Pass one or more [FunctionFsInterface] instances to [interfaces]. Each
+/// interface synthesizes its own [USBInterfaceDescriptor] followed by its
+/// endpoint descriptors. The flat descriptor list written to EP0 is built
+/// automatically — do not construct it by hand.
+///
+/// ## Lifecycle
+///
+/// 1. [Gadget.register] calls [prepare], which mounts FunctionFs, writes
+///    descriptors and strings to EP0, and opens endpoint files. The function
+///    transitions to [FunctionFsState.ready].
+/// 2. Call [RegGadget.bind] to attach to a UDC. The kernel sends a BIND event
+///    and the function transitions to [FunctionFsState.bound].
+/// 3. When the host sets a configuration, an ENABLE event arrives and the
+///    function transitions to [FunctionFsState.enabled]. Endpoint I/O is
+///    available from this point.
+/// 4. Call [RegGadget.remove] (or let it run in tearDown) to trigger [release],
+///    which closes all endpoint files, unmounts FunctionFs, and transitions to
+///    [FunctionFsState.disposed].
+///
+/// ## Subclassing
+///
+/// Override the `on*` hooks to respond to kernel events:
+///
+/// | Hook | Trigger |
+/// |---|---|
+/// | [onBind] | Function bound to UDC |
+/// | [onUnbind] | Function unbound from UDC |
+/// | [onEnable] | Host set configuration |
+/// | [onDisable] | Host cleared configuration |
+/// | [onSuspend] | USB bus suspended |
+/// | [onResume] | USB bus resumed |
+/// | [onSetup] | Control request received on EP0 |
+///
+/// The base [onSetup] implementation handles the standard USB requests
+/// required by the spec (GET_STATUS, SET/CLEAR_FEATURE for remote wakeup
+/// and endpoint halt). Call `super.onSetup(...)` for any request your
+/// subclass does not handle.
+///
+/// ## Accessing endpoints
+///
+/// After [onEnable], use [getEndpoint] to retrieve a typed endpoint handle:
+///
+/// ```dart
+/// final epIn  = getEndpoint<EndpointInFile>(EndpointNumber.ep1);
+/// final epOut = getEndpoint<EndpointOutFile>(EndpointNumber.ep1);
+/// ```
 class FunctionFs extends GadgetFunction with USBGadgetLogger {
   FunctionFs({
     required super.name,

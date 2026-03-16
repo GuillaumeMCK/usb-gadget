@@ -4,7 +4,47 @@ import 'package:meta/meta.dart';
 
 import '/usb_gadget.dart';
 
-/// Enhanced HIDFunctionFs with simplified endpoint configuration.
+/// A [FunctionFs] subclass that implements a USB HID (Human Interface Device)
+/// function.
+///
+/// Builds the required HID descriptor chain automatically:
+/// `[InterfaceDescriptor, HIDDescriptor, EndpointDescriptor, ...]`.
+/// The caller supplies endpoint topology via [HIDEndpointConfig] and,
+/// optionally, a [reportDescriptor].
+///
+/// ## Usage
+///
+/// ```dart
+/// final hid = HIDFunctionFs(
+///   name: 'keyboard',
+///   config: HIDEndpointConfig.inputOnly(),
+///   reportDescriptor: myReportDescriptor,
+/// );
+/// ```
+///
+/// ## Control requests
+///
+/// [onSetup] handles all mandatory HID class requests before falling back
+/// to the standard USB request handler in [FunctionFs.onSetup]:
+///
+/// | Request | Direction | Handler |
+/// |---|---|---|
+/// | GET_DESCRIPTOR (HID) | IN | Returns [hidDescriptor] |
+/// | GET_DESCRIPTOR (Report) | IN | Returns [reportDescriptor] |
+/// | GET_REPORT | IN | Delegates to [onGetReport] |
+/// | SET_REPORT | OUT | Delegates to [onSetReport] |
+/// | GET_IDLE | IN | Returns stored idle rate |
+/// | SET_IDLE | OUT | Stores idle rate, calls [onSetIdle] |
+/// | GET_PROTOCOL | IN | Returns current [protocol] |
+/// | SET_PROTOCOL | OUT | Calls [onSetProtocol] |
+///
+/// ## Subclassing
+///
+/// At minimum, override [onGetReport] to provide report data when the host
+/// issues GET_REPORT. All other hooks have no-op defaults.
+///
+/// Endpoint handles ([epIn], [epOut]) are populated on [onEnable] and
+/// cleared on [onDisable]. Do not access them outside the enabled state.
 class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   HIDFunctionFs({
     required super.name,
