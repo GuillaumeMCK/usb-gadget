@@ -9,7 +9,7 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   HIDFunctionFs({
     required super.name,
     required this.config,
-    this.subclass = 0x00,
+    this.subClass = 0x00,
     this.protocol = 0x00,
     this.reportDescriptor,
     int hidVersion = 0x0111,
@@ -23,9 +23,7 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
       interface = USBInterfaceDescriptor(
         interfaceNumber: .interface0,
         numEndpoints: .new(config.numEndpoints),
-        class_: .hid,
-        subClass: subclass,
-        protocol: protocol,
+        class_: Class(.hid, subClass, protocol),
       ),
       hidDescriptor = HIDDescriptor(
         hidVersion: hidVersion,
@@ -52,7 +50,7 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   final Uint8List? reportDescriptor;
 
   /// Interface device subclass (boot device or none).
-  final int subclass;
+  final int subClass;
 
   /// Interface protocol (keyboard, mouse, or none).
   int protocol;

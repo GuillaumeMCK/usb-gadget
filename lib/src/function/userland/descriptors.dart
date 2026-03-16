@@ -218,7 +218,7 @@ class FunctionFsDescriptors {
     final header = ByteData(12)
       ..setUint32(0, magic.value, .little)
       ..setUint32(4, length, .little)
-      ..setUint32(8, flags.toUint32(), .little);
+      ..setUint32(8, flags.value, .little);
     buffer.add(header.buffer.asUint8List());
 
     // Write all counts first
@@ -358,7 +358,7 @@ class FunctionFsFlags {
   /// unconfigured state after USB reset before SET_CONFIGURATION.
   final bool config0Settings;
 
-  int toUint32() {
+  int get value {
     var value = 0;
     if (hasFullSpeed) value |= _fullSpeedFlag;
     if (hasHighSpeed) value |= _highSpeedFlag;

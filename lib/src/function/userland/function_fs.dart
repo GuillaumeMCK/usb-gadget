@@ -5,6 +5,64 @@ import 'package:meta/meta.dart';
 import '/usb_gadget.dart';
 import 'descriptors.dart';
 
+/// A USB interface definition for a [FunctionFs] function.
+///
+/// Groups a set of endpoints under a single USB interface descriptor.
+/// When passed to [FunctionFs], the interface descriptor is synthesized
+/// automatically — the caller never constructs [USBInterfaceDescriptor]
+/// directly.
+///
+/// ## Usage
+///
+/// ```dart
+/// FunctionFs(
+///   name: 'my_function',
+///   interfaces: [
+///     FunctionFsInterface(
+///       class_: Class.vendor,
+///       endpoints: [
+///         EndpointTemplate(
+///           address: EndpointAddress.in_(EndpointNumber.ep1),
+///           config: EndpointConfig.bulk(),
+///         ),
+///         EndpointTemplate(
+///           address: EndpointAddress.out(EndpointNumber.ep1),
+///           config: EndpointConfig.bulk(),
+///         ),
+///       ],
+///     ),
+///   ],
+/// );
+/// ```
+class FunctionFsInterface {
+  FunctionFsInterface({
+    this.interfaceNumber = .interface0,
+    required this.class_,
+    this.subClass = 0x00,
+    this.protocol = 0x00,
+    this.name,
+    required this.endpoints,
+  });
+
+  final InterfaceNumber interfaceNumber;
+  final Class class_;
+  final int subClass;
+  final int protocol;
+  final String? name;
+  final List<EndpointDescriptor> endpoints;
+
+  /// Expands into the flat descriptor list FunctionFs needs:
+  /// [InterfaceDescriptor, EndpointDescriptor, EndpointDescriptor, ...]
+  List<USBDescriptor> get descriptors => [
+    USBInterfaceDescriptor(
+      interfaceNumber: interfaceNumber,
+      numEndpoints: .new(endpoints.length),
+      class_: class_,
+    ),
+    ...endpoints,
+  ];
+}
+
 /// FunctionFs lifecycle states
 enum FunctionFsState {
   /// Initial state, not yet prepared
@@ -39,13 +97,13 @@ enum FunctionFsState {
 class FunctionFs extends GadgetFunction with USBGadgetLogger {
   FunctionFs({
     required super.name,
-    List<USBDescriptor>? descriptors,
+    List<FunctionFsInterface> interfaces = const [],
     this.speeds = const {.fullSpeed, .highSpeed},
     this.strings = const {},
     this.flags = const FunctionFsFlags(),
     String? mountPoint,
   }) : _mountPoint = mountPoint ?? '/dev/ffs/$name',
-       descriptors = [...?descriptors];
+       descriptors = [...interfaces.expand((i) => i.descriptors)];
 
   @override
   FunctionType get type => .ffs;
@@ -249,7 +307,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
   /// Opens all endpoint files after descriptors have been written to EP0.
   ///
   /// FunctionFS uses sequential endpoint numbering: ep1, ep2, ep3, etc.
-  /// The order matches the order of EndpointTemplate descriptors.
+  /// The order matches the order of EndpointDescriptor descriptors.
   ///
   /// If any endpoint fails to open, all previously opened endpoints are closed
   /// and the error is propagated.
@@ -259,7 +317,7 @@ class FunctionFs extends GadgetFunction with USBGadgetLogger {
 
     try {
       for (final desc in descriptors) {
-        if (desc is! EndpointTemplate) continue;
+        if (desc is! EndpointDescriptor) continue;
 
         final epPath = '$_mountPoint/ep$index';
         final endpoint = switch (desc.address.direction) {
