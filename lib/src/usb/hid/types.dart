@@ -244,7 +244,7 @@ final class _InputOnlyEndpointConfig extends HIDEndpointConfig {
 
   @override
   List<USBDescriptor> get descriptors => [
-    EndpointTemplate(
+    EndpointDescriptor(
       address: .in_(endpointNumber),
       config: .interrupt(
         interval: reportInterval,
@@ -281,14 +281,14 @@ final class _BidirectionalEndpointConfig extends HIDEndpointConfig {
 
   @override
   List<USBDescriptor> get descriptors => [
-    EndpointTemplate(
+    EndpointDescriptor(
       address: .in_(inEndpointNumber),
       config: .interrupt(
         interval: reportInterval,
         maxPacketSize: maxPacketSize,
       ),
     ),
-    EndpointTemplate(
+    EndpointDescriptor(
       address: .out(outEndpointNumber),
       config: .interrupt(interval: pollInterval, maxPacketSize: maxPacketSize),
     ),
@@ -319,7 +319,7 @@ final class _OutputOnlyEndpointConfig extends HIDEndpointConfig {
 
   @override
   List<USBDescriptor> get descriptors => [
-    EndpointTemplate(
+    EndpointDescriptor(
       address: .out(endpointNumber),
       config: .interrupt(interval: pollInterval, maxPacketSize: maxPacketSize),
     ),

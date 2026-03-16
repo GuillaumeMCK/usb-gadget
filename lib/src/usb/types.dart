@@ -806,6 +806,71 @@ class ExtendedBytesPerInterval {
   String toString() => '$value bytes/interval';
 }
 
+/// A USB Vendor ID and Product ID pair.
+///
+/// Official VIDs are assigned by the USB Implementers Forum (USB-IF).
+/// Use vendor `0x1234` for testing.
+final class Id {
+  const Id({required this.vendor, required this.product});
+
+  /// USB Vendor ID (VID).
+  final int vendor;
+
+  /// USB Product ID (PID).
+  final int product;
+}
+
+/// USB device or interface class code, grouping class, subclass, and protocol.
+///
+/// Most composite devices use [Class.interfaceSpecific], which defers class
+/// information to each interface descriptor.
+///
+/// ```dart
+/// final cls = Class.interfaceSpecific();
+/// final cls = Class.vendorSpecific(0x00, 0x00);
+/// ```
+final class Class {
+  const Class(this._code, this.subClass, this.protocol)
+    : assert(subClass >= 0 && subClass <= 0xFF),
+      assert(protocol >= 0 && protocol <= 0xFF);
+
+  /// Defers class information to each interface descriptor.
+  ///
+  /// Can only be used as a device class, not an interface class.
+  const Class.interfaceSpecific() : this(.none, 0, 0);
+
+  /// Creates a vendor-specific class (code `0xFF`) with the given [subClass] and [protocol].
+  const Class.vendorSpecific(int subClass, int protocol)
+    : this(.vendorSpecific, subClass, protocol);
+
+  /// USB class code.
+  final ClassType _code;
+
+  int get code => _code.value;
+
+  /// USB subclass code.
+  final int subClass;
+
+  /// USB protocol code.
+  final int protocol;
+}
+
+/// Handles USB bMaxPower values for gadget configurations.
+///
+/// bMaxPower specifies the maximum power consumption of the device from the
+/// USB bus.
+final class MaxPower {
+  /// Creates a MaxPower value from a raw USB bMaxPower value
+  const MaxPower(this.milliAmps) : assert(milliAmps >= 0 && milliAmps <= 510);
+
+  final int milliAmps;
+
+  int get value => milliAmps ~/ 2;
+
+  @override
+  String toString() => 'MaxPower(value=$value, mA=$milliAmps)';
+}
+
 /// Type-safe device subclass code.
 ///
 /// Further refines the device class when used at the device descriptor level

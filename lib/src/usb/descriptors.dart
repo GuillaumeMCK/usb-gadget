@@ -200,7 +200,7 @@ abstract class DescriptorGenerator {
   ///
   /// Takes a list of base descriptors and produces speed-specific variants:
   /// - Interface descriptors are copied as-is
-  /// - EndpointTemplate descriptors are converted to [USBEndpointDescriptor]
+  /// - EndpointDescriptor descriptors are converted to [USBEndpointDescriptor]
   ///   with speed-appropriate packet sizes and intervals
   /// - SuperSpeed endpoints include companion descriptors
   ///
@@ -212,7 +212,7 @@ abstract class DescriptorGenerator {
     final result = <USBDescriptor>[];
 
     for (final desc in baseDescriptors) {
-      if (desc is EndpointTemplate) {
+      if (desc is EndpointDescriptor) {
         // Generate endpoint descriptor with speed-specific values
         result.add(
           USBEndpointDescriptor(
@@ -315,16 +315,12 @@ class USBInterfaceDescriptor implements USBDescriptor {
   /// - [alternateSetting]: Alternate setting index (default: 0)
   /// - [numEndpoints]: Number of endpoints excluding EP0 (required)
   /// - [class_]: Class code (required, use [ClassType] enum)
-  /// - [subClass]: Subclass code (default: 0)
-  /// - [protocol]: Protocol code (default: 0)
   /// - [stringIndex]: String descriptor index (default: none)
   const USBInterfaceDescriptor({
     required this.interfaceNumber,
     this.alternateSetting = AlternateSetting.default_,
     required this.numEndpoints,
     required this.class_,
-    this.subClass = 0x00,
-    this.protocol = 0x00,
     this.stringIndex = StringIndex.none,
   });
 
@@ -354,24 +350,7 @@ class USBInterfaceDescriptor implements USBDescriptor {
   /// Interface class code.
   ///
   /// Identifies the class specification this interface adheres to.
-  final ClassType class_;
-
-  /// The specific sub-category of this interface.
-  ///
-  /// This further qualifies the [class_]. The interpretation of this value
-  /// is context-dependent based on the interface [class_]:
-  /// * `0x00` -> `.none`
-  /// * `0x01` -> `.boot`
-  final int subClass;
-
-  /// The specific communication protocol used by this interface.
-  ///
-  /// Defines the behavior within the [class_] and [subClass].
-  /// Common mappings include:
-  /// * `0x00` -> `.none`
-  /// * `0x01` -> `.keyboard`
-  /// * `0x02` -> `.mouse`
-  final int protocol;
+  final Class class_;
 
   /// Index of string descriptor describing this interface.
   final StringIndex stringIndex;
@@ -384,9 +363,9 @@ class USBInterfaceDescriptor implements USBDescriptor {
       interfaceNumber.value,
       alternateSetting.value,
       numEndpoints.value,
-      class_.value,
-      subClass,
-      protocol,
+      class_.code,
+      class_.subClass,
+      class_.protocol,
       stringIndex.value,
     ]);
   }
@@ -868,13 +847,13 @@ final class IsochronousEndpointConfig extends EndpointConfig {
 ///
 /// Use [DescriptorGenerator.generateForSpeed()] to convert this template
 /// into actual endpoint descriptors appropriate for a specific USB speed.
-class EndpointTemplate implements USBDescriptor {
+class EndpointDescriptor implements USBDescriptor {
   /// Creates an endpoint template.
   ///
   /// Parameters:
   /// - [address]: Endpoint address with direction (required)
   /// - [config]: Endpoint configuration (required)
-  const EndpointTemplate({required this.address, required this.config});
+  const EndpointDescriptor({required this.address, required this.config});
 
   /// Endpoint address (number and direction).
   final EndpointAddress address;
@@ -891,7 +870,7 @@ class EndpointTemplate implements USBDescriptor {
   @override
   Uint8List toBytes() {
     throw UnsupportedError(
-      'EndpointTemplate must be converted to speed-specific descriptor '
+      'EndpointDescriptor must be converted to speed-specific descriptor '
       'using DescriptorGenerator.generateForSpeed()',
     );
   }
