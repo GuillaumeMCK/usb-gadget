@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
-import 'package:usb_gadget/src/platform/errno/errno.dart';
 import 'package:usb_gadget/usb_gadget.dart';
 
 import '../exceptions.dart';

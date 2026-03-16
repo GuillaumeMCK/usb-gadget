@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import '/src/platform/errno/errno.dart';
 import '/src/logger/logger.dart';
 import '/usb_gadget.dart';
 import 'fs.dart';
