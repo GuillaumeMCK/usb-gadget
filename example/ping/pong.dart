@@ -8,14 +8,15 @@ class PongFunction extends FunctionFs {
   PongFunction()
     : super(
         name: 'echo',
-        descriptors: [
-          const USBInterfaceDescriptor(
-            class_: .vendorSpecific,
+        interfaces: [
+          FunctionFsInterface(
+            class_: .interfaceSpecific(),
             interfaceNumber: .interface0,
-            numEndpoints: .two,
+            endpoints: [
+              const EndpointDescriptor(address: .in_(.ep1), config: .bulk()),
+              const EndpointDescriptor(address: .out(.ep2), config: .bulk()),
+            ],
           ),
-          const EndpointTemplate(address: .in_(.ep1), config: .bulk()),
-          const EndpointTemplate(address: .out(.ep2), config: .bulk()),
         ],
         strings: {
           .enUS: ['Pong Function'],

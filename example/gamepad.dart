@@ -182,8 +182,6 @@ class LogitechF310 extends HIDFunctionFs {
           0x81, 0x01, //   Input (Constant)
           0xC0, // End Collection
         ]),
-        subclass: 0,
-        protocol: 0,
         config: const .inputOnly(
           maxPacketSize: 7,
           reportInterval: .new(milliseconds: 10),
