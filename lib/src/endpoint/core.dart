@@ -226,10 +226,9 @@ final class EndpointControlFile extends EndpointFile {
         for (var i = 0; i + offset <= data.length; i += offset) {
           _streamController?.add(.fromBytes(data.sublist(i, i + offset)));
         }
-      } on OSError catch (err) {
-        if (err.errorCode != eagain) {
-          _streamController?.addError(err);
-        }
+      } on OSError catch (err, st) {
+        if (err.errorCode case eagain || einval) return;
+        _streamController?.addError(err, st);
       }
     });
   }
