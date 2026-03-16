@@ -1,8 +1,5 @@
 # usb-gadget
 
-> [!WARNING]
-> This library is under active development. Breaking changes may occur without warning.
-
 Turn any Linux device with a USB controller into a USB peripheral — keyboard, mouse, storage, network adapter, audio
 device, or your own custom protocol — written entirely in Dart.
 
