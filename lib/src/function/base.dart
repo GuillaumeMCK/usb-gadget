@@ -82,7 +82,7 @@ abstract class GadgetFunction with Releasable {
   /// Throws:
   /// - [FileSystemException] if configuration files cannot be written
   /// - [ArgumentError] if invalid configuration is provided
-  void prepare(String path);
+  Future<void> prepare(String path);
 
   /// Phase 2: Wait until function is ready for UDC binding.
   ///
