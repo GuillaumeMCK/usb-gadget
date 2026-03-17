@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:meta/meta.dart';
+
 import '/usb_gadget.dart';
 
 /// The lifecycle states of a USB device as reported by the Linux USB Gadget
@@ -50,6 +52,9 @@ final class UDC {
 
   /// The kernel name of this UDC (e.g. `dwc2`, `musb-hdrc.0`).
   String get name => _dir.uri.pathSegments.lastWhere((s) => s.isNotEmpty);
+
+  @visibleForTesting
+  bool get isDummyUDC => name.contains('dummy_udc');
 
   /// Whether the A-device supports HNP on an alternate port.
   Future<bool> get aAltHnpSupport => _readBool('a_alt_hnp_support');
