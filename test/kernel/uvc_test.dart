@@ -98,7 +98,7 @@ void main() {
   // cause every subsequent test in this group to hit EEXIST.
   // =========================================================================
 
-  group('UvcFunction — integration', skip: !hasUDC, () {
+  group('UvcFunction — integration', skip: !hasUDC || testUDC.isDummyUDC, () {
     RegGadget? reg;
 
     setUp(() async {

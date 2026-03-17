@@ -42,7 +42,7 @@ void main() {
   // Uac1Function — integration (requires hardware)
   // =========================================================================
 
-  group('Uac1Function — integration', skip: !hasUDC, () {
+  group('Uac1Function — integration', skip: !hasUDC || testUDC.isDummyUDC, () {
     late RegGadget reg;
 
     setUp(() async {
@@ -126,7 +126,7 @@ void main() {
   // Uac2Function — integration (requires hardware)
   // =========================================================================
 
-  group('Uac2Function — integration', skip: !hasUDC, () {
+  group('Uac2Function — integration', skip: !hasUDC || testUDC.isDummyUDC, () {
     late RegGadget reg;
 
     setUp(() async {
