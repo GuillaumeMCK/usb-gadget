@@ -284,15 +284,16 @@ final class EndpointInFile extends EndpointFile {
     if (fd != null) Unistd.write(fd, Uint8List(0));
   }
 
-  /// Enqueues [data] for asynchronous transmission to the host.
+  /// Transmits [data] to the host asynchronously.
   ///
-  /// The data is handed off to the [AioSink] and transmitted via Linux AIO.
-  /// Backpressure behaviour is determined by the AIO configuration.
+  /// Suspends the caller until a buffer slot is available, so the calling loop
+  /// naturally runs at the rate the hardware can drain — no explicit throttling
+  /// needed.
   ///
-  /// Throws [StateError] if endpoint is not open.
-  void write(Uint8List data) {
+  /// Throws [StateError] if the endpoint is not open.
+  Future<void> write(Uint8List data) {
     if (_fd == null) throw StateError('write: Endpoint is not open');
-    _aioSink.add(data);
+    return _aioSink.write(data);
   }
 
   /// Flushes all pending writes and waits for completion.
@@ -449,5 +450,6 @@ final class EndpointOutFile extends EndpointFile {
     if (isReleased) return;
     super.release();
     await close();
+    await _proxy.close();
   }
 }
