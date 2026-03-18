@@ -11,29 +11,28 @@ export 'exceptions.dart';
 export 'aio_sink.dart';
 export 'aio_stream.dart';
 
-/// Simple, safe AIO with automatic resource management.
-///
-/// A single [BufferPool] is shared between the [AioContext] and every
-/// [AioStream] / [AioSink] created from this instance. The pool size is the
-/// concurrency limit for both reads and writes — no separate tuning needed.
+/// Manages the [AioContext], [BufferPool], and file descriptor for a FunctionFS endpoint.
 final class Aio with Releasable {
-  Aio(int fd, {int maxEvents = 128, int bufferSize = 16384, int poolSize = 32})
+  /// Raw Linux file descriptor for the endpoint.
+  final int fd;
+  final BufferPool _pool;
+  final AioContext _ctx;
+
+  /// Creates an instance with manual sizing. Defaults to 512B (High-Speed Bulk MPS).
+  Aio(int fd, {int maxEvents = 128, int bufferSize = 512, int poolSize = 32})
     : this._(fd, pool: BufferPool(bufferSize, poolSize), maxEvents: maxEvents);
 
-  /// Creates an [Aio] instance sized for the given [EndpointConfig].
-  ///
-  /// Buffer size is set to [EndpointConfig.maxPacketSize] when provided,
-  /// otherwise the transfer-type default is used.
+  /// Automatically tunes buffer and pool sizes based on the [EndpointConfig] type.
   factory Aio.fromEndpointConfig(int fd, EndpointConfig config) {
-    final (maxEvents, bufferSize, poolSize) = switch (config) {
-      BulkEndpointConfig() => (256, 65536, 64),
-      ControlEndpointConfig() => (64, 512, 16),
-      IsochronousEndpointConfig() => (128, 8192, 32),
-      InterruptEndpointConfig() => (64, 1024, 16),
+    final (maxEvents, defaultMps, poolSize) = switch (config) {
+      BulkEndpointConfig() => (256, 512, 64),
+      ControlEndpointConfig() => (64, 64, 16),
+      IsochronousEndpointConfig() => (128, 1024, 32),
+      InterruptEndpointConfig() => (64, 64, 16),
     };
     return Aio._(
       fd,
-      pool: BufferPool(config.maxPacketSize ?? bufferSize, poolSize),
+      pool: BufferPool(config.maxPacketSize ?? defaultMps, poolSize),
       maxEvents: maxEvents,
     );
   }
@@ -42,26 +41,22 @@ final class Aio with Releasable {
     : _pool = pool,
       _ctx = AioContext(maxEvents);
 
-  final int fd;
-  final BufferPool _pool;
-  final AioContext _ctx;
-
+  /// The size of each buffer slot (matches the endpoint MPS).
   int get bufferSize => _pool.bufferSize;
 
-  int get poolSize => _pool.poolSize;
-
-  int get available => _pool.available;
-
+  /// Returns an [AioStream] for reading (OUT). Throws if released.
   AioStream get stream {
     if (isReleased) throw const AioDisposedException();
     return AioStream(fd, _ctx, _pool);
   }
 
+  /// Returns an [AioSink] for writing (IN). Throws if released.
   AioSink get sink {
     if (isReleased) throw const AioDisposedException();
     return AioSink(fd, _ctx, _pool);
   }
 
+  /// Disposes of the context and pool. Idempotent.
   @override
   void release() {
     if (isReleased) return;
