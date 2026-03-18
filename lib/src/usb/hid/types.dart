@@ -165,8 +165,8 @@ enum HIDReportType {
 sealed class HIDEndpointConfig {
   const HIDEndpointConfig({
     required this.maxPacketSize,
-    this.pollInterval = const Duration(milliseconds: 10),
-    this.reportInterval = const Duration(milliseconds: 10),
+    this.pollInterval = const Duration(milliseconds: 8),
+    this.reportInterval = const Duration(milliseconds: 8),
   });
 
   /// Creates an output-only HID configuration (single OUT endpoint).
