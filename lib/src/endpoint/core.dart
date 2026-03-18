@@ -296,6 +296,34 @@ final class EndpointInFile extends EndpointFile {
     return _aioSink.write(data);
   }
 
+  /// Writes data in a loop while [condition] returns `true`, forwarding each
+  /// [data] payload to [AioSink.write]. The loop naturally paces itself to the
+  /// hardware drain rate since [AioSink.write] suspends until a DMA buffer slot
+  /// is free.
+  ///
+  /// Returns a [StreamSubscription] driving the loop, or `null` if the endpoint
+  /// is closed. Cancel it to abort early, regardless of [condition].
+  ///
+  /// **The caller must cancel the subscription** when the endpoint is disabled
+  /// or released — writes to a closed [AioSink] throw [AioDisposedException],
+  /// which is suppressed, so the loop will spin until [condition] returns `false`.
+  ///
+  /// All other exceptions propagate to the subscription's error handler.
+  StreamSubscription<int>? writeWhile({
+    required bool Function() condition,
+    required Uint8List Function() data,
+  }) => () async* {
+    while (_fd != null) {
+      try {
+        if (condition()) {
+          yield await _aioSink.write(data());
+        } else {
+          await Future.delayed(const Duration(milliseconds: 1));
+        }
+      } on AioDisposedException {}
+    }
+  }().listen(null, cancelOnError: true);
+
   /// Flushes all pending writes and waits for completion.
   ///
   /// Closes the current [AioSink] (draining all queued operations) and then
