@@ -1,9 +1,8 @@
 import 'dart:io';
 
 import 'package:test/test.dart';
-import 'package:usb_gadget/usb_gadget.dart';
 
-import '../common.dart';
+import 'common.dart';
 
 void main() {
   setUpAll(ensureHardwareReady);
