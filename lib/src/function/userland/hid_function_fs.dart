@@ -143,7 +143,7 @@ class HIDFunctionFs extends FunctionFs with USBGadgetLogger {
   }
 
   @override
-  Future<void> onDisable() async {
+  void onDisable() {
     _interruptIn = null;
     _interruptOut = null;
     super.onDisable();
