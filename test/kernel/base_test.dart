@@ -5,10 +5,6 @@ import 'common.dart';
 void main() {
   setUpAll(ensureHardwareReady);
 
-  // =========================================================================
-  // KernelFunctionType — configfs name encoding
-  // =========================================================================
-
   group('KernelFunctionType.toString()', () {
     const cases = {
       KernelFunctionType.massStorage: 'mass_storage',
@@ -35,10 +31,6 @@ void main() {
       });
     }
   });
-
-  // =========================================================================
-  // KernelFunction base — lifecycle unit tests
-  // =========================================================================
 
   group('KernelFunction base', () {
     test('type is FunctionType.kernel', () {

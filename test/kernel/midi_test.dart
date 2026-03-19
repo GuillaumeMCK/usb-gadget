@@ -5,10 +5,6 @@ import 'common.dart';
 void main() {
   setUpAll(ensureHardwareReady);
 
-  // =========================================================================
-  // MidiFunction — unit tests (no hardware)
-  // =========================================================================
-
   group('MidiFunction unit', () {
     test('configfsName is "midi.{name}"', () {
       expect(MidiFunction(name: 'midi0').configfsName, 'midi.midi0');
@@ -42,10 +38,6 @@ void main() {
       expect(MidiFunction(name: 'm', outPorts: -1).validate(), isFalse);
     });
   });
-
-  // =========================================================================
-  // MidiFunction — integration (requires hardware)
-  // =========================================================================
 
   group('MidiFunction — integration', skip: !hasUDC, () {
     late RegGadget reg;

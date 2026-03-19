@@ -5,10 +5,6 @@ import 'common.dart';
 void main() {
   setUpAll(ensureHardwareReady);
 
-  // =========================================================================
-  // AcmFunction — unit tests (no hardware)
-  // =========================================================================
-
   group('AcmFunction unit', () {
     test('configfsName is "acm.{name}"', () {
       expect(AcmFunction(name: 'port0').configfsName, 'acm.port0');
@@ -37,24 +33,15 @@ void main() {
           name: 'port0',
           console: false,
         ).getConfigAttributes();
-        // console is written directly in prepare() with best-effort error handling
-        // to match kernels where the attribute is read-only. It is not in the
-        // attributes map.
         expect(attrs.containsKey('console'), isFalse);
       },
     );
   });
 
-  // =========================================================================
-  // AcmFunction — integration (requires hardware)
-  // =========================================================================
-
   group('AcmFunction — integration', skip: !hasUDC, () {
     late RegGadget reg;
 
     setUp(() async {
-      // console attribute is read-only on some kernels (open() returns EPERM
-      // before any write). Omit it so prepare() doesn't attempt to write it.
       final fn = AcmFunction(name: 'port0');
       reg = await kernelTestGadget('acm_test', fn).register();
       await reg.bind(testUDC);

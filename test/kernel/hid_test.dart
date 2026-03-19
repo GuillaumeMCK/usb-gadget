@@ -5,10 +5,6 @@ import 'common.dart';
 void main() {
   setUpAll(ensureHardwareReady);
 
-  // =========================================================================
-  // HIDFunction (kernel) — unit tests (no hardware)
-  // =========================================================================
-
   group('HIDFunction (kernel) unit', () {
     final desc = [0x05, 0x01, 0x09, 0x06];
 

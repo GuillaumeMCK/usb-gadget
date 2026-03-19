@@ -7,10 +7,6 @@ import 'common.dart';
 void main() {
   setUpAll(ensureHardwareReady);
 
-  // =========================================================================
-  // LoopbackFunction — unit tests (no hardware)
-  // =========================================================================
-
   group('LoopbackFunction unit', () {
     test('configfsName is "Loopback.{name}"', () {
       expect(LoopbackFunction(name: 'loop0').configfsName, 'Loopback.loop0');
@@ -34,17 +30,6 @@ void main() {
       expect(LoopbackFunction(name: 'loop0', qlen: 1001).validate(), isFalse);
     });
   });
-
-  // =========================================================================
-  // LoopbackFunction — integration (requires hardware + loopback module)
-  //
-  // Module availability is tested lazily: if register() throws
-  // PathNotFoundException on the function mkdir, the kernel module for
-  // "loopback" is not loaded and the test is skipped.  This is more reliable
-  // than a pre-flight probe, which can give false positives on kernels where
-  // usb_f_ss_lb exposes "loopback" in the module registry but only supports
-  // one live instance at a time.
-  // =========================================================================
 
   group('LoopbackFunction — integration', skip: !hasUDC, () {
     RegGadget? reg;
@@ -78,10 +63,6 @@ void main() {
     });
   });
 
-  // =========================================================================
-  // SourceSinkFunction — unit tests (no hardware)
-  // =========================================================================
-
   group('SourceSinkFunction unit', () {
     test('configfsName is "SourceSink.{name}"', () {
       expect(SourceSinkFunction(name: 'ss0').configfsName, 'SourceSink.ss0');
@@ -103,12 +84,6 @@ void main() {
       expect(attrs['pattern'], '1');
     });
   });
-
-  // =========================================================================
-  // SourceSinkFunction — integration (requires hardware + sourcesink module)
-  //
-  // Same lazy-skip approach as LoopbackFunction above.
-  // =========================================================================
 
   group('SourceSinkFunction — integration', skip: !hasUDC, () {
     RegGadget? reg;

@@ -7,10 +7,6 @@ import 'common.dart';
 void main() {
   setUpAll(ensureHardwareReady);
 
-  // =========================================================================
-  // PrinterFunction — unit tests (no hardware)
-  // =========================================================================
-
   group('PrinterFunction unit', () {
     test('configfsName is "printer.{name}"', () {
       expect(
@@ -38,10 +34,6 @@ void main() {
       expect(attrs['pnp_string'], 'Test Printer');
     });
   });
-
-  // =========================================================================
-  // PrinterFunction — integration (requires hardware)
-  // =========================================================================
 
   group('PrinterFunction — integration', skip: !hasUDC, () {
     late RegGadget reg;

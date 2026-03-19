@@ -5,10 +5,6 @@ import 'common.dart';
 void main() {
   setUpAll(ensureHardwareReady);
 
-  // =========================================================================
-  // MassStorageFunction — unit tests (no hardware)
-  // =========================================================================
-
   group('MassStorageFunction unit', () {
     test('configfsName is "mass_storage.{name}"', () {
       expect(
@@ -44,10 +40,6 @@ void main() {
     });
   });
 
-  // =========================================================================
-  // LunConfig — unit tests (no hardware)
-  // =========================================================================
-
   group('LunConfig unit', () {
     test('cdrom defaults to false', () {
       expect(const LunConfig().cdrom, isFalse);
@@ -61,14 +53,6 @@ void main() {
       expect(const LunConfig(path: '/tmp/disk.img').path, '/tmp/disk.img');
     });
   });
-
-  // =========================================================================
-  // MassStorageFunction — integration (requires hardware)
-  //
-  // Uses RegGadget? (nullable) so tearDown never throws LateInitializationError
-  // when setUp fails, which would otherwise leave the gadget dir behind and
-  // cause every subsequent test in this group to hit EEXIST.
-  // =========================================================================
 
   group('MassStorageFunction — integration', skip: !hasUDC, () {
     RegGadget? reg;
@@ -101,7 +85,4 @@ void main() {
       await expectLater(reg!.remove(), completes);
     });
   });
-
-  // NOTE: multi-LUN integration test omitted — mkdir lun.N (N >= 1) returns
-  // EBUSY on this Pi kernel regardless of bind state.
 }

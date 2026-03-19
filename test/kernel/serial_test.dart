@@ -7,10 +7,6 @@ import 'common.dart';
 void main() {
   setUpAll(ensureHardwareReady);
 
-  // =========================================================================
-  // PrinterFunction — unit tests (no hardware)
-  // =========================================================================
-
   group('PrinterFunction unit', () {
     test('configfsName is "printer.{name}"', () {
       expect(
@@ -38,14 +34,6 @@ void main() {
       expect(attrs['pnp_string'], 'Test Printer');
     });
   });
-
-  // =========================================================================
-  // PrinterFunction — integration (requires hardware)
-  //
-  // Uses RegGadget? (nullable) so tearDown never throws LateInitializationError
-  // when setUp fails, which would otherwise leave the gadget dir behind and
-  // cause every subsequent test in this group to hit EEXIST.
-  // =========================================================================
 
   group('PrinterFunction — integration', skip: !hasUDC, () {
     RegGadget? reg;

@@ -7,10 +7,6 @@ import 'common.dart';
 void main() {
   setUpAll(ensureHardwareReady);
 
-  // =========================================================================
-  // EthernetFunction — shared helpers (no hardware)
-  // =========================================================================
-
   group('EthernetFunction shared helpers', () {
     test('EcmFunction configfsName is "ecm.{name}"', () {
       expect(EcmFunction(name: 'usb0').configfsName, 'ecm.usb0');
@@ -65,17 +61,10 @@ void main() {
       () {
         final fn = RndisFunction(name: 'usb0', wceis: true);
         expect(fn.wceis, isTrue);
-        // wceis is written directly in prepare() with best-effort error handling
-        // to match kernels where the attribute is read-only. It is not in the
-        // attributes map.
         expect(fn.getConfigAttributes().containsKey('wceis'), isFalse);
       },
     );
   });
-
-  // =========================================================================
-  // EcmFunction — integration (requires hardware)
-  // =========================================================================
 
   group('EcmFunction — integration', skip: !hasUDC, () {
     late RegGadget reg;
@@ -100,14 +89,6 @@ void main() {
       expect(reg.functions().map((f) => f.driver), contains('ecm'));
     });
   });
-
-  // =========================================================================
-  // NcmFunction — integration (requires hardware)
-  //
-  // Uses RegGadget? (nullable) so tearDown never throws LateInitializationError
-  // when setUp fails, which would otherwise leave the gadget dir behind and
-  // cause every subsequent test in this group to hit EEXIST.
-  // =========================================================================
 
   group('NcmFunction — integration', skip: !hasUDC, () {
     RegGadget? reg;
@@ -145,10 +126,6 @@ void main() {
     );
   });
 
-  // =========================================================================
-  // EemFunction — integration (requires hardware)
-  // =========================================================================
-
   group('EemFunction — integration', skip: !hasUDC, () {
     late RegGadget reg;
 
@@ -168,12 +145,6 @@ void main() {
       expect(reg.functions().map((f) => f.driver), contains('eem'));
     });
   });
-
-  // =========================================================================
-  // RndisFunction — integration (requires hardware)
-  //
-  // Same nullable-RegGadget pattern as NcmFunction above.
-  // =========================================================================
 
   group('RndisFunction — integration', skip: !hasUDC, () {
     RegGadget? reg;
@@ -210,10 +181,6 @@ void main() {
       },
     );
   });
-
-  // =========================================================================
-  // EcmSubsetFunction — integration (requires hardware)
-  // =========================================================================
 
   group('EcmSubsetFunction — integration', skip: !hasUDC, () {
     late RegGadget reg;

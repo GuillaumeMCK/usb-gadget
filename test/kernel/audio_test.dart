@@ -5,10 +5,6 @@ import 'common.dart';
 void main() {
   setUpAll(ensureHardwareReady);
 
-  // =========================================================================
-  // Uac1Function — unit tests (no hardware)
-  // =========================================================================
-
   group('Uac1Function unit', () {
     test('configfsName is "uac1.{name}"', () {
       expect(Uac1Function(name: 'audio0').configfsName, 'uac1.audio0');

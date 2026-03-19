@@ -7,10 +7,6 @@ import 'common.dart';
 void main() {
   setUpAll(ensureHardwareReady);
 
-  // =========================================================================
-  // UvcFunction — unit tests (no hardware)
-  // =========================================================================
-
   group('UvcFunction unit', () {
     test('configfsName is "uvc.{name}"', () {
       expect(UvcFunction(name: 'video0').configfsName, 'uvc.video0');
@@ -38,10 +34,6 @@ void main() {
       expect(attrs['streaming_maxpacket'], '2048');
     });
   });
-
-  // =========================================================================
-  // UvcFrame — unit tests (no hardware)
-  // =========================================================================
 
   group('UvcFrame unit', () {
     test('UvcFrame.yuyv factory sets format to UvcFormat.yuyv', () {
@@ -73,10 +65,6 @@ void main() {
     });
   });
 
-  // =========================================================================
-  // UvcColorMatching — unit tests (no hardware)
-  // =========================================================================
-
   group('UvcColorMatching unit', () {
     test('stores primaries and coefficients', () {
       const cm = UvcColorMatching(
@@ -88,14 +76,6 @@ void main() {
       expect(cm.matrixCoefficients, 2);
     });
   });
-
-  // =========================================================================
-  // UvcFunction — integration (requires hardware)
-  //
-  // Uses RegGadget? (nullable) so tearDown never throws LateInitializationError
-  // when setUp fails, which would otherwise leave the gadget dir behind and
-  // cause every subsequent test in this group to hit EEXIST.
-  // =========================================================================
 
   group('UvcFunction — integration', skip: !hasUDC || testUDC.isDummyUDC, () {
     RegGadget? reg;
