@@ -98,6 +98,20 @@ final class Gadget with USBGadgetLogger {
     return _register(this, dir);
   }
 
+  /// Removes all configfs registrations that match this gadget's [name].
+  ///
+  /// Finds every [RegGadget] in configfs whose name equals [name] and calls
+  /// [RegGadget.remove] on each one. Useful when you no longer hold a
+  /// reference to the original [RegGadget] handles.
+  ///
+  /// Throws a [FileSystemException] if any configfs operation fails.
+  Future<void> remove() async {
+    final gadgets = await RegGadget.all().where((g) => g.name == name);
+    for (final reg in gadgets) {
+      await reg.remove();
+    }
+  }
+
   /// Finds or creates the configfs directory for this gadget.
   ///
   /// When [name] is null, increments a counter suffix until a free slot is
@@ -285,7 +299,7 @@ class RegGadget with USBGadgetLogger {
   /// Binds this gadget to [udc], or unbinds it when [udc] is `null`.
   ///
   /// Throws a [FileSystemException] if writing to the UDC file fails.
-  Future<void> bind(UDC? udc) async {
+  void bind(UDC? udc) {
     log?.debug(
       udc != null ? 'Binding to UDC: ${udc.name}' : 'Unbinding from UDC',
     );
@@ -293,22 +307,6 @@ class RegGadget with USBGadgetLogger {
       File('${_dir.path}/UDC').writeAsStringSync(udc?.name ?? '');
     } catch (err) {
       throw FileSystemException('Failed to bind gadget to UDC: $err');
-    }
-  }
-
-  /// Unbinds every gadget currently present in configfs.
-  ///
-  /// The configfs structure is left intact; gadgets can be re-bound
-  /// afterwards by calling [bind].
-  ///
-  /// ```dart
-  /// await RegGadget.unbindAll();
-  /// ```
-  static Future<void> unbindAll() async {
-    for (final g in all()) {
-      try {
-        await g.bind(null);
-      } catch (_) {}
     }
   }
 
@@ -326,9 +324,6 @@ class RegGadget with USBGadgetLogger {
   }
 
   /// Relinquishes ownership of the gadget, making [remove] a no-op.
-  ///
-  /// The gadget remains registered in configfs until removed by other
-  /// means (e.g. [unbindAll]).
   void detach() => isAttached = false;
 
   /// Unbinds and removes this gadget from configfs.
@@ -336,7 +331,7 @@ class RegGadget with USBGadgetLogger {
   /// Releases all functions, deletes all symlinks, subdirectories, and the
   /// gadget directory itself. Does nothing if [isAttached] is `false`.
   Future<void> remove() async {
-    if (!isAttached) return;
+    if (isAttached == false) return;
     await _doRemove();
   }
 
