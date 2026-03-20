@@ -3,7 +3,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog],
 and this project adheres to [Semantic Versioning].
 
-## 0.7.0 - 2026-03-20
+## 0.7.0
 ### Added
 - `writeWhile` method for continuous AIO writes
 - `isDummyUDC` property on UDC
@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning].
 - Default HID endpoint intervals for high-speed compatibility
 - Use numeric value for `MaxPower` attribute in gadget configfs
 
-## 0.6.0 - 2026-03-08
+## 0.6.0
 ### Added
 - FFI bindings and `Epoll` wrapper for Linux `epoll` and `eventfd` system calls,
   supporting I/O multiplexing with `create`, `add`, `modify`, `delete`, and `wait`,
