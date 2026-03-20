@@ -132,7 +132,7 @@ final class UDC {
           timeout,
         );
       }
-      await Future<void>.delayed(pollInterval);
+      await Future.delayed(pollInterval);
     }
   }
 
@@ -155,7 +155,7 @@ final class UDC {
     while (true) {
       final s = await state;
       if (s != last) yield last = s;
-      await Future<void>.delayed(pollInterval);
+      await Future.delayed(pollInterval);
     }
   }
 

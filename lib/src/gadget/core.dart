@@ -354,7 +354,7 @@ class RegGadget with USBGadgetLogger {
     for (var attempt = 0; attempt < 5; attempt++) {
       removeAt(_dir);
       if (!_dir.existsSync()) break;
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 100));
     }
     detach();
   }
