@@ -68,20 +68,17 @@ Future<void> main() async {
     configs: [.new(description: 'A Keyboard', functions: [keyboard])],
   );
 
-  final reg = await gadget.register();
   try {
+    final reg = await gadget.register();
     await reg.bind(defaultUDC);
     await reg.udc?.awaitState(.configured);
     await Future<void>.delayed(const .new(milliseconds: 100));
     [0x0B, 0x08, 0x0F, 0x0F, 0x12, 0x2C, 0x1A, 0x12, 0x15, 0x0F, 0x07, 0x28]
     // Write "hello world\n"
     .forEach(keyboard.sendKey);
-    await ProcessSignal.sigint
-        .watch()
-        .first;
+    await ProcessSignal.sigint.watch().first;
   } finally {
-    await reg.bind(null);
-    await reg.remove();
+    await gadget.remove();
   }
 }
 ```
