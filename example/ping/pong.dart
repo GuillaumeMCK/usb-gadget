@@ -72,14 +72,12 @@ Future<void> main() async {
     ],
   );
 
-  final reg = await gadget.register();
   try {
-    await reg.bind(defaultUDC);
+    final reg = await gadget.register();
     await reg.udc?.awaitState(.configured);
     stdout.writeln('Pong Device ready. Press Ctrl+C to exit.');
     await ProcessSignal.sigint.watch().first;
   } finally {
-    await reg.bind(null);
-    await reg.remove();
+    await gadget.remove();
   }
 }

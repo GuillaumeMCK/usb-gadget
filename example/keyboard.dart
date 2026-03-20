@@ -67,9 +67,9 @@ Future<void> main() async {
     ],
   );
 
-  final reg = await gadget.register();
   try {
-    await reg.bind(defaultUDC);
+    final reg = await gadget.register();
+    reg.bind(defaultUDC);
     await reg.udc?.awaitState(.configured);
     // An additional delay here prevents the first few keypresses from
     // being missed on some hosts.
@@ -80,7 +80,6 @@ Future<void> main() async {
     stdout.writeln('Ctrl+C to exit.');
     await ProcessSignal.sigint.watch().first;
   } finally {
-    await reg.bind(null);
-    await reg.remove();
+    await gadget.remove();
   }
 }

@@ -261,15 +261,14 @@ Future<void> main() async {
     ],
   );
 
-  final reg = await gadget.register();
   try {
-    await reg.bind(defaultUDC);
+    final reg = await gadget.register();
+    reg.bind(defaultUDC);
     stdout.writeln(
       'Logitech F310 (DirectInput) gadget active. Press Ctrl+C to stop.',
     );
     await ProcessSignal.sigint.watch().first;
   } finally {
-    await reg.bind(null);
-    await reg.remove();
+    await gadget.remove();
   }
 }

@@ -54,12 +54,12 @@ Future<void> main(List<String> args) async {
       ),
     ],
   );
-  final reg = await gadget.register();
   try {
-    await reg.bind(udc ?? defaultUDC);
+    final reg = await gadget.register();
+    reg.bind(udc ?? defaultUDC);
     stdout.writeln('Ctrl+C to exit.');
     await ProcessSignal.sigint.watch().first;
   } finally {
-    reg.remove();
+    await gadget.remove();
   }
 }
