@@ -44,7 +44,7 @@ void main() {
         markTestSkipped('loopback kernel module not available');
         return;
       }
-      await reg!.bind(testUDC);
+      reg!.bind(testUDC);
     });
 
     tearDown(() async {
@@ -98,7 +98,7 @@ void main() {
         markTestSkipped('sourcesink kernel module not available');
         return;
       }
-      await reg!.bind(testUDC);
+      reg!.bind(testUDC);
     });
 
     tearDown(() async {

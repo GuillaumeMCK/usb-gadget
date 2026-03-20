@@ -50,7 +50,7 @@ void main() {
         outPorts: 3,
       );
       reg = await kernelTestGadget('midi_test', fn).register();
-      await reg.bind(testUDC);
+      reg.bind(testUDC);
     });
 
     tearDown(() => reg.remove());

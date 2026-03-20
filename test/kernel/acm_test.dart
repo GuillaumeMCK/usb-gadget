@@ -44,7 +44,7 @@ void main() {
     setUp(() async {
       final fn = AcmFunction(name: 'port0');
       reg = await kernelTestGadget('acm_test', fn).register();
-      await reg.bind(testUDC);
+      reg.bind(testUDC);
     });
 
     tearDown(() => reg.remove());

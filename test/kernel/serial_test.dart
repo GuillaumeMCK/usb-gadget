@@ -45,7 +45,7 @@ void main() {
         queueLength: 20,
       );
       reg = await kernelTestGadget('printer_test', fn).register();
-      await reg!.bind(testUDC);
+      reg!.bind(testUDC);
     });
 
     tearDown(() async {

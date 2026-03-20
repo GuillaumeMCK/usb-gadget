@@ -89,7 +89,7 @@ void main() {
         ],
       );
       reg = await kernelTestGadget('uvc_test', fn).register();
-      await reg!.bind(testUDC);
+      reg!.bind(testUDC);
     });
 
     tearDown(() async {

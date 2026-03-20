@@ -51,7 +51,7 @@ void main() {
         pSsize: 2,
       );
       reg = await kernelTestGadget('uac1_test', fn).register();
-      await reg.bind(testUDC);
+      reg.bind(testUDC);
     });
 
     tearDown(() => reg.remove());
@@ -135,7 +135,7 @@ void main() {
         pSsize: 2,
       );
       reg = await kernelTestGadget('uac2_test', fn).register();
-      await reg.bind(testUDC);
+      reg.bind(testUDC);
     });
 
     tearDown(() => reg.remove());

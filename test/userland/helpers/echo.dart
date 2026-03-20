@@ -140,7 +140,7 @@ Future<RegGadget> _activateGadget(FunctionFs fn) async {
   );
 
   final reg = await gadget.register();
-  await reg.bind(testUDC);
+  reg.bind(testUDC);
 
   await reg.udc!.awaitState(.configured);
   await fn.awaitState(.enabled);
@@ -151,7 +151,7 @@ Future<RegGadget> _activateGadget(FunctionFs fn) async {
 Future<RegGadget> buildEchoGadget() => _activateGadget(EchoFunction());
 
 Future<void> teardownGadget(RegGadget reg) async {
-  await reg.bind(null);
+  reg.bind(null);
   try {
     await reg.remove();
   } catch (_) {}

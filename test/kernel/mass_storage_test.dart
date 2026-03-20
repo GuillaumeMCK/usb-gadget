@@ -63,7 +63,7 @@ void main() {
         luns: [const LunConfig(removable: true)],
       );
       reg = await kernelTestGadget('msd_test', fn).register();
-      await reg!.bind(testUDC);
+      reg!.bind(testUDC);
     });
 
     tearDown(() async {

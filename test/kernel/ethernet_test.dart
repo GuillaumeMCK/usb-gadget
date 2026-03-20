@@ -76,7 +76,7 @@ void main() {
         devAddr: '66:f9:7d:f2:3e:2a',
       );
       reg = await kernelTestGadget('ecm_test', fn).register();
-      await reg.bind(testUDC);
+      reg.bind(testUDC);
     });
 
     tearDown(() => reg.remove());
@@ -96,7 +96,7 @@ void main() {
     setUp(() async {
       final fn = NcmFunction(name: 'usb0');
       reg = await kernelTestGadget('ncm_test', fn).register();
-      await reg!.bind(testUDC);
+      reg!.bind(testUDC);
     });
 
     tearDown(() async {
@@ -132,7 +132,7 @@ void main() {
     setUp(() async {
       final fn = EemFunction(name: 'usb0');
       reg = await kernelTestGadget('eem_test', fn).register();
-      await reg.bind(testUDC);
+      reg.bind(testUDC);
     });
 
     tearDown(() => reg.remove());
@@ -152,7 +152,7 @@ void main() {
     setUp(() async {
       final fn = RndisFunction(name: 'usb0', wceis: true);
       reg = await kernelTestGadget('rndis_test', fn).register();
-      await reg!.bind(testUDC);
+      reg!.bind(testUDC);
     });
 
     tearDown(() async {
@@ -188,7 +188,7 @@ void main() {
     setUp(() async {
       final fn = EcmSubsetFunction(name: 'usb0');
       reg = await kernelTestGadget('ecm_subset_test', fn).register();
-      await reg.bind(testUDC);
+      reg.bind(testUDC);
     });
 
     tearDown(() => reg.remove());
