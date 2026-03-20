@@ -5,19 +5,6 @@ import 'dart:typed_data';
 
 import 'package:usb_gadget/usb_gadget.dart';
 
-// ---------------------------------------------------------------------------
-// Logitech F310 – DirectInput mode ("Logitech Dual Action", 046d:c216)
-//
-// Report layout (7 bytes, no report-ID prefix):
-//   Byte 0 : Left-stick X   0x00–0xFF  (centre = 0x80)
-//   Byte 1 : Left-stick Y   0x00–0xFF  (centre = 0x80, up = 0x00)
-//   Byte 2 : Right-stick X  0x00–0xFF  (centre = 0x80)
-//   Byte 3 : Right-stick Y  0x00–0xFF  (centre = 0x80, up = 0x00)
-//   Byte 4 : Buttons 1–8    (bit 0 = B1 … bit 7 = B8)
-//   Byte 5 : Buttons 9–12 in bits [3:0] + 4 padding bits [7:4]
-//   Byte 6 : Hat nibble [3:0] (0–7 = direction, 8 = centre) + 4 padding bits
-// ---------------------------------------------------------------------------
-
 enum F310Button implements BitFlag {
   x(1 << 0),
   a(1 << 1),
@@ -182,10 +169,7 @@ class LogitechF310 extends HIDFunctionFs {
           0x81, 0x01, //   Input (Constant)
           0xC0, // End Collection
         ]),
-        config: const .inputOnly(
-          maxPacketSize: 7,
-          reportInterval: .new(milliseconds: 10),
-        ),
+        config: const .inputOnly(maxPacketSize: 7),
         speeds: {.fullSpeed, .highSpeed},
         strings: {
           .enUS: ['Logitech Dual Action'],
@@ -195,22 +179,32 @@ class LogitechF310 extends HIDFunctionFs {
   final F310Report report = F310Report();
 
   int _frame = 0;
-  Timer? _timer;
+  StreamSubscription<void>? _report;
 
   @override
   Future<void> onEnable() async {
     super.onEnable();
-    _timer = .periodic(config.reportInterval, (_) {
-      _animateFrame();
-      if (state == .enabled) epIn.write(report.toBytes());
-    });
+    _report ??= epIn.writeWhile(
+      condition: () => state == .enabled,
+      data: () {
+        _animateFrame();
+        return report.toBytes();
+      },
+    );
   }
 
   @override
-  Future<void> release() async {
+  Future<void> onDisable() async {
+    await release(partial: true);
+    super.onDisable();
+  }
+
+  @override
+  Future<void> release({bool partial = false}) async {
     if (isReleased) return;
-    _timer?.cancel();
-    _timer = null;
+    await _report?.cancel();
+    _report = null;
+    if (partial) return;
     await super.release();
   }
 
