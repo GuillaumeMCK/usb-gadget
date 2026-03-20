@@ -1,39 +1,110 @@
-## 0.6.0
+# Changelog
+All notable changes to this project will be documented in this file.
+The format is based on [Keep a Changelog],
+and this project adheres to [Semantic Versioning].
 
-* **FIX**: Refresh OUT endpoints on enable to recover from host de-configuration, replacing dead `AioStream` instances without requiring consumers to re-subscribe.
-* **REFACTOR**: Restructure endpoint directory layout — move `functionfs/endpoint.dart` to `endpoint/core.dart` and relocate descriptors/events under `functions/ffs/`.
-* **REFACTOR**: Simplify `Aio` initialization in `EndpointInFile` and `EndpointOutFile` by passing file descriptors directly to `Aio.fromEndpointConfig`.
-* **REFACTOR**: Refactor `EndpointOutFile` to use a `StreamController` proxy for a stable broadcast stream across USB enable/disable cycles.
-* **REFACTOR**: Restructure kernel AIO bindings — rename `platform/aio` to `platform/libaio`, introduce a `Libaio` wrapper with scratch arrays to minimize allocations, and add an `Iocb` owning wrapper with factory methods for read/write ops.
-* **REFACTOR**: Relocate `AioStream` and `BufferPool` to `lib/src/endpoint/aio/`; remove seek offsets and ensure data is copied from native buffers before pool return to prevent use-after-free.
-* **REFACTOR**: Remove `AioSink`, old `AioContext`, and other high-level AIO abstractions in favor of the more direct `libaio` interface.
-* **FEAT**: Add FFI bindings and `Epoll` wrapper for Linux `epoll` and `eventfd` system calls, supporting I/O multiplexing with `create`, `add`, `modify`, `delete`, and `wait`, plus `eventfd` notification helpers.
-* **REFACTOR**: Use `DynamicLibrary.process()` to access libc in errno handling.
+## 0.7.0 - 2026-03-20
+### Added
+- `writeWhile` method for continuous AIO writes
+- `isDummyUDC` property on UDC
+- `usb-gadget` CLI tool for managing Linux USB gadgets
+- Comprehensive UVC frame and control configuration support
+- Expanded UAC1 and UAC2 audio function attributes
+- `devicePath()` method to `HIDFunction`
+- Unit and integration tests for kernel USB functions
+- Integration tests for bulk transfers, ZLP, and endpoint halt
 
-## 0.5.0
+### Changed
+- Rename `ffs` module to `userland`
+- Rename `GadgetFunctionType` to `FunctionType`
+- Rename `USBDeviceState` to `DeviceState`
+- Rename `USBHIDDescriptor` to `HIDDescriptor`
+- Remove legacy `USBSpeed` typedef
+- Overhaul gadget and configuration management
+- Delegate UDC state management and simplify Gadget API
+- Improve `Id`, `Class`, and `Config` API stability and validation
+- Introduce `FunctionFsInterface` and improve descriptor handling
+- Introduce `ConfigFsTree` for robust gadget teardown
+- Make `prepare()` asynchronous
+- Make `write()` asynchronous and implement backpressure
+- Make `onDisable` a synchronous method on HID
+- Replace `Comparable` implementation with comparison operators in `Speed` enum
+- Tune AIO buffer sizing
+- Update examples to use `writeWhile` and improve lifecycle handling
+- Rewrite ping/pong example to support large transfers and benchmarking
 
-* **FIX**: Various endpoint lifecycle and resource management fixes across `FunctionFs` and `HIDFunctionFs`.
-* **FIX**: Several reliability improvements to `AioSink` around write queue and resource release.
-* **REFACTOR**: Consolidate endpoint and resource lifecycle management into base classes.
+### Fixed
+- Add state checks to `write()` and `flush()`
+- Ignore `EINVAL` in read loop and include stack traces
+- Support zero-length packets in `AioStream`
+- Default HID endpoint intervals for high-speed compatibility
+- Use numeric value for `MaxPower` attribute in gadget configfs
 
-## 0.4.3
+## 0.6.0 - 2026-03-08
+### Added
+- FFI bindings and `Epoll` wrapper for Linux `epoll` and `eventfd` system calls,
+  supporting I/O multiplexing with `create`, `add`, `modify`, `delete`, and `wait`,
+  plus `eventfd` notification helpers
 
-* **FIX**: Add missing `fatal` method to `Logger` class
-* **CHORE**: Update logger exports to include the `Logger` class
-* **CHORE**: Remove the `PlatformLogger` export
+### Changed
+- Restructure kernel AIO bindings — rename `platform/aio` to `platform/libaio`,
+  introduce a `Libaio` wrapper with scratch arrays to minimize allocations, and
+  add an `Iocb` owning wrapper with factory methods for read/write ops
+- Restructure endpoint directory and simplify AIO initialization
+- Relocate `AioStream` and `BufferPool` to `lib/src/endpoint/aio/`; remove seek
+  offsets and ensure data is copied from native buffers before pool return to
+  prevent use-after-free
+- Remove `AioSink`, old `AioContext`, and other high-level AIO abstractions in
+  favor of the more direct `libaio` interface
+- Rename `DeviceClass.composite` to `perInterface`
+- Use `DynamicLibrary.process()` to access libc in errno handling
 
-## 0.4.2
+### Fixed
+- Refresh OUT endpoints on enable to recover from host de-configuration,
+  replacing dead `AioStream` instances without requiring consumers to re-subscribe
+- Rename `restart()` to `refresh()` on FunctionFS
 
-* **CHORE**: Export `ILogger` as public to allow custom mixin creation outside the library.
-* **FIX**: Release endpoints on disable to prevent resource leaks.
+## 0.5.0 - 2026-03-03
+### Changed
+- Use `release()` instead of `close()` for endpoint lifecycle
+- Move `Releasable` mixin and `release()` to `EndpointFile` base class
+- Remove `droppedWrites` tracking from `AioSink`
 
-## 0.4.1
+### Fixed
+- Add disabled state and fix `onDisable` transition in FunctionFS
+- Await `_releaseEndpoints` to prevent concurrent map modification
+- Do not release endpoints on disable or release in HID
+- Prevent removing from empty write queue in `AioSink`
+- Await close during resource release in `AioSink`
+- Handle writing to closed sink gracefully in `AioSink`
 
-* **FEAT**: Add compile-time environment-based logging configuration.
-* **REFACTOR**: Simplify log level representation.
-* **REFACTOR**: Enhance log formatting and color handling.
-* **FIX**: Replace hardcoded log level with environment-based constant.
+## 0.4.3 - 2026-03-02
+### Changed
+- Export `Logger` class and remove `PlatformLogger` export
 
-## 0.4.0
+### Fixed
+- Add missing `fatal` log method to `Logger` class
+- Prevent double release of resources
+- Log stack trace when present in printer function
 
-* **FEAT**: Initial release of the package.
+## 0.4.2 - 2026-03-02
+### Changed
+- Export `ILogger` as public to allow custom mixin creation outside the library
+
+### Fixed
+- Release endpoints on disable to prevent resource leaks
+
+## 0.4.1 - 2026-03-02
+### Added
+- Compile-time environment-based logging configuration
+
+### Changed
+- Simplify log level representation
+- Enhance log formatting and color handling
+
+### Fixed
+- Replace hardcoded log level with environment-based constant
+
+## 0.4.0 - 2026-03-02
+### Added
+- Initial release of the package
