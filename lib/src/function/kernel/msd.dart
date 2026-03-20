@@ -17,7 +17,7 @@ class MassStorageFunction extends KernelFunction {
 
   /// Tracks lun.1+ dirs created in [prepare] so [release] can sweep them.
   /// lun.0 is kernel-default and must not be removed.
-  ConfigfsTree? _lunTree;
+  ConfigFsTree? _lunTree;
 
   @override
   bool validate() {
@@ -34,7 +34,7 @@ class MassStorageFunction extends KernelFunction {
   @override
   Future<void> prepare(String path) async {
     await super.prepare(path);
-    _lunTree = ConfigfsTree();
+    _lunTree = ConfigFsTree();
     for (var i = 0; i < luns.length; i++) {
       final lun = luns[i];
       final lunPath = '$functionPath/lun.$i';

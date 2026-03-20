@@ -17,13 +17,13 @@ void writeAttr(String path, String? value) {
 ///
 /// ## Usage
 /// ```dart
-/// final tree = ConfigfsTree();
+/// final tree = ConfigFsTree();
 /// tree.mkdirp('$base/streaming/class/fs');
 /// tree.symlink('$base/streaming/class/fs/h', '$base/streaming/header/h');
 /// // ... later:
 /// tree.sweep();
 /// ```
-final class ConfigfsTree {
+final class ConfigFsTree {
   final _dirs = <String>[];
   final _links = <String>[];
 
@@ -99,9 +99,9 @@ final class ConfigfsTree {
   }
 }
 
-/// Tears down a gadget's configfs tree using [ConfigfsTree.absorb].
+/// Tears down a gadget's configfs tree using [ConfigFsTree.absorb].
 void removeAt(Directory dir) {
-  final tree = ConfigfsTree();
+  final tree = ConfigFsTree();
   // Insert the root dir BEFORE absorbing children, so it sits at index 0
   // in _dirs. sweep() iterates _dirs.reversed, meaning the root is visited
   // last — after all its children have already been deleted.

@@ -218,13 +218,13 @@ class UvcFunction extends KernelFunction {
 
   // When frames are provided we must build the configfs directory structure
   // manually instead of just writing attributes.
-  ConfigfsTree? _tree;
+  ConfigFsTree? _tree;
 
   @override
   Future<void> prepare(String path) async {
     await super.prepare(path);
     if (frames.isNotEmpty) {
-      _tree = ConfigfsTree();
+      _tree = ConfigFsTree();
       _writeFrameDescriptors(path, _tree!);
     }
   }
@@ -248,7 +248,7 @@ class UvcFunction extends KernelFunction {
     return attrs;
   }
 
-  void _writeFrameDescriptors(String base, ConfigfsTree tree) {
+  void _writeFrameDescriptors(String base, ConfigFsTree tree) {
     final seenColorMatching = <String>{};
     final seenGroups = <String>{};
 

@@ -110,7 +110,7 @@ class RndisFunction extends EthernetFunction {
   Future<void> release() async {
     if (isReleased) return;
     if (prepared) {
-      ConfigfsTree()
+      ConfigFsTree()
         ..absorb(Directory('$functionPath/os_desc'))
         ..sweep();
     }
@@ -127,7 +127,7 @@ class NcmFunction extends EthernetFunction {
   Future<void> release() async {
     if (isReleased) return;
     if (prepared) {
-      ConfigfsTree()
+      ConfigFsTree()
         ..absorb(Directory('$functionPath/os_desc'))
         ..sweep();
     }
