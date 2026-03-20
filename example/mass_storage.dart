@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:usb_gadget/usb_gadget.dart';
 
 Future<void> main(List<String> args) async {
-  String? udc;
+  UDC? udc;
   List<String> paths = const [];
 
   switch (args) {
@@ -13,8 +13,8 @@ Future<void> main(List<String> args) async {
         'Usage: dart mass_storage.dart [--udc UDC_NAME] LUN_FILE [LUN_FILE ...]\n',
       );
       exit(0);
-    case ['--udc', final String udcName, ...final sources]:
-      udc = udcName;
+    case ['--udc', final String name, ...final sources]:
+      udc = .fromName(name);
       paths = sources;
     case [...final files]:
       paths = [
@@ -56,7 +56,7 @@ Future<void> main(List<String> args) async {
   );
   final reg = await gadget.register();
   try {
-    await reg.bind(defaultUDC);
+    await reg.bind(udc ?? defaultUDC);
     stdout.writeln('Ctrl+C to exit.');
     await ProcessSignal.sigint.watch().first;
   } finally {
