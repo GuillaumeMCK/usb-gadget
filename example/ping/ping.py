@@ -1,72 +1,109 @@
 #!/usr/bin/env python3
-import usb.core
-import usb.util
+"""USB loopback benchmark — send payload, verify echo, report timing."""
+
+import struct
 import sys
 import time
 
-VID = 0x1d6b
-PID = 0x0104
-INTERFACE = 0
-EP_IN = 0x81
-EP_OUT = 0x01
+import usb.core
+import usb.util
 
-def prepare_device(dev):
+VID       = 0x1d6b
+PID       = 0x0104
+INTERFACE = 0
+EP_IN     = 0x81
+EP_OUT    = 0x02
+BUF       = 512 * 1024
+
+
+def fmt_size(n):
+    for unit in ("B", "KB", "MB"):
+        if n < 1024 or unit == "MB":
+            return f"{n:.1f} {unit}" if unit != "B" else f"{n} B"
+        n /= 1024
+
+
+def fmt_time(ms):
+    if ms < 1:    return f"{ms*1000:.1f} us"
+    if ms < 1000: return f"{ms:.2f} ms"
+    return f"{ms/1000:.3f} s"
+
+
+def fmt_rate(bps):
+    kbps = bps / 1024
+    return f"{kbps:.1f} KB/s" if kbps < 1024 else f"{kbps/1024:.2f} MB/s"
+
+
+def open_device():
+    dev = usb.core.find(idVendor=VID, idProduct=PID)
+    if dev is None:
+        sys.exit(f"device not found  VID=0x{VID:04x}  PID=0x{PID:04x}")
     try:
         if dev.is_kernel_driver_active(INTERFACE):
             dev.detach_kernel_driver(INTERFACE)
     except (NotImplementedError, usb.core.USBError):
         pass
-
     usb.util.claim_interface(dev, INTERFACE)
+    return dev
 
-def endpoint_config(dev) -> int:
-    cfg = dev.get_active_configuration()
-    intf = cfg[(INTERFACE, 0)]
-    pack_size = 0
 
+def packet_size(dev):
+    intf = dev.get_active_configuration()[(INTERFACE, 0)]
     for ep in intf.endpoints():
-        ep_addr = ep.bEndpointAddress
-        ep_type = usb.util.endpoint_type(ep.bmAttributes)
-        print(f"> Endpoint 0x{ep_addr:02x}")
-        print(f" Type:            {ep_type}")
-        print(f" Max Packet Size: {ep.wMaxPacketSize}")
-        print(f" Interval:        {ep.bInterval}")
-        if ep_addr == EP_IN:
-            pack_size = ep.wMaxPacketSize
-    return pack_size
+        if ep.bEndpointAddress == EP_IN:
+            return ep.wMaxPacketSize
+    raise RuntimeError("EP_IN not found")
 
-def send_and_receive(dev, payload: bytes, pkt_size: int) -> bytes:
-    print(f"PING -> {payload}", end=' ')
-    bytes_sent = dev.write(EP_OUT, payload, INTERFACE)
-    if bytes_sent != len(payload):
-        raise RuntimeError(f"Sent {bytes_sent} bytes, expected {len(payload)} bytes.")
-    received = dev.read(EP_IN, pkt_size, INTERFACE)
-    print(f"-> PONG {bytes(received)}")
-    return bytes(received)
+
+def roundtrip(dev, pkt, payload):
+    frame = struct.pack(">I", len(payload)) + payload
+
+    t0 = time.perf_counter()
+    dev.write(EP_OUT, frame, INTERFACE)
+    if len(frame) % pkt == 0:          # ZLP signals end-of-transfer
+        dev.write(EP_OUT, b"", INTERFACE)
+    t1 = time.perf_counter()
+
+    buf = bytearray()
+    while len(buf) < len(frame):
+        buf += dev.read(EP_IN, BUF, INTERFACE)
+    t2 = time.perf_counter()
+
+    write_ms = (t1 - t0) * 1000
+    read_ms  = (t2 - t1) * 1000
+    total_ms = (t2 - t0) * 1000
+    return bytes(buf[4:]), write_ms, read_ms, total_ms
+
+
+def run(dev, pkt, name, payload):
+    print(f"\n  {name}  ({fmt_size(len(payload))})")
+    echo, w, r, total = roundtrip(dev, pkt, payload)
+    rate = len(payload) / (total / 1000)
+    ok   = echo == payload
+    print(f"    write {fmt_time(w)}  read {fmt_time(r)}  total {fmt_time(total)}  {fmt_rate(rate)}")
+    print(f"    {'PASS' if ok else 'FAIL — data mismatch'}")
+    return ok
+
 
 def main():
-    dev = usb.core.find(idVendor=VID, idProduct=PID)
-    if dev is None:
-        print("ERROR: Device not found.")
-        sys.exit(1)
+    dev = open_device()
+    pkt = packet_size(dev)
 
-    prepare_device(dev)
-    pkt_size = endpoint_config(dev)
+    MB4 = 4 * 1024 * 1024
     tests = [
-        ("Text",               b"Hello USB!"),
-        ("Digits",             b"1234567890"),
-        ("Binary",             b"\x00\x01\x02\x03\x04"),
-        ("String with NULL",   b"ABC\x00DEF"),
-        ("pkt_size-1 bytes",   b"A" * (pkt_size - 1)), # ZLP not handled by pong device
+        ("tiny",            b"Hello USB!"),
+        ("single packet",   b"A" * pkt),
+        ("64 packets",      b"." * pkt * 64),
+        ("4 MB stress",     bytes(range(256)) * (MB4 // 256)),
     ]
 
-    for name, data in tests:
-        response = send_and_receive(dev, data, pkt_size)
-        if response != data:
-            print(f"ERROR: Mismatch in {name} test.")
+    print(f"USB loopback  pkt={fmt_size(pkt)}  buf={fmt_size(BUF)}")
+    results = [run(dev, pkt, name, payload) for name, payload in tests]
+    passed, total = sum(results), len(results)
+    print(f"\n  {passed}/{total} passed")
 
     usb.util.release_interface(dev, INTERFACE)
+    sys.exit(0 if passed == total else 1)
 
 if __name__ == "__main__":
     main()
-    exit(0)

@@ -24,27 +24,35 @@ class PongFunction extends FunctionFs {
         speeds: {.fullSpeed, .highSpeed},
       );
 
-  late final epIn = getEndpoint<EndpointInFile>(.ep1);
+  late final EndpointInFile epIn = getEndpoint<EndpointInFile>(.ep1);
+  late final EndpointOutFile epOut = getEndpoint<EndpointOutFile>(.ep2);
 
-  late final epOut = getEndpoint<EndpointOutFile>(.ep2);
-
-  StreamSubscription<Uint8List>? _dataSubscription;
+  StreamSubscription<Uint8List>? _dataSub;
 
   @override
   Future<void> onEnable() async {
     super.onEnable();
-    _dataSubscription = epOut.stream.listen((data) {
-      log?.debug('Received data:\n${data.xxd()}');
-      if (state == .enabled) epIn.write(data);
-    }, cancelOnError: false);
+    _dataSub ??= epOut.stream.listen(_onData);
   }
 
   @override
-  Future<void> release() async {
+  Future<void> onDisable() async {
+    await release(partial: true);
+    super.onDisable();
+  }
+
+  @override
+  Future<void> release({bool partial = false}) async {
     if (isReleased) return;
-    await _dataSubscription?.cancel();
-    _dataSubscription = null;
+    await _dataSub?.cancel();
+    _dataSub = null;
+    if (partial) return;
     await super.release();
+  }
+
+  Future<void> _onData(Uint8List data) async {
+    if (state != .enabled) return;
+    epIn.write(data);
   }
 }
 
