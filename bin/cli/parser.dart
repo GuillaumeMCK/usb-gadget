@@ -22,8 +22,8 @@ Future<(Gadget gadget, String? udc)> parseGadgetSpec(String yamlPath) async {
   final dynamic doc;
   try {
     doc = loadYaml(content);
-  } catch (e) {
-    throw ConfigException('$yamlPath: YAML syntax error: $e');
+  } catch (err) {
+    throw ConfigException('$yamlPath: YAML syntax error: $err');
   }
 
   if (doc is! YamlMap) {

@@ -36,8 +36,8 @@ Future<void> main(List<String> args) async {
   } on ConfigException catch (e) {
     stderr.writeln('\x1B[91merror:\x1B[0m ${e.message}');
     exit(1);
-  } catch (e, st) {
-    stderr.writeln('\x1B[91merror:\x1B[0m $e\n$st');
+  } catch (err, st) {
+    stderr.writeln('\x1B[91merror:\x1B[0m $err\n$st');
     exit(1);
   }
 }

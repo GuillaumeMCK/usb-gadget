@@ -58,8 +58,8 @@ class DownCommand extends Command<void> {
         print(
           "${Fmt.badge('DOWN', ok: false)}  removed '${Fmt.bold(reg.name)}'",
         );
-      } catch (e) {
-        stderr.writeln('${Fmt.warn}could not remove ${reg.name}: $e');
+      } catch (err) {
+        stderr.writeln('${Fmt.warn}could not remove ${reg.name}: $err');
       }
     }
   }
