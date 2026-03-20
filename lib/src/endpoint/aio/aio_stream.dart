@@ -4,7 +4,6 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 import 'package:using/using.dart';
 
-import '../../platform/libaio/libaio.dart';
 import 'aio_context.dart';
 import 'buffer_pool.dart';
 import '/src/platform/libaio/libaio.ffi.dart' as ffi_aio;
