@@ -2,6 +2,10 @@ import 'dart:io';
 
 import '/src/platform/errno/errno.dart';
 
+/// Writes [value] to the configfs attribute file at [path].
+///
+/// No-ops when [value] is `null`. Wraps any [FileSystemException] with a
+/// message that includes both the value and the target path.
 void writeAttr(String path, String? value) {
   if (value == null) return;
   try {
@@ -9,6 +13,17 @@ void writeAttr(String path, String? value) {
   } catch (err) {
     throw FileSystemException('Failed to write "$value" → $path: $err');
   }
+}
+
+/// Tears down a gadget's configfs tree using [ConfigFsTree.absorb].
+void removeAt(Directory dir) {
+  final tree = ConfigFsTree();
+  // Insert the root dir BEFORE absorbing children, so it sits at index 0
+  // in _dirs. sweep() iterates _dirs.reversed, meaning the root is visited
+  // last — after all its children have already been deleted.
+  tree._dirs.add(dir.path);
+  tree.absorb(dir);
+  tree.sweep();
 }
 
 /// Tracks directories and symlinks created under a configfs subtree so they
@@ -97,15 +112,4 @@ final class ConfigFsTree {
     }
     _dirs.clear();
   }
-}
-
-/// Tears down a gadget's configfs tree using [ConfigFsTree.absorb].
-void removeAt(Directory dir) {
-  final tree = ConfigFsTree();
-  // Insert the root dir BEFORE absorbing children, so it sits at index 0
-  // in _dirs. sweep() iterates _dirs.reversed, meaning the root is visited
-  // last — after all its children have already been deleted.
-  tree._dirs.add(dir.path);
-  tree.absorb(dir);
-  tree.sweep();
 }
