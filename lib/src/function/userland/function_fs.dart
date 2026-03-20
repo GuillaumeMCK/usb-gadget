@@ -51,8 +51,7 @@ class FunctionFsInterface {
   final String? name;
   final List<EndpointDescriptor> endpoints;
 
-  /// Expands into the flat descriptor list FunctionFs needs:
-  /// [InterfaceDescriptor, EndpointDescriptor, EndpointDescriptor, ...]
+  /// Create a list of descriptors for this interface.
   List<USBDescriptor> get descriptors => [
     USBInterfaceDescriptor(
       interfaceNumber: interfaceNumber,

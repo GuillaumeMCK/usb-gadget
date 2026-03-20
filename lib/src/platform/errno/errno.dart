@@ -2,33 +2,7 @@ import 'dart:io';
 import 'errno.ffi.dart' as errno_ffi;
 
 /// A utility class for working with Linux `errno` values via FFI.
-///
-/// ## Usage pattern
-///
-/// The cardinal rule of errno: **read it immediately after the syscall.**
-/// Any intervening function call — even innocent-looking ones — can
-/// overwrite it. Use [call] or [capture] to guarantee safe reads:
-///
-/// ```dart
-/// // Safe: errno is captured atomically with the native call result.
-/// final fd = Errno.call(() => open(path, O_RDONLY));
-///
-/// // Safe: inspect both the result and errno yourself.
-/// final (result, code) = Errno.capture(() => read(fd, buf, len));
-/// if (result < 0) { ... }
-/// ```
-///
-/// Do **not** do this:
-/// ```dart
-/// final result = nativeCall();
-/// // ← anything here can clobber errno
-/// final code = Errno.current; // may be wrong
-/// ```
-///
-/// ## Platform
-///
-/// Linux only. Errno values mirror `asm-generic/errno-base.h` and
-/// `asm-generic/errno.h`.
+
 // ---------------------------------------------------------------------------
 // Standard POSIX / Generic Errors (1–40)
 // ---------------------------------------------------------------------------
