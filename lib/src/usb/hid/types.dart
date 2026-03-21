@@ -1,5 +1,4 @@
-import '../descriptors.dart';
-import '../types.dart';
+import '../usb.dart';
 
 /// HID class-specific request codes (bRequest).
 ///

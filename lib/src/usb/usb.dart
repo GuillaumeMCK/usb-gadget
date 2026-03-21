@@ -1,4 +1,2 @@
-export 'descriptors.dart';
+export 'ch9/ch9.dart';
 export 'hid/hid.dart';
-export 'speeds.dart';
-export 'types.dart';
