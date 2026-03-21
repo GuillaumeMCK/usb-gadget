@@ -36,8 +36,9 @@ final class AioStream with Releasable {
   /// Submits reads until the pool is exhausted, paused, EOF, or released.
   void _fillWindow() {
     while (!_paused && !isReleased) {
-      if (!_submitRead())
+      if (!_submitRead()) {
         break; // pool exhausted — stop until a buffer is freed
+      }
     }
   }
 

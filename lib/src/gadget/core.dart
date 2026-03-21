@@ -106,7 +106,7 @@ final class Gadget with USBGadgetLogger {
   ///
   /// Throws a [FileSystemException] if any configfs operation fails.
   Future<void> remove() async {
-    final gadgets = await RegGadget.all().where((g) => g.name == name);
+    final gadgets = RegGadget.all().where((g) => g.name == name);
     for (final reg in gadgets) {
       await reg.remove();
     }

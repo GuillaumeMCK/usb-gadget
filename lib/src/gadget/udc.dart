@@ -178,6 +178,7 @@ UDC get defaultUDC => UDCs.firstOrNull ?? (throw StateError('No UDCs found'));
 bool get hasUDC => UDCs.isNotEmpty;
 
 /// Returns all UDCs available under `/sys/class/udc/`.
+// ignore: type=lint
 List<UDC> get UDCs {
   final dir = Directory('/sys/class/udc');
   if (!dir.existsSync()) return [];

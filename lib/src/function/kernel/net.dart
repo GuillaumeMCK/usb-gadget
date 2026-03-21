@@ -39,8 +39,8 @@ abstract class EthernetFunction extends KernelFunction {
 
   @override
   Map<String, String> getConfigAttributes() => {
-    if (hostAddr != null) 'host_addr': hostAddr!,
-    if (devAddr != null) 'dev_addr': devAddr!,
+    'host_addr': ?hostAddr,
+    'dev_addr': ?devAddr,
   };
 
   /// Gets the network interface name (e.g., "usb0").
@@ -54,15 +54,17 @@ abstract class EthernetFunction extends KernelFunction {
 
   /// Updates the host MAC address.
   void setHostAddr(String addr) {
-    if (!isValidMacAddress(addr))
+    if (!isValidMacAddress(addr)) {
       throw ArgumentError('Invalid MAC address: $addr');
+    }
     writeAttribute('host_addr', addr);
   }
 
   /// Updates the device MAC address.
   void setDevAddr(String addr) {
-    if (!isValidMacAddress(addr))
+    if (!isValidMacAddress(addr)) {
       throw ArgumentError('Invalid MAC address: $addr');
+    }
     writeAttribute('dev_addr', addr);
   }
 }

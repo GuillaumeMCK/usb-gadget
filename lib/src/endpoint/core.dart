@@ -320,7 +320,9 @@ final class EndpointInFile extends EndpointFile {
         } else {
           await Future.delayed(const Duration(milliseconds: 1));
         }
-      } on AioDisposedException {}
+      } on AioDisposedException {
+        // Ignore
+      }
     }
   }().listen(null, cancelOnError: true);
 
@@ -366,7 +368,7 @@ final class EndpointInFile extends EndpointFile {
   Future<void> release() async {
     if (isReleased) return;
     super.release();
-    await this.close();
+    await close();
   }
 }
 

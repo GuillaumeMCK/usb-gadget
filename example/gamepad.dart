@@ -21,7 +21,8 @@ enum F310Button implements BitFlag {
 
   const F310Button(this.value);
 
-  final value;
+  @override
+  final int value;
 }
 
 enum F310Hat {
