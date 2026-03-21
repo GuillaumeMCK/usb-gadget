@@ -3,6 +3,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog],
 and this project adheres to [Semantic Versioning].
 
+## 1.0.0
+### Added
+- `UsbGadget.remove()` to clean up configfs registrations without holding a `RegGadget` handle
+- Integration tests for bulk transfers, ZLP, and endpoint halt via Python USB host driver
+
+### Changed
+- **BREAKING**: `RegGadget.bind()` is now `void` (was `Future<void>`) — call sites no longer need `await`
+- **BREAKING**: Remove `RegGadget.unbindAll()`
+- Move `gadget.register()` inside `try` block; use `gadget.remove()` in `finally` for simplified lifecycle
+- Move USB Chapter 9 definitions (`descriptors`, `speeds`, `types`) to `lib/src/usb/ch9/` sub-package
+- Simplify `Future.delayed` calls — remove redundant `<void>` type arguments
+- Simplify doc comments in `Errno` and `FunctionFs`
+
+### Fixed
+- HID endpoint poll and report intervals corrected to 8ms for High-Speed USB compatibility (was 10ms, which is invalid for HS)
+- `UDC` binding error now includes the target UDC name in the log message
+
 ## 0.7.0
 ### Added
 - `writeWhile` method for continuous AIO writes
