@@ -91,7 +91,7 @@ and this project adheres to [Semantic Versioning].
   replacing dead `AioStream` instances without requiring consumers to re-subscribe
 - Rename `restart()` to `refresh()` on FunctionFS
 
-## 0.5.0 - 2026-03-03
+## 0.5.0
 ### Changed
 - Use `release()` instead of `close()` for endpoint lifecycle
 - Move `Releasable` mixin and `release()` to `EndpointFile` base class
@@ -105,7 +105,7 @@ and this project adheres to [Semantic Versioning].
 - Await close during resource release in `AioSink`
 - Handle writing to closed sink gracefully in `AioSink`
 
-## 0.4.3 - 2026-03-02
+## 0.4.3
 ### Changed
 - Export `Logger` class and remove `PlatformLogger` export
 
@@ -114,14 +114,14 @@ and this project adheres to [Semantic Versioning].
 - Prevent double release of resources
 - Log stack trace when present in printer function
 
-## 0.4.2 - 2026-03-02
+## 0.4.2
 ### Changed
 - Export `ILogger` as public to allow custom mixin creation outside the library
 
 ### Fixed
 - Release endpoints on disable to prevent resource leaks
 
-## 0.4.1 - 2026-03-02
+## 0.4.1
 ### Added
 - Compile-time environment-based logging configuration
 
@@ -132,6 +132,6 @@ and this project adheres to [Semantic Versioning].
 ### Fixed
 - Replace hardcoded log level with environment-based constant
 
-## 0.4.0 - 2026-03-02
+## 0.4.0
 ### Added
 - Initial release of the package
