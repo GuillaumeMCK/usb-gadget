@@ -1,5 +1,5 @@
 name: usb_gadget
-description: Expose standard or fully custom USB peripherals (gadgets) through a USB device controller (UDC) on Linux.
+description: Implement USB gadgets for UDC-capable Linux systems — Kernel Functions and FunctionFS
 version: 1.0.1
 homepage: https://github.com/GuillaumeMCK/usb-gadget
 
