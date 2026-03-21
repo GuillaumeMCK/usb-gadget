@@ -17,7 +17,7 @@ have one.
 ## Requirements
 
 ```bash
-sudo apt-get install libaio-dev                  # async I/O library required by this package
+sudo apt-get install libaio-dev                  # library required by this package
 sudo modprobe libcomposite                       # kernel module for USB gadget support
 sudo mount -t configfs none /sys/kernel/config   # if not already mounted
 ```
@@ -70,9 +70,9 @@ Future<void> main() async {
 
   try {
     final reg = await gadget.register();
-    await reg.bind(defaultUDC);
+    reg.bind(defaultUDC);
     await reg.udc?.awaitState(.configured);
-    await Future<void>.delayed(const .new(milliseconds: 100));
+    await Future.delayed(const .new(milliseconds: 100));
     [0x0B, 0x08, 0x0F, 0x0F, 0x12, 0x2C, 0x1A, 0x12, 0x15, 0x0F, 0x07, 0x28]
     // Write "hello world\n"
     .forEach(keyboard.sendKey);
@@ -86,7 +86,8 @@ Future<void> main() async {
 > More examples (gamepad, mass storage, custom FunctionFS) are in [`example/`](example/).
 
 > [!TIP]
-> Compile to a native executable for production use — JIT is not recommended for FunctionFS gadgets:
+> Compile to a native executable for production use — JIT latency can cause timing violations 
+> in FunctionFS gadgets.
 > ```bash
 > dart compile exe bin/app.dart -o my_gadget && sudo ./my_gadget
 > ```
@@ -188,6 +189,10 @@ setprop sys.usb.config "$ORIGINAL"
 
 </details>
 
-## License
+## Credits & References
 
-Apache 2.0 — see [LICENSE](LICENSE).
+- https://github.com/vpelletier/python-functionfs
+- https://github.com/surban/usb-gadget
+- https://www.beyondlogic.org/usbnutshell/usb1.shtml
+- https://www.kernel.org/doc/Documentation/filesystems/configfs/configfs.txt
+- https://www.kernel.org/doc/html/latest/driver-api/usb/gadget.html
