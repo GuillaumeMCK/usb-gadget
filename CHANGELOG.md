@@ -3,6 +3,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog],
 and this project adheres to [Semantic Versioning].
 
+## 1.0.1
+### Changed
+- Update `lints` to 6.1.0 and include `package:lints/recommended.yaml`
+
+### Fixed
+- Add missing curly braces to control flow statements in `aio_stream.dart` and `net.dart`
+- Remove unnecessary `await` on non-future in `gadget/core.dart`
+- Remove redundant `this.` qualifier in `endpoint/core.dart`
+- Simplify `getConfigAttributes` in `NetworkFunction` using null-aware syntax
+
 ## 1.0.0
 ### Added
 - `UsbGadget.remove()` to clean up configfs registrations without holding a `RegGadget` handle
