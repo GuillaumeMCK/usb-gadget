@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog],
 and this project adheres to [Semantic Versioning].
 
+## 1.0.2
+### Fixed
+- Track live `RegGadget` instances in a global registry so `RegGadget.all()` and `Gadget.remove()` operate on the original instances containing populated function lists, rather than reconstructing empty shells from the filesystem. This fixes `remove()` failing to unmount `FunctionFs` instances (EBUSY) and leaving stale configfs directories behind.
+
 ## 1.0.1
 ### Changed
 - Update `lints` to 6.1.0 and include `package:lints/recommended.yaml`

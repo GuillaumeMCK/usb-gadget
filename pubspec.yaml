@@ -1,6 +1,6 @@
 name: usb_gadget
 description: Implement USB gadgets for UDC-capable Linux systems — Kernel Functions and FunctionFS
-version: 1.0.1
+version: 1.0.2
 homepage: https://github.com/GuillaumeMCK/usb-gadget
 
 platforms:
