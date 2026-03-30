@@ -26,8 +26,9 @@ import 'fs.dart';
 ///   ],
 /// );
 ///
-/// final reg = await gadget.bind(udc);
+/// final reg = await gadget.register();
 /// try {
+///   reg.bind(udc);
 ///   // Device is active.
 /// } finally {
 ///   await reg.remove();
@@ -100,9 +101,8 @@ final class Gadget with USBGadgetLogger {
 
   /// Removes all configfs registrations that match this gadget's [name].
   ///
-  /// Finds every [RegGadget] in configfs whose name equals [name] and calls
-  /// [RegGadget.remove] on each one. Useful when you no longer hold a
-  /// reference to the original [RegGadget] handles.
+  /// Prefer [RegGadget.remove] on the handle returned by [register] when
+  /// available. This method is for when that handle has been lost.
   ///
   /// Throws a [FileSystemException] if any configfs operation fails.
   Future<void> remove() async {
@@ -115,7 +115,7 @@ final class Gadget with USBGadgetLogger {
   /// Finds or creates the configfs directory for this gadget.
   ///
   /// When [name] is null, increments a counter suffix until a free slot is
-  /// found (e.g. `usb-gadget0`, `usb-gadget1`, …).
+  /// found (e.g. `usb-gadget0`, `usb-gadget1`, ...).
   static Directory _resolveGadgetDir(String? name) {
     const base = '/sys/kernel/config/usb_gadget';
     if (name != null) {
@@ -245,16 +245,29 @@ class RegFunction {
 
 /// A USB gadget registered with the system.
 ///
-/// Obtained via [Gadget.register] or [RegGadget.bind]. This object owns the
-/// configfs structure: call [remove] to unbind and clean up, or [detach] to
-/// relinquish ownership and keep the gadget active after this handle is
-/// discarded.
+/// Obtained via [Gadget.register]. This object owns the configfs structure:
+/// call [remove] to unbind and clean up, or [detach] to relinquish ownership
+/// and keep the gadget active after this handle is discarded.
 ///
 /// Use [RegGadget.all] to enumerate all gadgets currently on the system.
 class RegGadget with USBGadgetLogger {
-  RegGadget._(this._dir);
+  RegGadget._(this._dir) {
+    _addToRegistry(this);
+  }
 
   final Directory _dir;
+
+  // gadget.remove() previously called RegGadget.all(), which reconstructed
+  // RegGadget instances from the filesystem with empty _functions lists.
+  // fn.release() was never called, the FunctionFs mount stayed live, and the
+  // kernel kept functions/ffs.<n> busy, causing removeAt() to hang on EBUSY.
+  // The registry maps configfs path -> original RegGadget so all() returns
+  // the live instance with its populated _functions list.
+  static final Map<String, RegGadget> _registry = {};
+
+  static void _addToRegistry(RegGadget reg) => _registry[reg.path] = reg;
+
+  static void _removeFromRegistry(RegGadget reg) => _registry.remove(reg.path);
 
   /// Whether [remove] will tear down the gadget.
   ///
@@ -280,7 +293,9 @@ class RegGadget with USBGadgetLogger {
 
   /// Returns all USB gadgets currently present in configfs.
   ///
-  /// Includes gadgets created outside of this program.
+  /// Prefers registry instances (created by this process) over bare
+  /// filesystem-reconstructed shells. Gadgets created outside this process
+  /// are returned with an empty [_functions] list.
   ///
   /// ```dart
   /// for (final g in RegGadget.all()) {
@@ -292,7 +307,7 @@ class RegGadget with USBGadgetLogger {
     if (!dir.existsSync()) return [];
     return [
       for (final e in dir.listSync())
-        if (e is Directory) RegGadget._(e),
+        if (e is Directory) _registry[e.path] ?? RegGadget._(e),
     ];
   }
 
@@ -331,7 +346,7 @@ class RegGadget with USBGadgetLogger {
   /// Releases all functions, deletes all symlinks, subdirectories, and the
   /// gadget directory itself. Does nothing if [isAttached] is `false`.
   Future<void> remove() async {
-    if (isAttached == false) return;
+    if (!isAttached) return;
     await _doRemove();
   }
 
@@ -341,6 +356,8 @@ class RegGadget with USBGadgetLogger {
     try {
       File('${_dir.path}/UDC').writeAsStringSync('');
     } catch (_) {}
+    // Must release via the live instance so FunctionFs functions unmount;
+    // the kernel holds functions/ffs.<n> busy while the mount is live.
     for (final fn in _functions) {
       try {
         await fn.release();
@@ -357,6 +374,7 @@ class RegGadget with USBGadgetLogger {
       await Future.delayed(const Duration(milliseconds: 100));
     }
     detach();
+    _removeFromRegistry(this);
   }
 
   @override
