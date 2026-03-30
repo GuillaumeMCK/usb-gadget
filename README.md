@@ -46,10 +46,13 @@ class Keyboard extends HIDFunction {
     reportLength: 8,
   );
 
-  void sendKey(int keyCode, {int modifiers = 0}) =>
-      file..writeFromSync(Uint8List(8)
+  void sendKey(int keyCode, {int modifiers = 0}) => file
+    ..writeFromSync(
+      Uint8List(8)
         ..[0] = modifiers
-        ..[2] = keyCode)..writeFromSync(Uint8List(8));
+        ..[2] = keyCode,
+    )
+    ..writeFromSync(Uint8List(8));
 }
 
 Future<void> main() async {
