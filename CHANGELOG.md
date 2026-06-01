@@ -3,6 +3,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog],
 and this project adheres to [Semantic Versioning].
 
+## 1.0.3
+### Fixed
+- `Unistd.fcntl` now passes its third argument to the syscall. The generated FFI binding fixed `fcntl` to two parameters, so the optional argument was silently dropped — leaving `setFlags`, `setNonBlocking`, and any `F_SET*`/`F_DUPFD` command a no-op. A 3-arg `fcntl` is now bound directly in the wrapper.
+- `Gadget.remove()` no longer silently does nothing for auto-named gadgets. `register()` now records the resolved configfs name (e.g. `usb-gadget0`) so `remove()` can locate the gadget even when `name` was left `null`.
+- AIO and EP0 watcher isolates now `epoll_wait` with a bounded (1 s) timeout instead of blocking indefinitely. An indefinitely-blocked FFI call left the isolate un-pausable, hanging process shutdown and `dart test` when teardown was skipped (e.g. a failed `setUpAll`). Real events/completions still wake the isolate immediately, so there is no added latency.
+
+### Changed
+- EP0 control events are now delivered event-driven via a dedicated `epoll_wait` watcher isolate instead of a 1 ms polling timer. This removes the constant idle-CPU wakeups and the up-to-1 ms latency the timer added to every control transfer. Reads and writes still happen on the main isolate, preserving the `ep0.read` / `ep0.write` contract; the watcher only signals readiness. The watch is `EPOLLONESHOT` and the main isolate reads exactly one event batch per wake then re-arms — EP0 is a control state machine, so reading again before answering a pending SETUP would corrupt the kernel's setup state (the reply would fail with `ESRCH`).
+- `BufferPool.free` is now O(1) (address→index map + membership flags) instead of two linear scans per released buffer, removing per-packet overhead on the AIO hot path.
+- EP0 control writes use a zero-copy `Uint8List.sublistView` window instead of allocating a fresh sublist on every `EAGAIN` retry.
+
 ## 1.0.2
 ### Fixed
 - Track live `RegGadget` instances in a global registry so `RegGadget.all()` and `Gadget.remove()` operate on the original instances containing populated function lists, rather than reconstructing empty shells from the filesystem. This fixes `remove()` failing to unmount `FunctionFs` instances (EBUSY) and leaving stale configfs directories behind.
