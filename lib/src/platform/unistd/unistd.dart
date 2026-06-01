@@ -8,7 +8,17 @@ import '/src/utils/bitwise.dart';
 import '../errno/errno.dart';
 import 'unistd.ffi.dart' as unistd_ffi;
 
-final _unistd = unistd_ffi.Unistd(ffi.DynamicLibrary.process());
+final _process = ffi.DynamicLibrary.process();
+final _unistd = unistd_ffi.Unistd(_process);
+
+/// `fcntl(2)` is variadic, but the generated binding fixes it to two
+/// arguments and so cannot pass the optional third argument. Bind a 3-arg
+/// form directly so commands that take an int argument (F_SETFD, F_SETFL,
+/// F_DUPFD, F_SETOWN, ...) actually receive it. Passing an unused extra
+/// argument to commands that ignore it (e.g. F_GETFL) is harmless.
+final _fcntl3 = _process.lookupFunction<
+    ffi.Int Function(ffi.Int, ffi.Int, ffi.Int),
+    int Function(int, int, int)>('fcntl');
 
 /// POSIX open() flags
 enum OpenFlag implements BitFlag {
@@ -317,7 +327,7 @@ abstract final class Unistd {
     }
 
     return Errno.call(
-      () => _unistd.fcntl(fd, cmd.value),
+      () => _fcntl3(fd, cmd.value, arg),
       isError: (r) => r == -1,
       message: 'fcntl',
     );
