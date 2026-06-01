@@ -59,6 +59,14 @@ final class Gadget with USBGadgetLogger {
   /// When `null`, a unique name is generated during [register].
   final String? name;
 
+  /// The configfs name actually used by the most recent [register] call.
+  ///
+  /// When [name] is `null`, [register] generates a name (e.g. `usb-gadget0`)
+  /// that is not reflected back into the final [name] field. This captures it
+  /// so [remove] can still locate the gadget after the [RegGadget] handle is
+  /// lost.
+  String? _registeredName;
+
   /// USB Vendor and Product ID.
   final Id id;
 
@@ -95,18 +103,25 @@ final class Gadget with USBGadgetLogger {
       throw StateError('USB gadget must have at least one configuration');
     }
     final dir = _resolveGadgetDir(name);
+    _registeredName = dir.path.split('/').last;
     log?.info('Registering gadget at ${dir.path}');
     return _register(this, dir);
   }
 
-  /// Removes all configfs registrations that match this gadget's [name].
+  /// Removes all configfs registrations that match this gadget's name.
+  ///
+  /// Matches against the name resolved by the most recent [register] call
+  /// (including auto-generated names when [name] is `null`), falling back to
+  /// [name] if this gadget has never been registered.
   ///
   /// Prefer [RegGadget.remove] on the handle returned by [register] when
   /// available. This method is for when that handle has been lost.
   ///
   /// Throws a [FileSystemException] if any configfs operation fails.
   Future<void> remove() async {
-    final gadgets = RegGadget.all().where((g) => g.name == name);
+    final target = _registeredName ?? name;
+    if (target == null) return;
+    final gadgets = RegGadget.all().where((g) => g.name == target);
     for (final reg in gadgets) {
       await reg.remove();
     }
