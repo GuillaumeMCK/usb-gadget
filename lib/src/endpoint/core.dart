@@ -180,7 +180,8 @@ final class EndpointControlFile extends EndpointFile {
     var offset = 0;
     while (offset < data.length) {
       try {
-        offset += Unistd.write(fd, data.sublist(offset));
+        // sublistView is a zero-copy window — no per-retry allocation.
+        offset += Unistd.write(fd, Uint8List.sublistView(data, offset));
       } on OSError catch (e) {
         if (e.errorCode == eagain) continue;
         rethrow;

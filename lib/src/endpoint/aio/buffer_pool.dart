@@ -64,17 +64,29 @@ final class _Semaphore {
 final class BufferPool with Releasable {
   BufferPool(this.bufferSize, this.poolSize) {
     _buffers = .generate(poolSize, (_) => calloc<ffi.Uint8>(bufferSize));
-    _available = .generate(poolSize, (i) => i);
+    _indexOf = {for (var i = 0; i < poolSize; i++) _buffers[i].address: i};
+    _free = .generate(poolSize, (i) => i);
+    _isFree = .filled(poolSize, true);
     _semaphore = _Semaphore(poolSize);
   }
 
   final int bufferSize;
   final int poolSize;
   late final List<ffi.Pointer<ffi.Uint8>> _buffers;
-  late final List<int> _available;
+
+  /// Maps a buffer's native address back to its pool index, giving [free] an
+  /// O(1) lookup instead of a linear scan of [_buffers].
+  late final Map<int, int> _indexOf;
+
+  /// Stack of currently-available buffer indices.
+  late final List<int> _free;
+
+  /// Per-index membership flag, guarding against double-free in O(1).
+  late final List<bool> _isFree;
+
   late final _Semaphore _semaphore;
 
-  int get available => _available.length;
+  int get available => _free.length;
 
   /// Acquires a buffer, **suspending** the caller if the pool is temporarily
   /// exhausted.  Resumes as soon as a buffer is returned via [free].
@@ -86,22 +98,30 @@ final class BufferPool with Releasable {
         .acquire(); // Yields until a slot is available or the pool is released.
     if (isReleased) throw StateError('BufferPool released while waiting');
     // The semaphore guarantees a slot is available at this point.
-    return _buffers[_available.removeLast()];
+    return _buffers[_take()];
   }
 
   /// Tries to acquire a buffer immediately.  Returns `null` if the pool is
   /// exhausted or has been released.  Write paths should prefer [acquireAsync].
   ffi.Pointer<ffi.Uint8>? acquire() {
     if (isReleased || !_semaphore.tryAcquire()) return null;
-    return _buffers[_available.removeLast()];
+    return _buffers[_take()];
+  }
+
+  /// Pops the next free index off the stack and marks it in use.
+  int _take() {
+    final idx = _free.removeLast();
+    _isFree[idx] = false;
+    return idx;
   }
 
   /// Returns [ptr] to the pool and wakes the next suspended [acquireAsync]
   /// waiter, if any.
   void free(ffi.Pointer<ffi.Uint8> ptr) {
-    final idx = _buffers.indexOf(ptr);
-    if (idx != -1 && !_available.contains(idx)) {
-      _available.add(idx);
+    final idx = _indexOf[ptr.address];
+    if (idx != null && !_isFree[idx]) {
+      _isFree[idx] = true;
+      _free.add(idx);
       _semaphore.release(); // wake a waiter *after* the slot is re-listed
     }
   }
