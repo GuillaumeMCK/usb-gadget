@@ -34,7 +34,11 @@ void _watcherEntry(_WatcherArgs args) {
 
   try {
     while (true) {
-      final ready = Epoll.wait(args.epfd, maxEvents: 2, timeoutMs: -1);
+      // Finite timeout (not -1): completions still wake the isolate immediately
+      // via the eventfd, but a bounded wait leaves a yield point between
+      // blocking syscalls so the VM can pause / kill this isolate. A
+      // permanently-blocked FFI call hangs process and `dart test` shutdown.
+      final ready = Epoll.wait(args.epfd, maxEvents: 2, timeoutMs: 1000);
 
       for (final (:data, events: _) in ready) {
         if (data == args.shutdownFd) {

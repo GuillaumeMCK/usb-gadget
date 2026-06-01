@@ -7,6 +7,7 @@ import 'package:using/using.dart';
 import '/src/platform/platform.dart';
 import '/usb_gadget.dart';
 import 'aio/aio.dart';
+import 'fd_readiness_watcher.dart';
 
 /// Base class for FunctionFs endpoint file descriptors.
 ///
@@ -99,7 +100,8 @@ final class EndpointControlFile extends EndpointFile {
          ep0Path: path,
        );
 
-  /// Maximum bytes read per epoll wake (4 events * 12 bytes each).
+  /// Bytes read per EP0 `read` (up to 4 events * 12 bytes). One read happens
+  /// per readiness wake; any remainder is delivered on the next wake.
   static const int eventBufferSize = 4 * FunctionFsEvent.size;
 
   /// The mount manager responsible for the `functionfs` filesystem.
@@ -108,9 +110,9 @@ final class EndpointControlFile extends EndpointFile {
   /// Broadcast controller for emitting [FunctionFsEvent] objects.
   StreamController<FunctionFsEvent>? _streamController;
 
-  /// Periodic timer that reads from the non-blocking EP0 file descriptor
-  /// at a fixed interval to deliver kernel USB events to the stream.
-  Timer? _pollingTimer;
+  /// Event-driven readiness notifier for the EP0 fd. Created on first listen,
+  /// released on cancel/close. `null` while not listening.
+  FdReadinessWatcher? _readiness;
 
   /// Indicates if the FunctionFs backing store is currently mounted.
   bool get isMounted => _mount.isMounted;
@@ -135,8 +137,7 @@ final class EndpointControlFile extends EndpointFile {
 
   @override
   Future<void> close() async {
-    _pollingTimer?.cancel();
-    _pollingTimer = null;
+    _stopReading();
 
     await _streamController?.close();
     _streamController = null;
@@ -220,23 +221,40 @@ final class EndpointControlFile extends EndpointFile {
   }
 
   void _startReading() {
-    _pollingTimer ??= .periodic(const .new(milliseconds: 1), (_) {
-      try {
-        final data = Unistd.read(_fd!, eventBufferSize);
-        const offset = FunctionFsEvent.size;
-        for (var i = 0; i + offset <= data.length; i += offset) {
-          _streamController?.add(.fromBytes(data.sublist(i, i + offset)));
-        }
-      } on OSError catch (err, st) {
-        if (err.errorCode case eagain || einval) return;
-        _streamController?.addError(err, st);
-      }
-    });
+    final fd = _fd;
+    if (_readiness != null || fd == null) return;
+    _readiness = FdReadinessWatcher(fd, onReadable: _onReadable);
   }
 
   void _stopReading() {
-    _pollingTimer?.cancel();
-    _pollingTimer = null;
+    _readiness?.release();
+    _readiness = null;
+  }
+
+  /// Reads one batch of EP0 events and emits them, then re-arms the watch.
+  ///
+  /// Performs exactly **one** `read` per wake — EP0 is a control state machine,
+  /// not a byte stream. After a SETUP event the kernel is `FFS_SETUP_PENDING`,
+  /// waiting for the reply that [FunctionFs.onSetup] writes; reading again here
+  /// would corrupt that state and the reply would fail with `ESRCH`. Any
+  /// buffered remainder is delivered by the next wake after re-arming.
+  void _onReadable() {
+    final controller = _streamController;
+    final fd = _fd;
+    if (controller == null || controller.isClosed || fd == null) return;
+
+    try {
+      final data = Unistd.read(fd, eventBufferSize);
+      const size = FunctionFsEvent.size;
+      for (var i = 0; i + size <= data.length; i += size) {
+        controller.add(.fromBytes(data.sublist(i, i + size)));
+      }
+    } on OSError catch (err, st) {
+      // EINVAL surfaces transiently across enable/disable transitions.
+      if (err.errorCode != einval) controller.addError(err, st);
+    } finally {
+      _readiness?.rearm();
+    }
   }
 }
 
